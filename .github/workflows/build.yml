@@ -16,7 +16,14 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x86
-
+          
+      - name: Generate libzhl import library
+        shell: cmd
+        run: |
+          lib.exe /nologo /def:libzhl.def /machine:x86 /out:libzhl.lib
+          if errorlevel 1 exit /b 1
+          dumpbin /headers libzhl.lib
+          
       - name: Build DLL
         shell: cmd
         run: |
@@ -27,3 +34,9 @@ jobs:
         with:
           name: MyNativeMod
           path: zhlMyNativeMod.dll
+
+      - name: Upload libzhl import library
+        uses: actions/upload-artifact@v4
+        with:
+          name: libzhl-import-library
+          path: libzhl.lib
