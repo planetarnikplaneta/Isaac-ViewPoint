@@ -256,7 +256,7 @@ static int Lua_Planet_PLANTE(lua_State* L)
 
     g_LuaPushString(
         L,
-        "Native plugin is working!"
+        "PLANTE!"
     );
 
     return 1;
