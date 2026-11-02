@@ -1,0 +1,29 @@
+name: Build Native Plugin
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure MSVC x86
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x86
+
+      - name: Build DLL
+        shell: cmd
+        run: |
+          cl /nologo /LD /EHsc /std:c++17 MyNativeMod.cpp /link /OUT:zhlMyNativeMod.dll
+
+      - name: Upload DLL
+        uses: actions/upload-artifact@v4
+        with:
+          name: MyNativeMod
+          path: zhlMyNativeMod.dll
