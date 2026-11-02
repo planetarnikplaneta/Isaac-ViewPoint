@@ -35,5 +35,5 @@ jobs:
       - name: Upload DLL
         uses: actions/upload-artifact@v4
         with:
-          name: MyNativeMod
-          path: zhlMyNativeMod.dll
+          name: Main_Planet
+          path: zhlMain_Planet.dll
