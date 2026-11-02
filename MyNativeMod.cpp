@@ -2,14 +2,18 @@
 #include <Windows.h>
 #include <cstdint>
 #include <cstddef>
+#include <cstdio>
 #include <string>
-#include <cstring>
 
 struct lua_State;
 typedef int (__cdecl *lua_CFunction)(lua_State*);
 
 #include "libzhl.h"
 #include "HookSystem.h"
+
+// --------------------------------------------------
+// Lua table registration
+// --------------------------------------------------
 
 namespace lua
 {
@@ -26,7 +30,6 @@ namespace lua
 
 static constexpr int PLANET_PL_PRE_DRAW_STRING = 1496;
 
-static constexpr int LUA_REGISTRYINDEX = -1001000;
 static constexpr int LUA_TTABLE = 5;
 static constexpr int LUA_TFUNCTION = 6;
 static constexpr int LUA_TSTRING = 4;
@@ -278,6 +281,40 @@ static void RegisterPlanetTable(lua_State* L)
 }
 
 // --------------------------------------------------
+// Log callback errors
+// --------------------------------------------------
+
+static void LogCallbackError(
+    int errorCode,
+    const char* message,
+    size_t length
+)
+{
+    FILE* file = fopen("C:\\MyNativeMod.log", "a");
+
+    if (!file)
+        return;
+
+    fprintf(
+        file,
+        "Isaac.RunAdditiveCallback error: %d\n",
+        errorCode
+    );
+
+    if (message)
+    {
+        fprintf(
+            file,
+            "%.*s\n",
+            static_cast<int>(length),
+            message
+        );
+    }
+
+    fclose(file);
+}
+
+// --------------------------------------------------
 // Call Isaac.RunAdditiveCallback
 // --------------------------------------------------
 
@@ -286,10 +323,7 @@ static std::string ProcessString(const char* original)
     if (!original)
         return "";
 
-    if (!g_LuaState)
-        return original;
-
-    if (g_InStringCallback)
+    if (!g_LuaState || g_InStringCallback)
         return original;
 
     if (!g_LuaGetGlobal ||
@@ -339,7 +373,7 @@ static std::string ProcessString(const char* original)
         return currentText;
     }
 
-    // Stack currently:
+    // Stack:
     // Isaac table
     // RunAdditiveCallback function
     //
@@ -370,9 +404,6 @@ static std::string ProcessString(const char* original)
         currentText.c_str()
     );
 
-    // Execute:
-    // Isaac.RunAdditiveCallback(1496, currentText)
-
     const int result = g_LuaPCallK(
         g_LuaState,
         2,
@@ -396,31 +427,11 @@ static std::string ProcessString(const char* original)
                 &length
             );
 
-            FILE* file = fopen(
-                "C:\\MyNativeMod.log",
-                "a"
+            LogCallbackError(
+                result,
+                errorMessage,
+                length
             );
-
-            if (file)
-            {
-                fprintf(
-                    file,
-                    "RunAdditiveCallback error: %d\n",
-                    result
-                );
-
-                if (errorMessage)
-                {
-                    fprintf(
-                        file,
-                        "%.*s\n",
-                        static_cast<int>(length),
-                        errorMessage
-                    );
-                }
-
-                fclose(file);
-            }
         }
     }
     else if (g_LuaType(g_LuaState, -1) == LUA_TSTRING)
