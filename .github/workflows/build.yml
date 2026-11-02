@@ -11,7 +11,15 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout native mod
+        uses: actions/checkout@v4
+
+      - name: Checkout REPENTOGON headers
+        uses: actions/checkout@v4
+        with:
+          repository: TeamREPENTOGON/REPENTOGON
+          ref: 1.1.3
+          path: REPENTOGON
 
       - name: Configure MSVC x86
         uses: ilammy/msvc-dev-cmd@v1
@@ -21,7 +29,7 @@ jobs:
       - name: Build DLL
         shell: cmd
         run: |
-          cl /nologo /LD /EHsc /std:c++17 /MD /I include /I libzhl /I libs/lua MyNativeMod.cpp libzhl.lib /link /OUT:zhlMyNativeMod.dll
+          cl /nologo /LD /EHsc /std:c++17 /MD /I REPENTOGON/include /I REPENTOGON/libzhl /I REPENTOGON/libs/lua MyNativeMod.cpp libzhl.lib /link /OUT:zhlMyNativeMod.dll
           if errorlevel 1 exit /b 1
 
       - name: Upload DLL
