@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <string>
+#include <algorithm>
 
 struct lua_State;
 typedef int (__cdecl *lua_CFunction)(lua_State*);
@@ -11,41 +12,132 @@ typedef int (__cdecl *lua_CFunction)(lua_State*);
 #include "libzhl.h"
 #include "HookSystem.h"
 
-// --------------------------------------------------
-// Lua table registration
-// --------------------------------------------------
+// ------------------------------------------------------------
+// REPENTOGON Lua userdata API
+// ------------------------------------------------------------
 
 namespace lua
 {
-    LIBZHL_API void TableAssoc(
+    enum class Metatables
+    {
+        FONT = 26,
+        KCOLOR = 55
+    };
+
+    LIBZHL_API void* GetMetatableKey(Metatables metatable);
+
+    LIBZHL_API void* CheckUserdata(
         lua_State* L,
-        const std::string& name,
-        lua_CFunction fn
+        int index,
+        Metatables metatable,
+        std::string const& name
     );
+
+    namespace luabridge
+    {
+        class LIBZHL_API UserdataPtr
+        {
+        public:
+            static void push(
+                lua_State* L,
+                void* pointer,
+                void const* key
+            );
+        };
+    }
 }
 
-// --------------------------------------------------
-// Constants
-// --------------------------------------------------
+// ------------------------------------------------------------
+// Lua API
+// ------------------------------------------------------------
+
+static constexpr int LUA_TNIL = 0;
+static constexpr int LUA_TBOOLEAN = 1;
+static constexpr int LUA_TNUMBER = 3;
+static constexpr int LUA_TSTRING = 4;
+static constexpr int LUA_TTABLE = 5;
+static constexpr int LUA_TFUNCTION = 6;
+static constexpr int LUA_TUSERDATA = 7;
+
+using LuaCreateTable = void (__cdecl*)(lua_State*, int, int);
+using LuaPushString = const char* (__cdecl*)(lua_State*, const char*);
+using LuaPushInteger = void (__cdecl*)(lua_State*, long long);
+using LuaPushNumber = void (__cdecl*)(lua_State*, double);
+using LuaPushBoolean = void (__cdecl*)(lua_State*, int);
+using LuaPushNil = void (__cdecl*)(lua_State*);
+using LuaPushValue = void (__cdecl*)(lua_State*, int);
+using LuaSetGlobal = void (__cdecl*)(lua_State*, const char*);
+using LuaSetField = void (__cdecl*)(lua_State*, int, const char*);
+using LuaGetGlobal = int (__cdecl*)(lua_State*, const char*);
+using LuaGetField = int (__cdecl*)(lua_State*, int, const char*);
+using LuaRotate = void (__cdecl*)(lua_State*, int, int);
+using LuaType = int (__cdecl*)(lua_State*, int);
+using LuaToString = const char* (__cdecl*)(lua_State*, int, size_t*);
+using LuaToNumber = double (__cdecl*)(lua_State*, int, int*);
+using LuaToBoolean = int (__cdecl*)(lua_State*, int);
+using LuaGetTop = int (__cdecl*)(lua_State*);
+using LuaSetTop = void (__cdecl*)(lua_State*, int);
+using LuaPCallK = int (__cdecl*)(
+    lua_State*, int, int, int, long long, lua_CFunction
+);
+
+static LuaCreateTable lua_createtable = nullptr;
+static LuaPushString lua_pushstring = nullptr;
+static LuaPushInteger lua_pushinteger = nullptr;
+static LuaPushNumber lua_pushnumber = nullptr;
+static LuaPushBoolean lua_pushboolean = nullptr;
+static LuaPushNil lua_pushnil = nullptr;
+static LuaPushValue lua_pushvalue = nullptr;
+static LuaSetGlobal lua_setglobal = nullptr;
+static LuaSetField lua_setfield = nullptr;
+static LuaGetGlobal lua_getglobal = nullptr;
+static LuaGetField lua_getfield = nullptr;
+static LuaRotate lua_rotate = nullptr;
+static LuaType lua_type = nullptr;
+static LuaToString lua_tolstring = nullptr;
+static LuaToNumber lua_tonumberx = nullptr;
+static LuaToBoolean lua_toboolean = nullptr;
+static LuaGetTop lua_gettop = nullptr;
+static LuaSetTop lua_settop = nullptr;
+static LuaPCallK lua_pcallk = nullptr;
+
+static lua_State* g_LuaState = nullptr;
 
 static constexpr int PLANET_PL_PRE_DRAW_STRING = 1496;
 
-static constexpr int LUA_TTABLE = 5;
-static constexpr int LUA_TFUNCTION = 6;
-static constexpr int LUA_TSTRING = 4;
+static bool g_LuaApiReady = false;
+static thread_local bool g_InDrawString = false;
 
-// --------------------------------------------------
-// Minimal game class declarations
-// --------------------------------------------------
+// ------------------------------------------------------------
+// Isaac structures
+// ------------------------------------------------------------
 
 struct Vector
 {
-    float x;
-    float y;
+    float X;
+    float Y;
 };
 
-struct KColor;
-struct FontSettings;
+struct KColor
+{
+    float Red;
+    float Green;
+    float Blue;
+    float Alpha;
+    int Unknown;
+};
+
+struct FontSettings
+{
+    int Align;
+    int16_t MaxChars;
+    uint16_t MaxLineWidth;
+    int WrapMode;
+    float LineHeightModifier;
+    int MissingCharOverride;
+    int Unknown1;
+    int Unknown2;
+};
 
 class Font
 {
@@ -65,408 +157,394 @@ public:
     void RegisterClasses();
 };
 
-// --------------------------------------------------
-// Lua API declarations
-// --------------------------------------------------
+// ------------------------------------------------------------
+// Logging
+// ------------------------------------------------------------
 
-using LuaCreateTable = void (__cdecl*)(
-    lua_State*, int, int
-);
-
-using LuaPushString = const char* (__cdecl*)(
-    lua_State*, const char*
-);
-
-using LuaPushInteger = void (__cdecl*)(
-    lua_State*, long long
-);
-
-using LuaSetGlobal = void (__cdecl*)(
-    lua_State*, const char*
-);
-
-using LuaSetField = void (__cdecl*)(
-    lua_State*, int, const char*
-);
-
-using LuaGetGlobal = int (__cdecl*)(
-    lua_State*, const char*
-);
-
-using LuaGetField = int (__cdecl*)(
-    lua_State*, int, const char*
-);
-
-using LuaRotate = void (__cdecl*)(
-    lua_State*, int, int
-);
-
-using LuaType = int (__cdecl*)(
-    lua_State*, int
-);
-
-using LuaToLString = const char* (__cdecl*)(
-    lua_State*, int, size_t*
-);
-
-using LuaGetTop = int (__cdecl*)(
-    lua_State*
-);
-
-using LuaSetTop = void (__cdecl*)(
-    lua_State*, int
-);
-
-using LuaKFunction = int (__cdecl*)(
-    lua_State*, int, intptr_t
-);
-
-using LuaPCallK = int (__cdecl*)(
-    lua_State*,
-    int,
-    int,
-    int,
-    intptr_t,
-    LuaKFunction
-);
-
-// --------------------------------------------------
-// Global state
-// --------------------------------------------------
-
-static lua_State* g_LuaState = nullptr;
-
-static LuaCreateTable g_LuaCreateTable = nullptr;
-static LuaPushString g_LuaPushString = nullptr;
-static LuaPushInteger g_LuaPushInteger = nullptr;
-static LuaSetGlobal g_LuaSetGlobal = nullptr;
-static LuaSetField g_LuaSetField = nullptr;
-static LuaGetGlobal g_LuaGetGlobal = nullptr;
-static LuaGetField g_LuaGetField = nullptr;
-static LuaRotate g_LuaRotate = nullptr;
-static LuaType g_LuaType = nullptr;
-static LuaToLString g_LuaToLString = nullptr;
-static LuaGetTop g_LuaGetTop = nullptr;
-static LuaSetTop g_LuaSetTop = nullptr;
-static LuaPCallK g_LuaPCallK = nullptr;
-
-static bool g_InStringCallback = false;
-static bool g_CallbackErrorLogged = false;
-
-// --------------------------------------------------
-// Initialize Lua API
-// --------------------------------------------------
-
-static bool InitializeLuaAPI()
+static void Log(const char* message)
 {
-    HMODULE luaModule = GetModuleHandleA("Lua5.3.3r.dll");
+    FILE* file = nullptr;
 
-    if (!luaModule)
-        return false;
+    fopen_s(&file, "C:\\MyNativeMod.log", "a");
 
-    g_LuaCreateTable = reinterpret_cast<LuaCreateTable>(
-        GetProcAddress(luaModule, "lua_createtable")
-    );
+    if (file)
+    {
+        fprintf(file, "%s\n", message);
+        fclose(file);
+    }
 
-    g_LuaPushString = reinterpret_cast<LuaPushString>(
-        GetProcAddress(luaModule, "lua_pushstring")
-    );
-
-    g_LuaPushInteger = reinterpret_cast<LuaPushInteger>(
-        GetProcAddress(luaModule, "lua_pushinteger")
-    );
-
-    g_LuaSetGlobal = reinterpret_cast<LuaSetGlobal>(
-        GetProcAddress(luaModule, "lua_setglobal")
-    );
-
-    g_LuaSetField = reinterpret_cast<LuaSetField>(
-        GetProcAddress(luaModule, "lua_setfield")
-    );
-
-    g_LuaGetGlobal = reinterpret_cast<LuaGetGlobal>(
-        GetProcAddress(luaModule, "lua_getglobal")
-    );
-
-    g_LuaGetField = reinterpret_cast<LuaGetField>(
-        GetProcAddress(luaModule, "lua_getfield")
-    );
-
-    g_LuaRotate = reinterpret_cast<LuaRotate>(
-        GetProcAddress(luaModule, "lua_rotate")
-    );
-
-    g_LuaType = reinterpret_cast<LuaType>(
-        GetProcAddress(luaModule, "lua_type")
-    );
-
-    g_LuaToLString = reinterpret_cast<LuaToLString>(
-        GetProcAddress(luaModule, "lua_tolstring")
-    );
-
-    g_LuaGetTop = reinterpret_cast<LuaGetTop>(
-        GetProcAddress(luaModule, "lua_gettop")
-    );
-
-    g_LuaSetTop = reinterpret_cast<LuaSetTop>(
-        GetProcAddress(luaModule, "lua_settop")
-    );
-
-    g_LuaPCallK = reinterpret_cast<LuaPCallK>(
-        GetProcAddress(luaModule, "lua_pcallk")
-    );
-
-    return
-        g_LuaCreateTable &&
-        g_LuaPushString &&
-        g_LuaPushInteger &&
-        g_LuaSetGlobal &&
-        g_LuaSetField &&
-        g_LuaGetGlobal &&
-        g_LuaGetField &&
-        g_LuaRotate &&
-        g_LuaType &&
-        g_LuaToLString &&
-        g_LuaGetTop &&
-        g_LuaSetTop &&
-        g_LuaPCallK;
+    OutputDebugStringA(message);
+    OutputDebugStringA("\n");
 }
 
-// --------------------------------------------------
-// Planet.Test()
-// --------------------------------------------------
+static void LogLuaError(lua_State* L, const char* prefix)
+{
+    const char* error = lua_tolstring(L, -1, nullptr);
+
+    char buffer[2048];
+
+    sprintf_s(
+        buffer,
+        "%s: %s",
+        prefix,
+        error ? error : "Unknown Lua error"
+    );
+
+    Log(buffer);
+}
+
+// ------------------------------------------------------------
+// Lua API initialization
+// ------------------------------------------------------------
+
+static bool InitializeLuaApi()
+{
+    HMODULE module = GetModuleHandleA("Lua5.3.3r.dll");
+
+    if (!module)
+        return false;
+
+#define LOAD_LUA_FUNCTION(name) \
+    name = reinterpret_cast<decltype(name)>(GetProcAddress(module, #name)); \
+    if (!name) return false;
+
+    LOAD_LUA_FUNCTION(lua_createtable)
+    LOAD_LUA_FUNCTION(lua_pushstring)
+    LOAD_LUA_FUNCTION(lua_pushinteger)
+    LOAD_LUA_FUNCTION(lua_pushnumber)
+    LOAD_LUA_FUNCTION(lua_pushboolean)
+    LOAD_LUA_FUNCTION(lua_pushnil)
+    LOAD_LUA_FUNCTION(lua_pushvalue)
+    LOAD_LUA_FUNCTION(lua_setglobal)
+    LOAD_LUA_FUNCTION(lua_setfield)
+    LOAD_LUA_FUNCTION(lua_getglobal)
+    LOAD_LUA_FUNCTION(lua_getfield)
+    LOAD_LUA_FUNCTION(lua_rotate)
+    LOAD_LUA_FUNCTION(lua_type)
+    LOAD_LUA_FUNCTION(lua_tolstring)
+    LOAD_LUA_FUNCTION(lua_tonumberx)
+    LOAD_LUA_FUNCTION(lua_toboolean)
+    LOAD_LUA_FUNCTION(lua_gettop)
+    LOAD_LUA_FUNCTION(lua_settop)
+    LOAD_LUA_FUNCTION(lua_pcallk)
+
+#undef LOAD_LUA_FUNCTION
+
+    g_LuaApiReady = true;
+    return true;
+}
+
+// ------------------------------------------------------------
+// Planet Lua global
+// ------------------------------------------------------------
 
 static int Lua_Planet_Test(lua_State* L)
 {
-    if (!g_LuaPushString)
-        return 0;
-
-    g_LuaPushString(
-        L,
-        "Native plugin is working!"
-    );
-
+    lua_pushstring(L, "Native plugin is working!");
     return 1;
 }
 
-// --------------------------------------------------
-// Create global Planet table
-// --------------------------------------------------
-
 static void RegisterPlanetTable(lua_State* L)
 {
-    g_LuaCreateTable(L, 0, 2);
+    lua_createtable(L, 0, 2);
 
-    lua::TableAssoc(
-        L,
-        std::string("Test"),
-        Lua_Planet_Test
+    lua_pushstring(L, "PL_PRE_DRAW_STRING");
+    lua_pushinteger(L, PLANET_PL_PRE_DRAW_STRING);
+    lua_setfield(L, -2, "PL_PRE_DRAW_STRING");
+
+    lua_pushstring(L, "Test");
+    // Register Test as a C function.
+    // The function is pushed using lua_pushcclosure below.
+    lua_settop(L, lua_gettop(L) - 1);
+
+    // Use the Lua C API directly to create the function closure.
+    // lua_pushcclosure is resolved separately.
+    HMODULE module = GetModuleHandleA("Lua5.3.3r.dll");
+
+    using LuaPushCClosure = void (__cdecl*)(lua_State*, lua_CFunction, int);
+
+    auto pushCClosure = reinterpret_cast<LuaPushCClosure>(
+        GetProcAddress(module, "lua_pushcclosure")
     );
 
-    g_LuaPushInteger(
-        L,
-        PLANET_PL_PRE_DRAW_STRING
-    );
+    if (pushCClosure)
+    {
+        lua_pushstring(L, "Test");
+        pushCClosure(L, Lua_Planet_Test, 0);
+        lua_setfield(L, -2, "Test");
+    }
 
-    g_LuaSetField(
-        L,
-        -2,
-        "PL_PRE_DRAW_STRING"
-    );
+    lua_setglobal(L, "Planet");
+}
 
-    g_LuaSetGlobal(
+// ------------------------------------------------------------
+// Lua userdata helpers
+// ------------------------------------------------------------
+
+static void PushFont(lua_State* L, Font* font)
+{
+    lua::luabridge::UserdataPtr::push(
         L,
-        "Planet"
+        font,
+        lua::GetMetatableKey(lua::Metatables::FONT)
     );
 }
 
-// --------------------------------------------------
-// Log callback errors
-// --------------------------------------------------
+static void PushColor(lua_State* L, KColor* color)
+{
+    lua::luabridge::UserdataPtr::push(
+        L,
+        color,
+        lua::GetMetatableKey(lua::Metatables::KCOLOR)
+    );
+}
 
-static void LogCallbackError(
-    int errorCode,
-    const char* message,
-    size_t length
+static Font* ReadFont(lua_State* L, int index)
+{
+    if (lua_type(L, index) != LUA_TUSERDATA)
+        return nullptr;
+
+    void* userdata = lua::CheckUserdata(
+        L,
+        index,
+        lua::Metatables::FONT,
+        "Font"
+    );
+
+    if (!userdata)
+        return nullptr;
+
+    // Userdata's native pointer is stored at offset 4.
+    return *reinterpret_cast<Font**>(
+        reinterpret_cast<unsigned char*>(userdata) + 4
+    );
+}
+
+static KColor* ReadColor(lua_State* L, int index)
+{
+    if (lua_type(L, index) != LUA_TUSERDATA)
+        return nullptr;
+
+    void* userdata = lua::CheckUserdata(
+        L,
+        index,
+        lua::Metatables::KCOLOR,
+        "KColor"
+    );
+
+    if (!userdata)
+        return nullptr;
+
+    return *reinterpret_cast<KColor**>(
+        reinterpret_cast<unsigned char*>(userdata) + 4
+    );
+}
+
+// ------------------------------------------------------------
+// Callback values
+// ------------------------------------------------------------
+
+struct DrawStringValues
+{
+    std::string Text;
+    Font* FontObject = nullptr;
+
+    float X = 0.0f;
+    float Y = 0.0f;
+
+    KColor Color{};
+
+    int BoxWidth = 0;
+    bool Center = false;
+};
+
+// ------------------------------------------------------------
+// Run registered callbacks
+// ------------------------------------------------------------
+
+static void RunPreDrawStringCallbacks(
+    lua_State* L,
+    DrawStringValues& values
 )
 {
-    FILE* file = fopen("C:\\MyNativeMod.log", "a");
-
-    if (!file)
+    if (!L || !g_LuaApiReady)
         return;
 
-    fprintf(
-        file,
-        "Isaac.RunAdditiveCallback error: %d\n",
-        errorCode
-    );
+    const int originalTop = lua_gettop(L);
 
-    if (message)
+    // Isaac.GetCallbackIterator(1496)
+    lua_getglobal(L, "Isaac");
+
+    if (lua_type(L, -1) != LUA_TTABLE)
     {
-        fprintf(
-            file,
-            "%.*s\n",
-            static_cast<int>(length),
-            message
-        );
+        lua_settop(L, originalTop);
+        return;
     }
 
-    fclose(file);
-}
+    lua_getfield(L, -1, "GetCallbackIterator");
 
-// --------------------------------------------------
-// Call Isaac.RunAdditiveCallback
-// --------------------------------------------------
-
-static std::string ProcessString(const char* original)
-{
-    if (!original)
-        return "";
-
-    if (!g_LuaState || g_InStringCallback)
-        return original;
-
-    if (!g_LuaGetGlobal ||
-        !g_LuaGetField ||
-        !g_LuaRotate ||
-        !g_LuaPushInteger ||
-        !g_LuaPushString ||
-        !g_LuaType ||
-        !g_LuaToLString ||
-        !g_LuaGetTop ||
-        !g_LuaSetTop ||
-        !g_LuaPCallK)
+    if (lua_type(L, -1) != LUA_TFUNCTION)
     {
-        return original;
+        lua_settop(L, originalTop);
+        return;
     }
 
-    std::string currentText(original);
+    lua_pushinteger(L, PLANET_PL_PRE_DRAW_STRING);
 
-    const int originalStackTop = g_LuaGetTop(g_LuaState);
-
-    g_InStringCallback = true;
-
-    // Get Isaac table.
-    g_LuaGetGlobal(
-        g_LuaState,
-        "Isaac"
-    );
-
-    if (g_LuaType(g_LuaState, -1) != LUA_TTABLE)
+    if (lua_pcallk(L, 1, 1, 0, 0, nullptr) != 0)
     {
-        g_LuaSetTop(g_LuaState, originalStackTop);
-        g_InStringCallback = false;
-        return currentText;
+        LogLuaError(L, "GetCallbackIterator failed");
+        lua_settop(L, originalTop);
+        return;
     }
 
-    // Get Isaac.RunAdditiveCallback.
-    g_LuaGetField(
-        g_LuaState,
-        -1,
-        "RunAdditiveCallback"
-    );
-
-    if (g_LuaType(g_LuaState, -1) != LUA_TFUNCTION)
+    if (lua_type(L, -1) != LUA_TFUNCTION)
     {
-        g_LuaSetTop(g_LuaState, originalStackTop);
-        g_InStringCallback = false;
-        return currentText;
+        lua_settop(L, originalTop);
+        return;
     }
 
     // Stack:
-    // Isaac table
-    // RunAdditiveCallback function
-    //
-    // Move the function before the table, then remove the table.
+    // [Isaac, iterator]
+    const int iteratorIndex = lua_gettop(L);
 
-    g_LuaRotate(
-        g_LuaState,
-        -2,
-        1
-    );
-
-    g_LuaSetTop(
-        g_LuaState,
-        g_LuaGetTop(g_LuaState) - 1
-    );
-
-    // Arguments:
-    // 1. Callback ID
-    // 2. Current string
-
-    g_LuaPushInteger(
-        g_LuaState,
-        PLANET_PL_PRE_DRAW_STRING
-    );
-
-    g_LuaPushString(
-        g_LuaState,
-        currentText.c_str()
-    );
-
-    const int result = g_LuaPCallK(
-        g_LuaState,
-        2,
-        1,
-        0,
-        0,
-        nullptr
-    );
-
-    if (result != 0)
+    while (true)
     {
-        if (!g_CallbackErrorLogged)
+        // Call iterator().
+        lua_pushvalue(L, iteratorIndex);
+
+        if (lua_pcallk(L, 0, 1, 0, 0, nullptr) != 0)
         {
-            g_CallbackErrorLogged = true;
+            LogLuaError(L, "Callback iterator failed");
+            break;
+        }
 
-            size_t length = 0;
+        // nil means there are no more callbacks.
+        if (lua_type(L, -1) == LUA_TNIL)
+            break;
 
-            const char* errorMessage = g_LuaToLString(
-                g_LuaState,
-                -1,
-                &length
-            );
+        // Callback record.
+        const int recordIndex = lua_gettop(L);
 
-            LogCallbackError(
-                result,
-                errorMessage,
-                length
+        if (lua_type(L, recordIndex) != LUA_TTABLE)
+        {
+            lua_settop(L, iteratorIndex);
+            continue;
+        }
+
+        lua_getfield(L, recordIndex, "Mod");
+        lua_getfield(L, recordIndex, "Function");
+
+        // Stack:
+        // [Isaac, iterator, record, Mod, Function]
+        if (lua_type(L, -1) != LUA_TFUNCTION)
+        {
+            lua_settop(L, iteratorIndex);
+            continue;
+        }
+
+        // Move Function before Mod.
+        lua_rotate(L, -2, 1);
+
+        // Stack:
+        // [Isaac, iterator, record, Function, Mod]
+
+        lua_pushstring(L, values.Text.c_str());
+        PushFont(L, values.FontObject);
+
+        lua_pushnumber(L, values.X);
+        lua_pushnumber(L, values.Y);
+
+        PushColor(L, &values.Color);
+
+        lua_pushnumber(L, values.BoxWidth);
+        lua_pushboolean(L, values.Center ? 1 : 0);
+
+        // Arguments:
+        // Mod, Text, Font, X, Y, Color, BoxWidth, Center
+        //
+        // Results:
+        // Text, Font, X, Y, Color, BoxWidth, Center
+
+        if (lua_pcallk(L, 8, 7, 0, 0, nullptr) != 0)
+        {
+            LogLuaError(L, "PL_PRE_DRAW_STRING callback failed");
+            lua_settop(L, iteratorIndex);
+            continue;
+        }
+
+        // Results begin at iteratorIndex + 2.
+        const int result = iteratorIndex + 2;
+
+        // Text
+        if (lua_type(L, result) == LUA_TSTRING)
+        {
+            const char* text = lua_tolstring(L, result, nullptr);
+
+            if (text)
+                values.Text = text;
+        }
+
+        // Font
+        if (lua_type(L, result + 1) == LUA_TUSERDATA)
+        {
+            Font* font = ReadFont(L, result + 1);
+
+            if (font)
+                values.FontObject = font;
+        }
+
+        // X
+        if (lua_type(L, result + 2) == LUA_TNUMBER)
+        {
+            values.X = static_cast<float>(
+                lua_tonumberx(L, result + 2, nullptr)
             );
         }
-    }
-    else if (g_LuaType(g_LuaState, -1) == LUA_TSTRING)
-    {
-        size_t length = 0;
 
-        const char* replacement = g_LuaToLString(
-            g_LuaState,
-            -1,
-            &length
-        );
-
-        if (replacement)
+        // Y
+        if (lua_type(L, result + 3) == LUA_TNUMBER)
         {
-            currentText.assign(
-                replacement,
-                length
+            values.Y = static_cast<float>(
+                lua_tonumberx(L, result + 3, nullptr)
             );
         }
+
+        // RenderColor
+        if (lua_type(L, result + 4) == LUA_TUSERDATA)
+        {
+            KColor* color = ReadColor(L, result + 4);
+
+            if (color)
+                values.Color = *color;
+        }
+
+        // BoxWidth
+        if (lua_type(L, result + 5) == LUA_TNUMBER)
+        {
+            double width = lua_tonumberx(L, result + 5, nullptr);
+
+            width = std::clamp(width, 0.0, 65535.0);
+
+            values.BoxWidth = static_cast<int>(width);
+        }
+
+        // Center
+        if (lua_type(L, result + 6) == LUA_TBOOLEAN)
+        {
+            values.Center = lua_toboolean(L, result + 6) != 0;
+        }
+
+        // Remove record and results, preserve iterator.
+        lua_settop(L, iteratorIndex);
     }
 
-    // Restore the original Lua stack.
-    g_LuaSetTop(
-        g_LuaState,
-        originalStackTop
-    );
-
-    g_InStringCallback = false;
-
-    return currentText;
+    lua_settop(L, originalTop);
 }
 
-// --------------------------------------------------
-// LuaEngine::RegisterClasses
-// --------------------------------------------------
+// ------------------------------------------------------------
+// LuaEngine hook
+// ------------------------------------------------------------
 
 HOOK_METHOD_PRIORITY(
     LuaEngine,
@@ -477,22 +555,29 @@ HOOK_METHOD_PRIORITY(
 {
     super();
 
-    g_LuaState = *reinterpret_cast<lua_State**>(
+    lua_State* L = *reinterpret_cast<lua_State**>(
         reinterpret_cast<unsigned char*>(this) + 0x18
     );
 
-    if (!g_LuaState)
+    if (!L)
         return;
 
-    if (!InitializeLuaAPI())
+    if (!InitializeLuaApi())
+    {
+        Log("Failed to initialize Lua API");
         return;
+    }
 
-    RegisterPlanetTable(g_LuaState);
+    g_LuaState = L;
+
+    RegisterPlanetTable(L);
+
+    Log("Planet native Lua API registered");
 }
 
-// --------------------------------------------------
+// ------------------------------------------------------------
 // Font::DrawString hook
-// --------------------------------------------------
+// ------------------------------------------------------------
 
 HOOK_METHOD_PRIORITY(
     Font,
@@ -502,28 +587,78 @@ HOOK_METHOD_PRIORITY(
      KColor* color, FontSettings* settings) -> void
 )
 {
-    if (!str || g_InStringCallback)
+    // Prevent recursive callback execution.
+    // This also allows drawing through a different Font object.
+    if (g_InDrawString)
     {
         super(str, pos, scale, color, settings);
         return;
     }
 
-    const std::string replacement = ProcessString(str);
+    if (!str || !color || !settings || !g_LuaState || !g_LuaApiReady)
+    {
+        super(str, pos, scale, color, settings);
+        return;
+    }
 
-    super(
-        replacement.c_str(),
-        pos,
-        scale,
-        color,
-        settings
+    g_InDrawString = true;
+
+    DrawStringValues values;
+
+    values.Text = str;
+    values.FontObject = this;
+
+    values.X = pos.X;
+    values.Y = pos.Y;
+
+    values.Color = *color;
+
+    values.BoxWidth = settings->MaxLineWidth;
+    values.Center = settings->Align == 1;
+
+    RunPreDrawStringCallbacks(g_LuaState, values);
+
+    pos.X = values.X;
+    pos.Y = values.Y;
+
+    *color = values.Color;
+
+    settings->MaxLineWidth = static_cast<uint16_t>(
+        std::clamp(values.BoxWidth, 0, 65535)
     );
+
+    // TOP_LEFT = 0, TOP_CENTER = 1.
+    settings->Align = values.Center ? 1 : 0;
+
+    const char* finalText = values.Text.c_str();
+
+    // If Lua returned a different Font object, dispatch through it.
+    // The recursive hook sees g_InDrawString and calls the original
+    // function directly, using the replacement Font as "this".
+    if (values.FontObject && values.FontObject != this)
+    {
+        values.FontObject->DrawString(
+            finalText,
+            pos,
+            scale,
+            color,
+            settings
+        );
+    }
+    else
+    {
+        super(finalText, pos, scale, color, settings);
+    }
+
+    g_InDrawString = false;
 }
 
-// --------------------------------------------------
-// Plugin entry point
-// --------------------------------------------------
+// ------------------------------------------------------------
+// REPENTOGON native plugin entry point
+// ------------------------------------------------------------
 
 extern "C" __declspec(dllexport) int ModInit()
 {
+    Log("Planet native plugin loaded");
     return 0;
 }
