@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <cstdio>
+#include <cstring>
 
 struct lua_State;
 typedef int (__cdecl *lua_CFunction)(lua_State*);
@@ -363,7 +364,15 @@ HOOK_METHOD_PRIORITY(
         fprintf(file, "DrawString called: %s\n", str ? str : "<null>");
         fclose(file);
     }
-
+if (str && strcmp(str, "Hello") == 0)
+{
+    FILE* file = fopen("C:\\MyNativeMod.log", "a");
+    if (file)
+    {
+        fprintf(file, ">>> HELLO DETECTED INSIDE HOOK <<<\n");
+        fclose(file);
+    }
+}
     if (!str || g_InStringCallback)
     {
         super(str, pos, scale, color, settings);
