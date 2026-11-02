@@ -29,7 +29,7 @@ jobs:
       - name: Build DLL
         shell: cmd
         run: |
-          cl /nologo /LD /EHsc /std:c++17 /MD /I REPENTOGON/include /I REPENTOGON/libzhl /I REPENTOGON/libs/lua MyNativeMod.cpp libzhl.lib /link /OUT:zhlMyNativeMod.dll
+          cl /nologo /LD /EHsc /std:c++17 /MD /I REPENTOGON/include /I REPENTOGON/libzhl /I REPENTOGON/libs/lua Main_Planet.cpp libzhl.lib /link /OUT:zhlMain_Planet.dll
           if errorlevel 1 exit /b 1
 
       - name: Upload DLL
