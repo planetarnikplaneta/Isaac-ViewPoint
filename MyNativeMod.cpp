@@ -347,13 +347,15 @@ HOOK_METHOD_PRIORITY(LuaEngine, RegisterClasses, 101, () -> void)
 // Font::DrawString hook
 // --------------------------------------------------
 
-HOOK_METHOD_PRIORITY(
-    Font,
-    DrawString,
-    100,
-    (const char* str, Vector pos, Vector scale,
-     KColor* color, FontSettings* settings) -> void
-)
+HOOK_METHOD_PRIORITY(Font, DrawString, 100,
+    (const char* str, Vector pos, Vector scale, KColor* color, FontSettings* settings) -> void)
+{
+    OutputDebugStringA(
+        str ? str : "[Font::DrawString received nullptr]"
+    );
+
+    super(str, pos, scale, color, settings);
+}
 {
     if (!str || g_InStringCallback)
     {
