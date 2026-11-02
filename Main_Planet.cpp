@@ -249,6 +249,19 @@ static int Lua_Planet_Test(lua_State* L)
     return 1;
 }
 
+static int Lua_Planet_PLANTE(lua_State* L)
+{
+    if (!g_LuaPushString)
+        return 0;
+
+    g_LuaPushString(
+        L,
+        "Native plugin is working!"
+    );
+
+    return 1;
+}
+
 // --------------------------------------------------
 // Create global Planet table
 // --------------------------------------------------
@@ -262,7 +275,13 @@ static void RegisterPlanetTable(lua_State* L)
         std::string("Test"),
         Lua_Planet_Test
     );
-
+    
+    lua::TableAssoc(
+        L,
+        std::string("PLANTE"),
+        Lua_Planet_PLANTE
+    );
+    
     g_LuaPushInteger(
         L,
         PLANET_PL_PRE_DRAW_STRING
