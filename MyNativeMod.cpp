@@ -107,6 +107,7 @@ static LuaPCallK g_LuaPCallK = nullptr;
 static std::vector<int> g_StringCallbacks;
 
 static bool g_InStringCallback = false;
+static bool g_CallbackErrorLogged = false;
 
 // --------------------------------------------------
 // MyNativeMod.Test()
@@ -287,11 +288,46 @@ static std::string ProcessString(const char* original)
             nullptr
         );
 
-        if (result != 0)
+if (result != 0)
+{
+    if (!g_CallbackErrorLogged)
+    {
+        g_CallbackErrorLogged = true;
+
+        size_t errorLength = 0;
+
+        const char* errorMessage = g_LuaToLString(
+            g_LuaState,
+            -1,
+            &errorLength
+        );
+
+        FILE* file = fopen("C:\\MyNativeMod.log", "a");
+
+        if (file)
         {
-            LogProcess("ERROR: Lua callback execution failed");
+            fprintf(file, "LUA CALLBACK ERROR\n");
+            fprintf(file, "Error code: %d\n", result);
+
+            if (errorMessage)
+            {
+                fprintf(
+                    file,
+                    "Message: %.*s\n",
+                    static_cast<int>(errorLength),
+                    errorMessage
+                );
+            }
+            else
+            {
+                fprintf(file, "Message is not a string\n");
+            }
+
+            fclose(file);
         }
-        else if (g_LuaType(g_LuaState, -1) == LUA_TSTRING)
+    }
+}
+else if (g_LuaType(g_LuaState, -1) == LUA_TSTRING)
         {
             size_t length = 0;
 
