@@ -294,10 +294,10 @@ static std::string ProcessString(const char* original)
 }
 
 // --------------------------------------------------
-// LuaEngine::RegisterClasses hook
+// LuaEngine::RegisterClasses 
 // --------------------------------------------------
 
-HOOK_METHOD_PRIORITY(LuaEngine, RegisterClasses, 101, () -> void)
+_METHOD_PRIORITY(LuaEngine, RegisterClasses, 101, () -> void)
 {
     super();
 
@@ -348,6 +348,7 @@ HOOK_METHOD_PRIORITY(LuaEngine, RegisterClasses, 101, () -> void)
 // --------------------------------------------------
 // Font::DrawString hook
 // --------------------------------------------------
+static bool g_HelloLogged = false;
 
 HOOK_METHOD_PRIORITY(
     Font,
@@ -357,19 +358,14 @@ HOOK_METHOD_PRIORITY(
      KColor* color, FontSettings* settings) -> void
 )
 {
-    FILE* file = fopen("C:\\MyNativeMod.log", "a");
-
-    if (file)
-    {
-        fprintf(file, "DrawString called: %s\n", str ? str : "<null>");
-        fclose(file);
-    }
-if (str && strcmp(str, "Hello") == 0)
+if (str && strcmp(str, "Hello") == 0 && !g_HelloLogged)
 {
+    g_HelloLogged = true;
+
     FILE* file = fopen("C:\\MyNativeMod.log", "a");
     if (file)
     {
-        fprintf(file, ">>> HELLO DETECTED INSIDE HOOK <<<\n");
+        fprintf(file, "Hello detected successfully!\n");
         fclose(file);
     }
 }
