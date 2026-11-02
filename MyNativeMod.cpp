@@ -62,7 +62,11 @@ using LuaPushString = const char* (__cdecl*)(lua_State*, const char*);
 using LuaSetGlobal = void (__cdecl*)(lua_State*, const char*);
 using LuaPushValue = void (__cdecl*)(lua_State*, int);
 using LuaLRef = int (__cdecl*)(lua_State*, int);
-using LuaRawGetI = int (__cdecl*)(lua_State*, int, int);
+using LuaRawGetI = int (__cdecl*)(
+    lua_State*,
+    int,
+    long long
+);
 using LuaType = int (__cdecl*)(lua_State*, int);
 using LuaToLString = const char* (__cdecl*)(lua_State*, int, size_t*);
 using LuaGetTop = int (__cdecl*)(lua_State*);
@@ -268,12 +272,22 @@ static std::string ProcessString(const char* original)
     for (int reference : callbacks)
     {
 
-        g_LuaRawGetI(
-            g_LuaState,
-            LUA_REGISTRYINDEX,
-            reference
-        );
+g_LuaRawGetI(
+    g_LuaState,
+    LUA_REGISTRYINDEX,
+    static_cast<long long>(reference)
+);
+    if (g_LuaType(g_LuaState, -1) != LUA_TFUNCTION)
+    {
+        if (!g_CallbackErrorLogged)
+        {
+            g_CallbackErrorLogged = true;
+            LogProcess("ERROR: Registry reference did not return a function");
+        }
 
+        g_LuaSetTop(g_LuaState, originalStackTop);
+        continue;
+    }
         g_LuaPushString(
             g_LuaState,
             currentText.c_str()
