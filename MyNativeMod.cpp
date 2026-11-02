@@ -125,7 +125,7 @@ static int Lua_MyNativeMod_Test(lua_State* L)
 // --------------------------------------------------
 // MyNativeMod.AddCallback(function)
 // --------------------------------------------------
-
+static void LogProcess(const char* message);
 static int Lua_MyNativeMod_AddCallback(lua_State* L)
 {
     if (!g_LuaType ||
@@ -245,8 +245,6 @@ static std::string ProcessString(const char* original)
         return original;
     }
 
-    LogProcess("ProcessString entered");
-
     if (!g_LuaRawGetI ||
         !g_LuaPushString ||
         !g_LuaType ||
@@ -268,7 +266,6 @@ static std::string ProcessString(const char* original)
 
     for (int reference : callbacks)
     {
-        LogProcess("Calling Lua callback");
 
         g_LuaRawGetI(
             g_LuaState,
@@ -307,7 +304,6 @@ static std::string ProcessString(const char* original)
             if (replacement)
             {
                 currentText.assign(replacement, length);
-                LogProcess("Lua callback returned a string");
             }
         }
 
