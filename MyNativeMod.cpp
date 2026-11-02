@@ -1,6 +1,8 @@
 #include <Windows.h>
 #include <string>
-#include <lua.hpp>
+
+struct lua_State;
+typedef int (__cdecl *lua_CFunction)(lua_State*);
 
 #include "libzhl.h"
 #include "HookSystem.h"
