@@ -20,7 +20,7 @@ jobs:
       - name: Build DLL
         shell: cmd
         run: |
-          cl /nologo /LD /EHsc /std:c++17 MyNativeMod.cpp /link /OUT:zhlMyNativeMod.dll
+          cl /nologo /LD /EHsc /std:c++17 MyNativeMod.cpp /link user32.lib /OUT:zhlMyNativeMod.dll
 
       - name: Upload DLL
         uses: actions/upload-artifact@v4
