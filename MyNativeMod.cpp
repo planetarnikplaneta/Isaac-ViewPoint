@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <string>
 #include <vector>
+#include <cstdio>
 
 struct lua_State;
 typedef int (__cdecl *lua_CFunction)(lua_State*);
@@ -347,16 +348,22 @@ HOOK_METHOD_PRIORITY(LuaEngine, RegisterClasses, 101, () -> void)
 // Font::DrawString hook
 // --------------------------------------------------
 
-HOOK_METHOD_PRIORITY(Font, DrawString, 100,
-    (const char* str, Vector pos, Vector scale, KColor* color, FontSettings* settings) -> void)
+HOOK_METHOD_PRIORITY(
+    Font,
+    DrawString,
+    100,
+    (const char* str, Vector pos, Vector scale,
+     KColor* color, FontSettings* settings) -> void
+)
 {
-    OutputDebugStringA(
-        str ? str : "[Font::DrawString received nullptr]"
-    );
+    FILE* file = fopen("C:\\MyNativeMod.log", "a");
 
-    super(str, pos, scale, color, settings);
-}
-{
+    if (file)
+    {
+        fprintf(file, "DrawString called: %s\n", str ? str : "<null>");
+        fclose(file);
+    }
+
     if (!str || g_InStringCallback)
     {
         super(str, pos, scale, color, settings);
