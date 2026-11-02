@@ -2876,5 +2876,6 @@ EXPORTS
     glad_glViewport
     glad_glViewportArrayv
     glad_glViewportIndexedf
+?push@UserdataPtr@luabridge@lua@@SAXPAUlua_State@@PAXPBX@Z
     glad_glViewportIndexedfv
     glad_glWaitSync
