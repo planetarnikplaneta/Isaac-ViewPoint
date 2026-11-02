@@ -292,12 +292,11 @@ static std::string ProcessString(const char* original)
 
     return currentText;
 }
-
 // --------------------------------------------------
-// LuaEngine::RegisterClasses 
+// LuaEngine::RegisterClasses
 // --------------------------------------------------
 
-_METHOD_PRIORITY(LuaEngine, RegisterClasses, 101, () -> void)
+HOOK_METHOD_PRIORITY(LuaEngine, RegisterClasses, 101, () -> void)
 {
     super();
 
