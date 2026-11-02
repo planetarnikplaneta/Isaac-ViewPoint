@@ -1352,6 +1352,7 @@ EXPORTS
     ?PushCallbackRegistryKey@lua@@YAXPAUlua_State@@@Z
     ?PushCurrentRenderTarget@Rendering@@SGXXZ
     ?PushMetatable@lua@@YAXPAUlua_State@@W4Metatables@1@@Z
+    ?Push@UserdataPtr@luabridge@lua@@SAXPAUlua_State@@PAXPBX@Z=?push@UserdataPtr@luabridge@lua@@SAXPAUlua_State@@QAXQBX@Z
     ?PushToSteamCloud@SteamCloudFile@@QAE_NPBDI@Z
     ?QueryCapsule@EntityList@@QAEPAUEntityList_EL@@PAU2@PAUCapsule@@I@Z
     ?QueryRadius@EntityList@@QAE?AUEntityList_EL@@PAUVector@@MI@Z
@@ -2876,7 +2877,5 @@ EXPORTS
     glad_glViewport
     glad_glViewportArrayv
     glad_glViewportIndexedf
-    ?push@UserdataPtr@luabridge@lua@@SAXPAUlua_State@@PAXPBX@Z
-    ?push@UserdataPtr@luabridge@lua@@SAXPAUlua_State@@PAXPBX@Z=?push@UserdataPtr@luabridge@lua@@SAXPAUlua_State@@QAXQBX@Z
     glad_glViewportIndexedfv
     glad_glWaitSync
