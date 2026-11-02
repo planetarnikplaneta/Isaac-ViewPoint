@@ -147,7 +147,8 @@ static int Lua_MyNativeMod_AddCallback(lua_State* L)
     );
 
     g_StringCallbacks.push_back(reference);
-
+    LogProcess("Lua callback registered successfully");
+    
     return 0;
 }
 
@@ -214,13 +215,37 @@ static bool InitializeLuaAPI()
 // Execute registered string callbacks
 // --------------------------------------------------
 
+static void LogProcess(const char* message)
+{
+    FILE* file = fopen("C:\\MyNativeMod.log", "a");
+    if (file)
+    {
+        fprintf(file, "%s\n", message);
+        fclose(file);
+    }
+}
+
 static std::string ProcessString(const char* original)
 {
-    if (!original || !g_LuaState || g_InStringCallback)
-        return original ? original : "";
+    if (!original)
+        return "";
+
+    if (!g_LuaState)
+    {
+        LogProcess("ERROR: Lua state is NULL");
+        return original;
+    }
+
+    if (g_InStringCallback)
+        return original;
 
     if (g_StringCallbacks.empty())
+    {
+        LogProcess("ERROR: No callbacks registered");
         return original;
+    }
+
+    LogProcess("ProcessString entered");
 
     if (!g_LuaRawGetI ||
         !g_LuaPushString ||
@@ -230,12 +255,11 @@ static std::string ProcessString(const char* original)
         !g_LuaSetTop ||
         !g_LuaPCallK)
     {
+        LogProcess("ERROR: Lua API incomplete");
         return original;
     }
 
     std::string currentText(original);
-
-    // Take a snapshot so callbacks can register more callbacks safely.
     const std::vector<int> callbacks = g_StringCallbacks;
 
     g_InStringCallback = true;
@@ -244,20 +268,19 @@ static std::string ProcessString(const char* original)
 
     for (int reference : callbacks)
     {
-        // Push the registered Lua function.
+        LogProcess("Calling Lua callback");
+
         g_LuaRawGetI(
             g_LuaState,
             LUA_REGISTRYINDEX,
             reference
         );
 
-        // Push the current string as its argument.
         g_LuaPushString(
             g_LuaState,
             currentText.c_str()
         );
 
-        // Call function(text), expecting one result.
         const int result = g_LuaPCallK(
             g_LuaState,
             1,
@@ -267,8 +290,11 @@ static std::string ProcessString(const char* original)
             nullptr
         );
 
-        if (result == 0 &&
-            g_LuaType(g_LuaState, -1) == LUA_TSTRING)
+        if (result != 0)
+        {
+            LogProcess("ERROR: Lua callback execution failed");
+        }
+        else if (g_LuaType(g_LuaState, -1) == LUA_TSTRING)
         {
             size_t length = 0;
 
@@ -281,10 +307,10 @@ static std::string ProcessString(const char* original)
             if (replacement)
             {
                 currentText.assign(replacement, length);
+                LogProcess("Lua callback returned a string");
             }
         }
 
-        // Restore the stack before the next callback.
         g_LuaSetTop(g_LuaState, originalStackTop);
     }
 
