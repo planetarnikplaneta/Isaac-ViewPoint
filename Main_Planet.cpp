@@ -6,7 +6,7 @@
 #include <string>
 
 struct lua_State;
-typedef int (__cdecl *lua_CFunction)(lua_State*);
+typedef int (__cdecl* lua_CFunction)(lua_State*);
 
 #include "libzhl.h"
 #include "HookSystem.h"
@@ -67,6 +67,7 @@ struct KColor
     {
     }
 };
+
 struct FontSettings;
 
 class Font
@@ -103,6 +104,10 @@ using LuaPushInteger = void (__cdecl*)(
     lua_State*, long long
 );
 
+using LuaPushNumber = void (__cdecl*)(
+    lua_State*, double
+);
+
 using LuaSetGlobal = void (__cdecl*)(
     lua_State*, const char*
 );
@@ -129,6 +134,10 @@ using LuaType = int (__cdecl*)(
 
 using LuaToLString = const char* (__cdecl*)(
     lua_State*, int, size_t*
+);
+
+using LuaToNumberX = double (__cdecl*)(
+    lua_State*, int, int*
 );
 
 using LuaGetTop = int (__cdecl*)(
@@ -161,15 +170,23 @@ static lua_State* g_LuaState = nullptr;
 static LuaCreateTable g_LuaCreateTable = nullptr;
 static LuaPushString g_LuaPushString = nullptr;
 static LuaPushInteger g_LuaPushInteger = nullptr;
+static LuaPushNumber g_LuaPushNumber = nullptr;
+
 static LuaSetGlobal g_LuaSetGlobal = nullptr;
 static LuaSetField g_LuaSetField = nullptr;
+
 static LuaGetGlobal g_LuaGetGlobal = nullptr;
 static LuaGetField g_LuaGetField = nullptr;
+
 static LuaRotate g_LuaRotate = nullptr;
 static LuaType g_LuaType = nullptr;
+
 static LuaToLString g_LuaToLString = nullptr;
+static LuaToNumberX g_LuaToNumberX = nullptr;
+
 static LuaGetTop g_LuaGetTop = nullptr;
 static LuaSetTop g_LuaSetTop = nullptr;
+
 static LuaPCallK g_LuaPCallK = nullptr;
 
 static bool g_InStringCallback = false;
@@ -186,62 +203,40 @@ static bool InitializeLuaAPI()
     if (!luaModule)
         return false;
 
-    g_LuaCreateTable = reinterpret_cast<LuaCreateTable>(
-        GetProcAddress(luaModule, "lua_createtable")
-    );
+#define LOAD_LUA_FUNCTION(variable, name) \
+    variable = reinterpret_cast<decltype(variable)>( \
+        GetProcAddress(luaModule, name) \
+    )
 
-    g_LuaPushString = reinterpret_cast<LuaPushString>(
-        GetProcAddress(luaModule, "lua_pushstring")
-    );
+    LOAD_LUA_FUNCTION(g_LuaCreateTable, "lua_createtable");
+    LOAD_LUA_FUNCTION(g_LuaPushString, "lua_pushstring");
+    LOAD_LUA_FUNCTION(g_LuaPushInteger, "lua_pushinteger");
+    LOAD_LUA_FUNCTION(g_LuaPushNumber, "lua_pushnumber");
 
-    g_LuaPushInteger = reinterpret_cast<LuaPushInteger>(
-        GetProcAddress(luaModule, "lua_pushinteger")
-    );
+    LOAD_LUA_FUNCTION(g_LuaSetGlobal, "lua_setglobal");
+    LOAD_LUA_FUNCTION(g_LuaSetField, "lua_setfield");
 
-    g_LuaSetGlobal = reinterpret_cast<LuaSetGlobal>(
-        GetProcAddress(luaModule, "lua_setglobal")
-    );
+    LOAD_LUA_FUNCTION(g_LuaGetGlobal, "lua_getglobal");
+    LOAD_LUA_FUNCTION(g_LuaGetField, "lua_getfield");
 
-    g_LuaSetField = reinterpret_cast<LuaSetField>(
-        GetProcAddress(luaModule, "lua_setfield")
-    );
+    LOAD_LUA_FUNCTION(g_LuaRotate, "lua_rotate");
+    LOAD_LUA_FUNCTION(g_LuaType, "lua_type");
 
-    g_LuaGetGlobal = reinterpret_cast<LuaGetGlobal>(
-        GetProcAddress(luaModule, "lua_getglobal")
-    );
+    LOAD_LUA_FUNCTION(g_LuaToLString, "lua_tolstring");
+    LOAD_LUA_FUNCTION(g_LuaToNumberX, "lua_tonumberx");
 
-    g_LuaGetField = reinterpret_cast<LuaGetField>(
-        GetProcAddress(luaModule, "lua_getfield")
-    );
+    LOAD_LUA_FUNCTION(g_LuaGetTop, "lua_gettop");
+    LOAD_LUA_FUNCTION(g_LuaSetTop, "lua_settop");
 
-    g_LuaRotate = reinterpret_cast<LuaRotate>(
-        GetProcAddress(luaModule, "lua_rotate")
-    );
+    LOAD_LUA_FUNCTION(g_LuaPCallK, "lua_pcallk");
 
-    g_LuaType = reinterpret_cast<LuaType>(
-        GetProcAddress(luaModule, "lua_type")
-    );
-
-    g_LuaToLString = reinterpret_cast<LuaToLString>(
-        GetProcAddress(luaModule, "lua_tolstring")
-    );
-
-    g_LuaGetTop = reinterpret_cast<LuaGetTop>(
-        GetProcAddress(luaModule, "lua_gettop")
-    );
-
-    g_LuaSetTop = reinterpret_cast<LuaSetTop>(
-        GetProcAddress(luaModule, "lua_settop")
-    );
-
-    g_LuaPCallK = reinterpret_cast<LuaPCallK>(
-        GetProcAddress(luaModule, "lua_pcallk")
-    );
+#undef LOAD_LUA_FUNCTION
 
     return
         g_LuaCreateTable &&
         g_LuaPushString &&
         g_LuaPushInteger &&
+        g_LuaPushNumber &&
         g_LuaSetGlobal &&
         g_LuaSetField &&
         g_LuaGetGlobal &&
@@ -249,9 +244,71 @@ static bool InitializeLuaAPI()
         g_LuaRotate &&
         g_LuaType &&
         g_LuaToLString &&
+        g_LuaToNumberX &&
         g_LuaGetTop &&
         g_LuaSetTop &&
         g_LuaPCallK;
+}
+
+// --------------------------------------------------
+// Lua table helpers
+// --------------------------------------------------
+
+static void SetNumberField(
+    lua_State* L,
+    const char* name,
+    double value
+)
+{
+    g_LuaPushNumber(L, value);
+    g_LuaSetField(L, -2, name);
+}
+
+static double GetNumberField(
+    lua_State* L,
+    int table,
+    const char* name,
+    double fallback
+)
+{
+    g_LuaGetField(L, table, name);
+
+    int isNumber = 0;
+
+    double value = g_LuaToNumberX(
+        L,
+        -1,
+        &isNumber
+    );
+
+    g_LuaSetTop(L, -2);
+
+    return isNumber ? value : fallback;
+}
+
+static void PushVectorTable(
+    lua_State* L,
+    float x,
+    float y
+)
+{
+    g_LuaCreateTable(L, 0, 2);
+
+    SetNumberField(L, "x", x);
+    SetNumberField(L, "y", y);
+}
+
+static void PushColorTable(
+    lua_State* L,
+    const KColor* color
+)
+{
+    g_LuaCreateTable(L, 0, 4);
+
+    SetNumberField(L, "r", color->_red);
+    SetNumberField(L, "g", color->_green);
+    SetNumberField(L, "b", color->_blue);
+    SetNumberField(L, "a", color->_alpha);
 }
 
 // --------------------------------------------------
@@ -284,7 +341,7 @@ static void RegisterPlanetTable(lua_State* L)
         std::string("Test"),
         Lua_Planet_Test
     );
-    
+
     g_LuaPushInteger(
         L,
         PLANET_PL_PRE_DRAW_STRING
@@ -340,93 +397,93 @@ static void LogCallbackError(
 // Call Isaac.RunAdditiveCallback
 // --------------------------------------------------
 
-static std::string ProcessString(const char* original)
+static void ProcessDrawString(
+    const char* text,
+    Vector& pos,
+    Vector& scale,
+    KColor* color,
+    std::string& replacement
+)
 {
-    if (!original)
-        return "";
+    if (!g_LuaState || g_InStringCallback || !color)
+        return;
 
-    if (!g_LuaState || g_InStringCallback)
-        return original;
-
-    if (!g_LuaGetGlobal ||
-        !g_LuaGetField ||
-        !g_LuaRotate ||
-        !g_LuaPushInteger ||
-        !g_LuaPushString ||
-        !g_LuaType ||
-        !g_LuaToLString ||
-        !g_LuaGetTop ||
-        !g_LuaSetTop ||
-        !g_LuaPCallK)
-    {
-        return original;
-    }
-
-    std::string currentText(original);
-
-    const int originalStackTop = g_LuaGetTop(g_LuaState);
+    const int originalTop = g_LuaGetTop(g_LuaState);
 
     g_InStringCallback = true;
 
-    // Get Isaac table.
-    g_LuaGetGlobal(
-        g_LuaState,
-        "Isaac"
-    );
+    // Isaac.RunAdditiveCallback
+    g_LuaGetGlobal(g_LuaState, "Isaac");
+    g_LuaGetField(g_LuaState, -1, "RunAdditiveCallback");
 
-    if (g_LuaType(g_LuaState, -1) != LUA_TTABLE)
-    {
-        g_LuaSetTop(g_LuaState, originalStackTop);
-        g_InStringCallback = false;
-        return currentText;
-    }
+    // Stack: Isaac, function
+    // Move function before Isaac.
+    g_LuaRotate(g_LuaState, -2, 1);
 
-    // Get Isaac.RunAdditiveCallback.
-    g_LuaGetField(
-        g_LuaState,
-        -1,
-        "RunAdditiveCallback"
-    );
+    // Remove Isaac.
+    g_LuaSetTop(g_LuaState, -2);
 
-    if (g_LuaType(g_LuaState, -1) != LUA_TFUNCTION)
-    {
-        g_LuaSetTop(g_LuaState, originalStackTop);
-        g_InStringCallback = false;
-        return currentText;
-    }
-
-    // Stack:
-    // Isaac table
-    // RunAdditiveCallback function
-    //
-    // Move the function before the table, then remove the table.
-
-    g_LuaRotate(
-        g_LuaState,
-        -2,
-        1
-    );
-
-    g_LuaSetTop(
-        g_LuaState,
-        g_LuaGetTop(g_LuaState) - 1
-    );
-
-    // Arguments:
-    // 1. Callback ID
-    // 2. Current string
-
+    // Callback ID
     g_LuaPushInteger(
         g_LuaState,
         PLANET_PL_PRE_DRAW_STRING
     );
 
+    // Data table
+    g_LuaCreateTable(g_LuaState, 0, 4);
+
+    // text
     g_LuaPushString(
         g_LuaState,
-        currentText.c_str()
+        text ? text : ""
     );
 
-    const int result = g_LuaPCallK(
+    g_LuaSetField(
+        g_LuaState,
+        -2,
+        "text"
+    );
+
+    // pos
+    PushVectorTable(
+        g_LuaState,
+        pos.x,
+        pos.y
+    );
+
+    g_LuaSetField(
+        g_LuaState,
+        -2,
+        "pos"
+    );
+
+    // scale
+    PushVectorTable(
+        g_LuaState,
+        scale.x,
+        scale.y
+    );
+
+    g_LuaSetField(
+        g_LuaState,
+        -2,
+        "scale"
+    );
+
+    // color
+    PushColorTable(
+        g_LuaState,
+        color
+    );
+
+    g_LuaSetField(
+        g_LuaState,
+        -2,
+        "color"
+    );
+
+    // Isaac.RunAdditiveCallback(callbackID, data)
+    int errorCode = g_LuaPCallK(
         g_LuaState,
         2,
         1,
@@ -435,55 +492,180 @@ static std::string ProcessString(const char* original)
         nullptr
     );
 
-    if (result != 0)
-    {
-        if (!g_CallbackErrorLogged)
-        {
-            g_CallbackErrorLogged = true;
-
-            size_t length = 0;
-
-            const char* errorMessage = g_LuaToLString(
-                g_LuaState,
-                -1,
-                &length
-            );
-
-            LogCallbackError(
-                result,
-                errorMessage,
-                length
-            );
-        }
-    }
-    else if (g_LuaType(g_LuaState, -1) == LUA_TSTRING)
+    if (errorCode != 0)
     {
         size_t length = 0;
 
-        const char* replacement = g_LuaToLString(
+        const char* error = g_LuaToLString(
             g_LuaState,
             -1,
             &length
         );
 
-        if (replacement)
+        if (!g_CallbackErrorLogged)
         {
-            currentText.assign(
-                replacement,
+            LogCallbackError(
+                errorCode,
+                error,
                 length
+            );
+
+            g_CallbackErrorLogged = true;
+        }
+
+        g_LuaSetTop(g_LuaState, originalTop);
+        g_InStringCallback = false;
+        return;
+    }
+
+    // Returned value must be a table.
+    if (g_LuaType(g_LuaState, -1) == LUA_TTABLE)
+    {
+        const int result = g_LuaGetTop(g_LuaState);
+
+        // --------------------------------------------------
+        // Text
+        // --------------------------------------------------
+
+        g_LuaGetField(
+            g_LuaState,
+            result,
+            "text"
+        );
+
+        if (g_LuaType(g_LuaState, -1) == LUA_TSTRING)
+        {
+            const char* newText = g_LuaToLString(
+                g_LuaState,
+                -1,
+                nullptr
+            );
+
+            if (newText)
+                replacement.assign(newText);
+        }
+
+        g_LuaSetTop(g_LuaState, result);
+
+        // --------------------------------------------------
+        // Position
+        // --------------------------------------------------
+
+        g_LuaGetField(
+            g_LuaState,
+            result,
+            "pos"
+        );
+
+        if (g_LuaType(g_LuaState, -1) == LUA_TTABLE)
+        {
+            pos.x = static_cast<float>(
+                GetNumberField(
+                    g_LuaState,
+                    -1,
+                    "x",
+                    pos.x
+                )
+            );
+
+            pos.y = static_cast<float>(
+                GetNumberField(
+                    g_LuaState,
+                    -1,
+                    "y",
+                    pos.y
+                )
+            );
+        }
+
+        g_LuaSetTop(g_LuaState, result);
+
+        // --------------------------------------------------
+        // Scale
+        // --------------------------------------------------
+
+        g_LuaGetField(
+            g_LuaState,
+            result,
+            "scale"
+        );
+
+        if (g_LuaType(g_LuaState, -1) == LUA_TTABLE)
+        {
+            scale.x = static_cast<float>(
+                GetNumberField(
+                    g_LuaState,
+                    -1,
+                    "x",
+                    scale.x
+                )
+            );
+
+            scale.y = static_cast<float>(
+                GetNumberField(
+                    g_LuaState,
+                    -1,
+                    "y",
+                    scale.y
+                )
+            );
+        }
+
+        g_LuaSetTop(g_LuaState, result);
+
+        // --------------------------------------------------
+        // Color
+        // --------------------------------------------------
+
+        g_LuaGetField(
+            g_LuaState,
+            result,
+            "color"
+        );
+
+        if (g_LuaType(g_LuaState, -1) == LUA_TTABLE)
+        {
+            color->_red = static_cast<float>(
+                GetNumberField(
+                    g_LuaState,
+                    -1,
+                    "r",
+                    color->_red
+                )
+            );
+
+            color->_green = static_cast<float>(
+                GetNumberField(
+                    g_LuaState,
+                    -1,
+                    "g",
+                    color->_green
+                )
+            );
+
+            color->_blue = static_cast<float>(
+                GetNumberField(
+                    g_LuaState,
+                    -1,
+                    "b",
+                    color->_blue
+                )
+            );
+
+            color->_alpha = static_cast<float>(
+                GetNumberField(
+                    g_LuaState,
+                    -1,
+                    "a",
+                    color->_alpha
+                )
             );
         }
     }
 
-    // Restore the original Lua stack.
-    g_LuaSetTop(
-        g_LuaState,
-        originalStackTop
-    );
+    g_LuaSetTop(g_LuaState, originalTop);
 
     g_InStringCallback = false;
-
-    return currentText;
 }
 
 // --------------------------------------------------
@@ -524,30 +706,31 @@ HOOK_METHOD_PRIORITY(
      KColor* color, FontSettings* settings) -> void
 )
 {
-    if (!str || g_InStringCallback)
+    if (!str || !color || g_InStringCallback)
     {
         super(str, pos, scale, color, settings);
         return;
     }
 
-    // Modify position.
-    pos.x += 10.0f;
-    pos.y += 5.0f;
+    // Preserve the original color.
+    KColor modifiedColor = *color;
 
-    // Modify scale.
-    scale.x *= 1.5f;
-    scale.y *= 1.5f;
+    // Persistent replacement text.
+    std::string replacement = str;
 
-    // Replace color.
-    KColor newColor(1.0f, 0.0f, 0.0f, 1.0f);
-
-    const std::string replacement = ProcessString(str);
+    ProcessDrawString(
+        str,
+        pos,
+        scale,
+        &modifiedColor,
+        replacement
+    );
 
     super(
         replacement.c_str(),
         pos,
         scale,
-        &newColor,
+        &modifiedColor,
         settings
     );
 }
