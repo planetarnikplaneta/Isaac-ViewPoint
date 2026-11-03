@@ -44,7 +44,29 @@ struct Vector
     float y;
 };
 
-struct KColor;
+struct KColor
+{
+    float _red;
+    float _green;
+    float _blue;
+    float _alpha;
+    int _unk;
+
+    KColor(
+        float r = 1,
+        float g = 1,
+        float b = 1,
+        float a = 1,
+        int unk = 0
+    )
+        : _red(r),
+          _green(g),
+          _blue(b),
+          _alpha(a),
+          _unk(unk)
+    {
+    }
+};
 struct FontSettings;
 
 class Font
@@ -508,39 +530,16 @@ HOOK_METHOD_PRIORITY(
         return;
     }
 
-    // --------------------------------------------------
-    // Modify position
-    // --------------------------------------------------
-
+    // Modify position.
     pos.x += 10.0f;
     pos.y += 5.0f;
 
-    // --------------------------------------------------
-    // Modify scale
-    // --------------------------------------------------
-
+    // Modify scale.
     scale.x *= 1.5f;
     scale.y *= 1.5f;
 
-    // --------------------------------------------------
-    // Modify color
-    // --------------------------------------------------
-
-    // Example: replace with another KColor.
-    KColor newColor = *color;
-
-    // Set RGB values (example).
-    // Adjust these fields to match the actual KColor definition.
-    newColor.Red = 255;
-    newColor.Green = 0;
-    newColor.Blue = 0;
-    newColor.Alpha = 255;
-
-    color = &newColor;
-
-    // --------------------------------------------------
-    // Process string
-    // --------------------------------------------------
+    // Replace color.
+    KColor newColor(1.0f, 0.0f, 0.0f, 1.0f);
 
     const std::string replacement = ProcessString(str);
 
@@ -548,10 +547,11 @@ HOOK_METHOD_PRIORITY(
         replacement.c_str(),
         pos,
         scale,
-        color,
+        &newColor,
         settings
     );
 }
+
 // --------------------------------------------------
 // Plugin entry point
 // --------------------------------------------------
