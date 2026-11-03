@@ -249,19 +249,6 @@ static int Lua_Planet_Test(lua_State* L)
     return 1;
 }
 
-static int Lua_Planet_PLANTE(lua_State* L)
-{
-    if (!g_LuaPushString)
-        return 0;
-
-    g_LuaPushString(
-        L,
-        "PLANTE!"
-    );
-
-    return 1;
-}
-
 // --------------------------------------------------
 // Create global Planet table
 // --------------------------------------------------
@@ -274,12 +261,6 @@ static void RegisterPlanetTable(lua_State* L)
         L,
         std::string("Test"),
         Lua_Planet_Test
-    );
-    
-    lua::TableAssoc(
-        L,
-        std::string("PLANTE"),
-        Lua_Planet_PLANTE
     );
     
     g_LuaPushInteger(
@@ -527,6 +508,40 @@ HOOK_METHOD_PRIORITY(
         return;
     }
 
+    // --------------------------------------------------
+    // Modify position
+    // --------------------------------------------------
+
+    pos.x += 10.0f;
+    pos.y += 5.0f;
+
+    // --------------------------------------------------
+    // Modify scale
+    // --------------------------------------------------
+
+    scale.x *= 1.5f;
+    scale.y *= 1.5f;
+
+    // --------------------------------------------------
+    // Modify color
+    // --------------------------------------------------
+
+    // Example: replace with another KColor.
+    KColor newColor = *color;
+
+    // Set RGB values (example).
+    // Adjust these fields to match the actual KColor definition.
+    newColor.Red = 255;
+    newColor.Green = 0;
+    newColor.Blue = 0;
+    newColor.Alpha = 255;
+
+    color = &newColor;
+
+    // --------------------------------------------------
+    // Process string
+    // --------------------------------------------------
+
     const std::string replacement = ProcessString(str);
 
     super(
@@ -537,7 +552,6 @@ HOOK_METHOD_PRIORITY(
         settings
     );
 }
-
 // --------------------------------------------------
 // Plugin entry point
 // --------------------------------------------------
