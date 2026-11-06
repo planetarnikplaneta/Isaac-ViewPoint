@@ -291,11 +291,7 @@ namespace
 
 static void RenderOBJOverlay()
 {
-    if (!__ptr_g_ShapeRenderer || !__ptr_g_WindowSizeX || !__ptr_g_WindowSizeY)
-        return;
-
-    ShapeRenderer *renderer = *__ptr_g_ShapeRenderer;
-    if (!renderer)
+    if (!g_ShapeRenderer)
         return;
 
     if (!g_MeshLoaded)
@@ -308,34 +304,80 @@ static void RenderOBJOverlay()
     if (g_Vertices.empty() || g_Edges.empty())
         return;
 
-    const float width = static_cast<float>(*__ptr_g_WindowSizeX);
-    const float height = static_cast<float>(*__ptr_g_WindowSizeY);
+    const float width = static_cast<float>(g_WindowSizeX);
+    const float height = static_cast<float>(g_WindowSizeY);
 
     if (width <= 0.0f || height <= 0.0f)
         return;
 
+    const float angle = static_cast<float>(GetTickCount64()) * 0.0008f;
+
+    // Project all vertices to screen space in the local model coordinates
+    std::vector<Vector> projected;
+    projected.reserve(g_Vertices.size());
+
+    float minX = 0.0f, maxX = 0.0f;
+    float minY = 0.0f, maxY = 0.0f;
+    bool first = true;
+
+    for (const Vertex3 &v : g_Vertices)
+    {
+        Vector p = Project3D(v, angle, 0.0f, 0.0f, 1.0f);
+        projected.push_back(p);
+
+        if (first)
+        {
+            minX = maxX = p.x;
+            minY = maxY = p.y;
+            first = false;
+        }
+        else
+        {
+            minX = std::min(minX, p.x);
+            maxX = std::max(maxX, p.x);
+            minY = std::min(minY, p.y);
+            maxY = std::max(maxY, p.y);
+        }
+    }
+
+    const float spanX = std::max(maxX - minX, 0.001f);
+    const float spanY = std::max(maxY - minY, 0.001f);
+
+    // Fit the whole model into about 70% of the window
+    const float fitScale = std::min(width * 0.70f / spanX, height * 0.70f / spanY);
+
     const float centerX = width * 0.5f;
     const float centerY = height * 0.5f;
-    const float focalLength = std::min(width, height) * 0.70f;
-    const float angle = static_cast<float>(GetTickCount64()) * 0.0008f;
+
+    // Offset so model is centered on screen
+    const float offsetX = centerX - ((minX + maxX) * 0.5f * fitScale);
+    const float offsetY = centerY - ((minY + maxY) * 0.5f * fitScale);
 
     KColor color(0.35f, 0.85f, 1.0f, 1.0f);
     const float thickness = 1.1f;
 
-const size_t step = 1;
+    // Draw fewer edges to keep FPS sane.
+    // For a test you can set step = 1 if you want the full mesh.
+    const size_t maxDraws = 4000;
+    const size_t step = std::max<size_t>(1, g_Edges.size() / maxDraws);
 
     for (size_t i = 0; i < g_Edges.size(); i += step)
     {
         const Edge &edge = g_Edges[i];
-        if (edge.a >= g_Vertices.size() || edge.b >= g_Vertices.size())
+        if (edge.a >= projected.size() || edge.b >= projected.size())
             continue;
 
-        Vector p1 = Project3D(g_Vertices[edge.a], angle, centerX, centerY, focalLength);
-        Vector p2 = Project3D(g_Vertices[edge.b], angle, centerX, centerY, focalLength);
+        Vector p1 = projected[edge.a];
+        Vector p2 = projected[edge.b];
 
-        renderer->RenderLine(&p1, &p2, &color, &color, thickness);
+        p1.x = p1.x * fitScale + offsetX;
+        p1.y = p1.y * fitScale + offsetY;
+
+        p2.x = p2.x * fitScale + offsetX;
+        p2.y = p2.y * fitScale + offsetY;
+
+        g_ShapeRenderer->RenderLine(&p1, &p2, &color, &color, thickness);
     }
-}
 }
 
 // -----------------------------------------------------------------------------
