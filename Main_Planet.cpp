@@ -322,8 +322,7 @@ static void RenderOBJOverlay()
     KColor color(0.35f, 0.85f, 1.0f, 1.0f);
     const float thickness = 1.1f;
 
-    const size_t maxDraws = 256;
-    const size_t step = std::max<size_t>(1, g_Edges.size() / maxDraws);
+const size_t step = 1;
 
     for (size_t i = 0; i < g_Edges.size(); i += step)
     {
