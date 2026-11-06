@@ -1,8 +1,10 @@
+#define NOMINMAX
 #include <Windows.h>
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -37,6 +39,20 @@ struct KColor
 };
 
 struct ANM2;
+
+class PlayerHUD
+{
+public:
+    void RenderHearts(
+        Vector *unk,
+        ANM2 *sprite,
+        int playerHudLayout,
+        float scale,
+        Vector pos);
+
+    char _padding[8];
+    short _playerHudIndex;
+};
 
 class ShapeRenderer
 {
@@ -336,7 +352,7 @@ HOOK_METHOD_PRIORITY(
 
     // This keeps it from drawing once per player instance.
     // if you want it on every HUD, remove this check.
-    if (this && (this->GetPlayer() != nullptr))
+    if (_playerHudIndex == 0)
         RenderOBJOverlay();
 }
 
