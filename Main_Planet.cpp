@@ -8,8 +8,6 @@
 #include <fstream>
 #include <sstream>
 #include <string>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 #include "libzhl.h"
@@ -62,7 +60,7 @@ struct ShapeRenderer
         const float &thickness);
 };
 
-// These are pointer-to-pointer imports from libzhl.def.
+// libzhl.def exports pointer-reference symbols for these engine globals.
 extern LIBZHL_API ShapeRenderer **__ptr_g_ShapeRenderer;
 extern LIBZHL_API unsigned int *__ptr_g_WindowSizeX;
 extern LIBZHL_API unsigned int *__ptr_g_WindowSizeY;
@@ -83,33 +81,26 @@ namespace
         uint32_t c;
     };
 
-    struct Edge
-    {
-        uint32_t a;
-        uint32_t b;
-    };
-
     struct CameraVertex
     {
         float x;
         float y;
         float z;
         float depth;
-        Vector projected;
+        float screenX;
+        float screenY;
         bool valid;
-    };
-
-    struct DrawEdge
-    {
-        Edge edge;
-        float depth;
     };
 
     static HMODULE g_Module = nullptr;
     static bool g_MeshLoaded = false;
-
     static std::vector<Vertex3> g_Vertices;
     static std::vector<Triangle> g_Triangles;
+
+    // Reused each frame to avoid repeatedly allocating the software depth/color buffers.
+    static std::vector<float> g_DepthBuffer;
+    static std::vector<uint8_t> g_ShadeBuffer;
+    static std::vector<CameraVertex> g_CameraVertices;
 
     static void LogMessage(const char *message)
     {
@@ -165,13 +156,6 @@ namespace
         return true;
     }
 
-    static uint64_t MakeEdgeKey(uint32_t a, uint32_t b)
-    {
-        const uint32_t lo = std::min(a, b);
-        const uint32_t hi = std::max(a, b);
-        return (static_cast<uint64_t>(lo) << 32) | hi;
-    }
-
     static void LoadOBJ()
     {
         const std::string path = GetObjPath();
@@ -185,8 +169,8 @@ namespace
 
         std::vector<Vertex3> rawVertices;
         std::vector<Triangle> triangles;
-
         std::string line;
+
         while (std::getline(input, line))
         {
             if (line.empty() || line[0] == '#')
@@ -240,7 +224,6 @@ namespace
             minV.x = std::min(minV.x, v.x);
             minV.y = std::min(minV.y, v.y);
             minV.z = std::min(minV.z, v.z);
-
             maxV.x = std::max(maxV.x, v.x);
             maxV.y = std::max(maxV.y, v.y);
             maxV.z = std::max(maxV.z, v.z);
@@ -249,16 +232,15 @@ namespace
         const float cx = (minV.x + maxV.x) * 0.5f;
         const float cy = (minV.y + maxV.y) * 0.5f;
         const float cz = (minV.z + maxV.z) * 0.5f;
-
         const float sx = maxV.x - minV.x;
         const float sy = maxV.y - minV.y;
         const float sz = maxV.z - minV.z;
-        const float modelScale =
-            2.5f / std::max({sx, sy, sz, 0.0001f});
+
+        // Fixed model normalization. This scale does not change while rotating.
+        const float modelScale = 3.0f / std::max({sx, sy, sz, 0.0001f});
 
         g_Vertices.clear();
         g_Vertices.reserve(rawVertices.size());
-
         for (const Vertex3 &v : rawVertices)
         {
             g_Vertices.push_back({
@@ -279,6 +261,11 @@ namespace
             g_Vertices.size(),
             g_Triangles.size());
         LogMessage(message);
+    }
+
+    static float EdgeFunction(float ax, float ay, float bx, float by, float px, float py)
+    {
+        return (px - ax) * (by - ay) - (py - ay) * (bx - ax);
     }
 
     static void RenderOBJOverlay()
@@ -304,199 +291,212 @@ namespace
         if (g_Vertices.empty() || g_Triangles.empty())
             return;
 
-        const float width = static_cast<float>(*__ptr_g_WindowSizeX);
-        const float height = static_cast<float>(*__ptr_g_WindowSizeY);
-
-        if (width <= 0.0f || height <= 0.0f)
+        const int width = static_cast<int>(*__ptr_g_WindowSizeX);
+        const int height = static_cast<int>(*__ptr_g_WindowSizeY);
+        if (width <= 0 || height <= 0 || width > 8192 || height > 8192)
             return;
 
-        const float angle =
-            static_cast<float>(GetTickCount64()) * 0.0008f;
+        const size_t pixelCount = static_cast<size_t>(width) * static_cast<size_t>(height);
+        g_DepthBuffer.assign(pixelCount, 0.0f);
+        g_ShadeBuffer.assign(pixelCount, 0);
+        g_CameraVertices.resize(g_Vertices.size());
 
+        // Constant rotation speed and fixed scale prevent the model from pulsing
+        // or shifting as its projected bounds change.
+        const float seconds = static_cast<float>(GetTickCount64()) * 0.001f;
+        const float angle = seconds * 0.25f;
         const float c = std::cos(angle);
         const float s = std::sin(angle);
-
-        const float pitch = -0.35f;
+        const float pitch = -0.25f;
         const float pc = std::cos(pitch);
         const float ps = std::sin(pitch);
 
-        // Transform and project every vertex once for this frame.
-        std::vector<CameraVertex> cameraVertices;
-        cameraVertices.reserve(g_Vertices.size());
+        const float focalLength = static_cast<float>(std::min(width, height)) * 0.85f;
+        const float cameraDistance = 5.0f;
+        const float centerX = static_cast<float>(width) * 0.5f;
+        const float centerY = static_cast<float>(height) * 0.5f;
 
-        float minX = 0.0f;
-        float maxX = 0.0f;
-        float minY = 0.0f;
-        float maxY = 0.0f;
-        bool haveBounds = false;
-
-        for (const Vertex3 &v : g_Vertices)
+        for (size_t i = 0; i < g_Vertices.size(); ++i)
         {
+            const Vertex3 &v = g_Vertices[i];
             const float rx = v.x * c - v.z * s;
             const float rz = v.x * s + v.z * c;
-
             const float ry = v.y * pc - rz * ps;
             const float cameraZ = v.y * ps + rz * pc;
-            const float depth = 5.0f + cameraZ;
+            const float depth = cameraDistance + cameraZ;
 
             CameraVertex cv{};
             cv.x = rx;
             cv.y = ry;
             cv.z = cameraZ;
             cv.depth = depth;
-            cv.valid = depth > 0.5f;
+            cv.valid = depth > 0.1f;
 
             if (cv.valid)
             {
-                const float invDepth = 1.0f / depth;
-                cv.projected = {
-                    rx * invDepth,
-                    -ry * invDepth
-                };
-
-                if (!haveBounds)
-                {
-                    minX = maxX = cv.projected.x;
-                    minY = maxY = cv.projected.y;
-                    haveBounds = true;
-                }
-                else
-                {
-                    minX = std::min(minX, cv.projected.x);
-                    maxX = std::max(maxX, cv.projected.x);
-                    minY = std::min(minY, cv.projected.y);
-                    maxY = std::max(maxY, cv.projected.y);
-                }
+                const float perspective = focalLength / depth;
+                cv.screenX = centerX + rx * perspective;
+                cv.screenY = centerY - ry * perspective;
             }
 
-            cameraVertices.push_back(cv);
+            g_CameraVertices[i] = cv;
         }
 
-        if (!haveBounds)
-            return;
+        // Camera-space directional light, facing generally toward the camera.
+        float lightX = -0.35f;
+        float lightY = 0.55f;
+        float lightZ = -0.76f;
+        const float lightLength = std::sqrt(lightX * lightX + lightY * lightY + lightZ * lightZ);
+        lightX /= lightLength;
+        lightY /= lightLength;
+        lightZ /= lightLength;
 
-        const float spanX = std::max(maxX - minX, 0.001f);
-        const float spanY = std::max(maxY - minY, 0.001f);
-
-        // Fit the projected model inside 70% of the window and center it.
-        const float fitScale = std::min(
-            width * 0.70f / spanX,
-            height * 0.70f / spanY);
-
-        const float offsetX =
-            width * 0.5f - ((minX + maxX) * 0.5f * fitScale);
-        const float offsetY =
-            height * 0.5f - ((minY + maxY) * 0.5f * fitScale);
-
-        // Collect unique edges belonging to front-facing triangles.
-        // Camera is on the negative camera-Z side, so visible outward
-        // normals point toward negative Z.
-        std::unordered_map<uint64_t, float> visibleEdges;
-        visibleEdges.reserve(g_Triangles.size() * 2);
-
+        // Software rasterize filled triangles with a per-pixel depth buffer.
+        // This performs hidden-surface removal without drawing the rear surfaces.
         for (const Triangle &tri : g_Triangles)
         {
-            if (tri.a >= cameraVertices.size() ||
-                tri.b >= cameraVertices.size() ||
-                tri.c >= cameraVertices.size())
+            if (tri.a >= g_CameraVertices.size() ||
+                tri.b >= g_CameraVertices.size() ||
+                tri.c >= g_CameraVertices.size())
             {
                 continue;
             }
 
-            const CameraVertex &a = cameraVertices[tri.a];
-            const CameraVertex &b = cameraVertices[tri.b];
-            const CameraVertex &d = cameraVertices[tri.c];
-
+            const CameraVertex &a = g_CameraVertices[tri.a];
+            const CameraVertex &b = g_CameraVertices[tri.b];
+            const CameraVertex &d = g_CameraVertices[tri.c];
             if (!a.valid || !b.valid || !d.valid)
                 continue;
 
-            const float ux = b.x - a.x;
-            const float uy = b.y - a.y;
-            const float uz = b.z - a.z;
-
-            const float vx = d.x - a.x;
-            const float vy = d.y - a.y;
-            const float vz = d.z - a.z;
-
-            const float normalZ = ux * vy - uy * vx;
-
-            // Back-face culling. If your OBJ uses reversed winding,
-            // change this test to: normalZ <= 1.0e-8f
-            if (normalZ >= -1.0e-8f)
+            const float area = EdgeFunction(
+                a.screenX, a.screenY,
+                b.screenX, b.screenY,
+                d.screenX, d.screenY);
+            if (std::fabs(area) < 1.0e-6f)
                 continue;
 
-            const float triDepth = (a.depth + b.depth + d.depth) / 3.0f;
+            const int minX = std::max(0, static_cast<int>(std::floor(
+                std::min({a.screenX, b.screenX, d.screenX}))));
+            const int maxX = std::min(width - 1, static_cast<int>(std::ceil(
+                std::max({a.screenX, b.screenX, d.screenX}))));
+            const int minY = std::max(0, static_cast<int>(std::floor(
+                std::min({a.screenY, b.screenY, d.screenY}))));
+            const int maxY = std::min(height - 1, static_cast<int>(std::ceil(
+                std::max({a.screenY, b.screenY, d.screenY}))));
 
-            const uint64_t keys[3] = {
-                MakeEdgeKey(tri.a, tri.b),
-                MakeEdgeKey(tri.b, tri.c),
-                MakeEdgeKey(tri.c, tri.a)
-            };
+            if (minX > maxX || minY > maxY)
+                continue;
 
-            for (const uint64_t key : keys)
+            // Flat diffuse lighting per triangle. Flip the normal toward the
+            // camera so inconsistent OBJ winding does not make faces vanish.
+            const float abx = b.x - a.x;
+            const float aby = b.y - a.y;
+            const float abz = b.z - a.z;
+            const float acx = d.x - a.x;
+            const float acy = d.y - a.y;
+            const float acz = d.z - a.z;
+
+            float nx = aby * acz - abz * acy;
+            float ny = abz * acx - abx * acz;
+            float nz = abx * acy - aby * acx;
+            float normalLength = std::sqrt(nx * nx + ny * ny + nz * nz);
+            if (normalLength < 1.0e-8f)
+                continue;
+
+            nx /= normalLength;
+            ny /= normalLength;
+            nz /= normalLength;
+
+            if (nz > 0.0f)
             {
-                auto it = visibleEdges.find(key);
+                nx = -nx;
+                ny = -ny;
+                nz = -nz;
+            }
 
-                // Keep the nearer depth when an edge is shared by faces.
-                if (it == visibleEdges.end())
-                    visibleEdges.emplace(key, triDepth);
-                else
-                    it->second = std::min(it->second, triDepth);
+            const float diffuse = std::max(0.0f, nx * lightX + ny * lightY + nz * lightZ);
+            const float brightness = 0.22f + 0.78f * diffuse;
+            const uint8_t shade = static_cast<uint8_t>(
+                std::max(1.0f, std::min(15.0f, std::round(brightness * 15.0f))));
+
+            const float invArea = 1.0f / area;
+
+            for (int y = minY; y <= maxY; ++y)
+            {
+                const float py = static_cast<float>(y) + 0.5f;
+                const size_t rowOffset = static_cast<size_t>(y) * static_cast<size_t>(width);
+
+                for (int x = minX; x <= maxX; ++x)
+                {
+                    const float px = static_cast<float>(x) + 0.5f;
+                    const float w0 = EdgeFunction(
+                        b.screenX, b.screenY,
+                        d.screenX, d.screenY,
+                        px, py) * invArea;
+                    const float w1 = EdgeFunction(
+                        d.screenX, d.screenY,
+                        a.screenX, a.screenY,
+                        px, py) * invArea;
+                    const float w2 = 1.0f - w0 - w1;
+
+                    if (w0 < 0.0f || w1 < 0.0f || w2 < 0.0f)
+                        continue;
+
+                    // Interpolate reciprocal depth for perspective-correct visibility.
+                    const float invDepth = w0 / a.depth + w1 / b.depth + w2 / d.depth;
+                    const size_t pixel = rowOffset + static_cast<size_t>(x);
+
+                    if (invDepth > g_DepthBuffer[pixel])
+                    {
+                        g_DepthBuffer[pixel] = invDepth;
+                        g_ShadeBuffer[pixel] = shade;
+                    }
+                }
             }
         }
 
-        if (visibleEdges.empty())
-            return;
-
-        std::vector<DrawEdge> drawList;
-        drawList.reserve(visibleEdges.size());
-
-        for (const auto &entry : visibleEdges)
+        // Draw horizontal runs of equally shaded pixels. This uses the engine's
+        // existing line primitive to display the software-filled/depth-tested image.
+        KColor shades[16];
+        for (int i = 0; i < 16; ++i)
         {
-            const uint32_t a = static_cast<uint32_t>(entry.first >> 32);
-            const uint32_t b = static_cast<uint32_t>(entry.first & 0xffffffffu);
-            drawList.push_back({{a, b}, entry.second});
+            const float t = static_cast<float>(i) / 15.0f;
+            shades[i] = KColor(0.10f + 0.20f * t,
+                               0.28f + 0.62f * t,
+                               0.38f + 0.62f * t,
+                               1.0f);
         }
 
-        // Painter-style depth order: far edges first, near edges last.
-        std::sort(
-            drawList.begin(),
-            drawList.end(),
-            [](const DrawEdge &lhs, const DrawEdge &rhs)
-            {
-                return lhs.depth > rhs.depth;
-            });
-
-        KColor color(0.35f, 0.85f, 1.0f, 1.0f);
-        const float thickness = 1.1f;
-
-        for (const DrawEdge &item : drawList)
+        const float lineThickness = 1.2f;
+        for (int y = 0; y < height; ++y)
         {
-            const Edge &edge = item.edge;
+            const size_t rowOffset = static_cast<size_t>(y) * static_cast<size_t>(width);
+            int x = 0;
 
-            if (edge.a >= cameraVertices.size() ||
-                edge.b >= cameraVertices.size())
+            while (x < width)
             {
-                continue;
+                const uint8_t shade = g_ShadeBuffer[rowOffset + static_cast<size_t>(x)];
+                if (shade == 0)
+                {
+                    ++x;
+                    continue;
+                }
+
+                const int startX = x;
+                while (x + 1 < width &&
+                       g_ShadeBuffer[rowOffset + static_cast<size_t>(x + 1)] == shade)
+                {
+                    ++x;
+                }
+
+                Vector p1 = {static_cast<float>(startX) + 0.5f,
+                             static_cast<float>(y) + 0.5f};
+                Vector p2 = {static_cast<float>(x) + 0.5f,
+                             static_cast<float>(y) + 0.5f};
+
+                renderer->RenderLine(&p1, &p2, &shades[shade], &shades[shade], lineThickness);
+                ++x;
             }
-
-            const CameraVertex &a = cameraVertices[edge.a];
-            const CameraVertex &b = cameraVertices[edge.b];
-
-            if (!a.valid || !b.valid)
-                continue;
-
-            Vector p1 = {
-                a.projected.x * fitScale + offsetX,
-                a.projected.y * fitScale + offsetY
-            };
-
-            Vector p2 = {
-                b.projected.x * fitScale + offsetX,
-                b.projected.y * fitScale + offsetY
-            };
-
-            renderer->RenderLine(&p1, &p2, &color, &color, thickness);
         }
     }
 }
