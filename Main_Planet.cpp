@@ -289,61 +289,54 @@ namespace
         };
     }
 
-    static void RenderOBJOverlay()
+static void RenderOBJOverlay()
+{
+    if (!__ptr_g_ShapeRenderer || !__ptr_g_WindowSizeX || !__ptr_g_WindowSizeY)
+        return;
+
+    ShapeRenderer *renderer = *__ptr_g_ShapeRenderer;
+    if (!renderer)
+        return;
+
+    if (!g_MeshLoaded)
     {
-        if (!g_ShapeRenderer)
-            return;
-
+        LoadOBJ();
         if (!g_MeshLoaded)
-        {
-            LoadOBJ();
-            if (!g_MeshLoaded)
-                return;
-        }
-
-        if (g_Vertices.empty() || g_Edges.empty())
             return;
-
-        const float width = static_cast<float>(g_WindowSizeX);
-        const float height = static_cast<float>(g_WindowSizeY);
-
-        if (width <= 0.0f || height <= 0.0f)
-            return;
-
-        const float centerX = width * 0.5f;
-        const float centerY = height * 0.5f;
-        const float focalLength = std::min(width, height) * 0.70f;
-
-        const float angle = static_cast<float>(GetTickCount64()) * 0.0008f;
-
-        KColor color(0.35f, 0.85f, 1.0f, 1.0f);
-        const float thickness = 1.1f;
-
-        const size_t maxDraws = 256;
-        const size_t step = std::max<size_t>(1, g_Edges.size() / maxDraws);
-
-        for (size_t i = 0; i < g_Edges.size(); i += step)
-        {
-            const Edge &edge = g_Edges[i];
-            if (edge.a >= g_Vertices.size() || edge.b >= g_Vertices.size())
-                continue;
-
-            Vector p1 = Project3D(g_Vertices[edge.a], angle, centerX, centerY, focalLength);
-            Vector p2 = Project3D(g_Vertices[edge.b], angle, centerX, centerY, focalLength);
-
-            ShapeRenderer *renderer =
-    (__ptr_g_ShapeRenderer != nullptr) ? *__ptr_g_ShapeRenderer : nullptr;
-if (!renderer || !__ptr_g_WindowSizeX || !__ptr_g_WindowSizeY)
-    return;
-
-const float width = static_cast<float>(*__ptr_g_WindowSizeX);
-const float height = static_cast<float>(*__ptr_g_WindowSizeY);
-
-// ...
-
-renderer->RenderLine(&p1, &p2, &color, &color, thickness);
-        }
     }
+
+    if (g_Vertices.empty() || g_Edges.empty())
+        return;
+
+    const float width = static_cast<float>(*__ptr_g_WindowSizeX);
+    const float height = static_cast<float>(*__ptr_g_WindowSizeY);
+
+    if (width <= 0.0f || height <= 0.0f)
+        return;
+
+    const float centerX = width * 0.5f;
+    const float centerY = height * 0.5f;
+    const float focalLength = std::min(width, height) * 0.70f;
+    const float angle = static_cast<float>(GetTickCount64()) * 0.0008f;
+
+    KColor color(0.35f, 0.85f, 1.0f, 1.0f);
+    const float thickness = 1.1f;
+
+    const size_t maxDraws = 256;
+    const size_t step = std::max<size_t>(1, g_Edges.size() / maxDraws);
+
+    for (size_t i = 0; i < g_Edges.size(); i += step)
+    {
+        const Edge &edge = g_Edges[i];
+        if (edge.a >= g_Vertices.size() || edge.b >= g_Vertices.size())
+            continue;
+
+        Vector p1 = Project3D(g_Vertices[edge.a], angle, centerX, centerY, focalLength);
+        Vector p2 = Project3D(g_Vertices[edge.b], angle, centerX, centerY, focalLength);
+
+        renderer->RenderLine(&p1, &p2, &color, &color, thickness);
+    }
+}
 }
 
 // -----------------------------------------------------------------------------
