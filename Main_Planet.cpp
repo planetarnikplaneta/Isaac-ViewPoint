@@ -294,7 +294,7 @@ static int Lua_Planet_Test(lua_State *L)
 
     g_LuaPushString(
         L,
-        "Native plugin is working!");
+        "Native plugin is working! and Update!");
 
     return 1;
 }
