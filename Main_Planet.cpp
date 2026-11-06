@@ -54,9 +54,8 @@ public:
     short _playerHudIndex;
 };
 
-class ShapeRenderer
+struct ShapeRenderer
 {
-public:
     LIBZHL_API int RenderLine(
         Vector *pos1,
         Vector *pos2,
@@ -65,9 +64,9 @@ public:
         const float &thickness);
 };
 
-extern LIBZHL_API ShapeRenderer *g_ShapeRenderer;
-extern LIBZHL_API unsigned int g_WindowSizeX;
-extern LIBZHL_API unsigned int g_WindowSizeY;
+extern LIBZHL_API ShapeRenderer **__ptr_g_ShapeRenderer;
+extern LIBZHL_API unsigned int *__ptr_g_WindowSizeX;
+extern LIBZHL_API unsigned int *__ptr_g_WindowSizeY;
 
 // -----------------------------------------------------------------------------
 // OBJ mesh data
@@ -332,7 +331,17 @@ namespace
             Vector p1 = Project3D(g_Vertices[edge.a], angle, centerX, centerY, focalLength);
             Vector p2 = Project3D(g_Vertices[edge.b], angle, centerX, centerY, focalLength);
 
-            g_ShapeRenderer->RenderLine(&p1, &p2, &color, &color, thickness);
+            ShapeRenderer *renderer =
+    (__ptr_g_ShapeRenderer != nullptr) ? *__ptr_g_ShapeRenderer : nullptr;
+if (!renderer || !__ptr_g_WindowSizeX || !__ptr_g_WindowSizeY)
+    return;
+
+const float width = static_cast<float>(*__ptr_g_WindowSizeX);
+const float height = static_cast<float>(*__ptr_g_WindowSizeY);
+
+// ...
+
+renderer->RenderLine(&p1, &p2, &color, &color, thickness);
         }
     }
 }
