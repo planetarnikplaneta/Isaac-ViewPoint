@@ -1,41 +1,20 @@
-
 #include <Windows.h>
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
-#include <cstddef>
 #include <cstdio>
+#include <fstream>
+#include <sstream>
 #include <string>
-
-struct lua_State;
-typedef int(__cdecl *lua_CFunction)(lua_State *);
+#include <unordered_set>
+#include <vector>
 
 #include "libzhl.h"
 #include "HookSystem.h"
 
-// --------------------------------------------------
-// Lua table registration
-// --------------------------------------------------
-
-namespace lua
-{
-    LIBZHL_API void TableAssoc(
-        lua_State *L,
-        const std::string &name,
-        lua_CFunction fn);
-}
-
-// --------------------------------------------------
-// Constants
-// --------------------------------------------------
-
-static constexpr int PLANET_PL_PRE_DRAW_STRING = 1496;
-
-static constexpr int LUA_TTABLE = 5;
-static constexpr int LUA_TFUNCTION = 6;
-static constexpr int LUA_TSTRING = 4;
-
-// --------------------------------------------------
-// Minimal game class declarations
-// --------------------------------------------------
+// -----------------------------------------------------------------------------
+// Minimal engine types
+// -----------------------------------------------------------------------------
 
 struct Vector
 {
@@ -51,619 +30,329 @@ struct KColor
     float _alpha;
     int _unk;
 
-    KColor(
-        float r = 1,
-        float g = 1,
-        float b = 1,
-        float a = 1,
-        int unk = 0)
-        : _red(r),
-          _green(g),
-          _blue(b),
-          _alpha(a),
-          _unk(unk)
+    KColor(float r = 1.0f, float g = 1.0f, float b = 1.0f, float a = 1.0f, int unk = 0)
+        : _red(r), _green(g), _blue(b), _alpha(a), _unk(unk)
     {
     }
 };
 
-struct FontSettings;
+struct ANM2;
 
-class Font
+class ShapeRenderer
 {
 public:
-    void DrawString(
-        const char *str,
-        Vector pos,
-        Vector scale,
-        KColor *color,
-        FontSettings *settings);
+    LIBZHL_API int RenderLine(
+        Vector *pos1,
+        Vector *pos2,
+        KColor *col1,
+        KColor *col2,
+        const float &thickness);
 };
 
-class LuaEngine
+extern LIBZHL_API ShapeRenderer *g_ShapeRenderer;
+extern LIBZHL_API unsigned int g_WindowSizeX;
+extern LIBZHL_API unsigned int g_WindowSizeY;
+
+// -----------------------------------------------------------------------------
+// OBJ mesh data
+// -----------------------------------------------------------------------------
+
+namespace
 {
-public:
-    void RegisterClasses();
-};
-
-// --------------------------------------------------
-// Lua API declarations
-// --------------------------------------------------
-
-using LuaCreateTable = void(__cdecl *)(
-    lua_State *, int, int);
-
-using LuaPushString = const char *(__cdecl *)(lua_State *, const char *);
-
-using LuaPushInteger = void(__cdecl *)(
-    lua_State *, long long);
-
-using LuaPushNumber = void(__cdecl *)(
-    lua_State *, double);
-
-using LuaSetGlobal = void(__cdecl *)(
-    lua_State *, const char *);
-
-using LuaSetField = void(__cdecl *)(
-    lua_State *, int, const char *);
-
-using LuaGetGlobal = int(__cdecl *)(
-    lua_State *, const char *);
-
-using LuaGetField = int(__cdecl *)(
-    lua_State *, int, const char *);
-
-using LuaRotate = void(__cdecl *)(
-    lua_State *, int, int);
-
-using LuaType = int(__cdecl *)(
-    lua_State *, int);
-
-using LuaToLString = const char *(__cdecl *)(lua_State *, int, size_t *);
-
-using LuaToNumberX = double(__cdecl *)(
-    lua_State *, int, int *);
-
-using LuaGetTop = int(__cdecl *)(
-    lua_State *);
-
-using LuaSetTop = void(__cdecl *)(
-    lua_State *, int);
-
-using LuaKFunction = int(__cdecl *)(
-    lua_State *, int, intptr_t);
-
-using LuaPCallK = int(__cdecl *)(
-    lua_State *,
-    int,
-    int,
-    int,
-    intptr_t,
-    LuaKFunction);
-
-// --------------------------------------------------
-// Global state
-// --------------------------------------------------
-
-static lua_State *g_LuaState = nullptr;
-
-static LuaCreateTable g_LuaCreateTable = nullptr;
-static LuaPushString g_LuaPushString = nullptr;
-static LuaPushInteger g_LuaPushInteger = nullptr;
-static LuaPushNumber g_LuaPushNumber = nullptr;
-
-static LuaSetGlobal g_LuaSetGlobal = nullptr;
-static LuaSetField g_LuaSetField = nullptr;
-
-static LuaGetGlobal g_LuaGetGlobal = nullptr;
-static LuaGetField g_LuaGetField = nullptr;
-
-static LuaRotate g_LuaRotate = nullptr;
-static LuaType g_LuaType = nullptr;
-
-static LuaToLString g_LuaToLString = nullptr;
-static LuaToNumberX g_LuaToNumberX = nullptr;
-
-static LuaGetTop g_LuaGetTop = nullptr;
-static LuaSetTop g_LuaSetTop = nullptr;
-
-static LuaPCallK g_LuaPCallK = nullptr;
-
-static bool g_InStringCallback = false;
-static bool g_CallbackErrorLogged = false;
-
-// --------------------------------------------------
-// Initialize Lua API
-// --------------------------------------------------
-
-static bool InitializeLuaAPI()
-{
-    HMODULE luaModule = GetModuleHandleA("Lua5.3.3r.dll");
-
-    if (!luaModule)
-        return false;
-
-#define LOAD_LUA_FUNCTION(variable, name)            \
-    variable = reinterpret_cast<decltype(variable)>( \
-        GetProcAddress(luaModule, name))
-
-    LOAD_LUA_FUNCTION(g_LuaCreateTable, "lua_createtable");
-    LOAD_LUA_FUNCTION(g_LuaPushString, "lua_pushstring");
-    LOAD_LUA_FUNCTION(g_LuaPushInteger, "lua_pushinteger");
-    LOAD_LUA_FUNCTION(g_LuaPushNumber, "lua_pushnumber");
-
-    LOAD_LUA_FUNCTION(g_LuaSetGlobal, "lua_setglobal");
-    LOAD_LUA_FUNCTION(g_LuaSetField, "lua_setfield");
-
-    LOAD_LUA_FUNCTION(g_LuaGetGlobal, "lua_getglobal");
-    LOAD_LUA_FUNCTION(g_LuaGetField, "lua_getfield");
-
-    LOAD_LUA_FUNCTION(g_LuaRotate, "lua_rotate");
-    LOAD_LUA_FUNCTION(g_LuaType, "lua_type");
-
-    LOAD_LUA_FUNCTION(g_LuaToLString, "lua_tolstring");
-    LOAD_LUA_FUNCTION(g_LuaToNumberX, "lua_tonumberx");
-
-    LOAD_LUA_FUNCTION(g_LuaGetTop, "lua_gettop");
-    LOAD_LUA_FUNCTION(g_LuaSetTop, "lua_settop");
-
-    LOAD_LUA_FUNCTION(g_LuaPCallK, "lua_pcallk");
-
-#undef LOAD_LUA_FUNCTION
-
-    return g_LuaCreateTable &&
-           g_LuaPushString &&
-           g_LuaPushInteger &&
-           g_LuaPushNumber &&
-           g_LuaSetGlobal &&
-           g_LuaSetField &&
-           g_LuaGetGlobal &&
-           g_LuaGetField &&
-           g_LuaRotate &&
-           g_LuaType &&
-           g_LuaToLString &&
-           g_LuaToNumberX &&
-           g_LuaGetTop &&
-           g_LuaSetTop &&
-           g_LuaPCallK;
-}
-
-// --------------------------------------------------
-// Lua table helpers
-// --------------------------------------------------
-
-static void SetNumberField(
-    lua_State *L,
-    const char *name,
-    double value)
-{
-    g_LuaPushNumber(L, value);
-    g_LuaSetField(L, -2, name);
-}
-
-static double GetNumberField(
-    lua_State *L,
-    int table,
-    const char *name,
-    double fallback)
-{
-    g_LuaGetField(L, table, name);
-
-    int isNumber = 0;
-
-    double value = g_LuaToNumberX(
-        L,
-        -1,
-        &isNumber);
-
-    g_LuaSetTop(L, -2);
-
-    return isNumber ? value : fallback;
-}
-
-static void PushVectorTable(
-    lua_State *L,
-    float x,
-    float y)
-{
-    g_LuaCreateTable(L, 0, 2);
-
-    SetNumberField(L, "x", x);
-    SetNumberField(L, "y", y);
-}
-
-static void PushColorTable(
-    lua_State *L,
-    const KColor *color)
-{
-    g_LuaCreateTable(L, 0, 4);
-
-    SetNumberField(L, "r", color->_red);
-    SetNumberField(L, "g", color->_green);
-    SetNumberField(L, "b", color->_blue);
-    SetNumberField(L, "a", color->_alpha);
-}
-
-// --------------------------------------------------
-// Planet.Test()
-// --------------------------------------------------
-
-static int Lua_Planet_Test(lua_State *L)
-{
-    if (!g_LuaPushString)
-        return 0;
-
-    g_LuaPushString(
-        L,
-        "Native plugin is working! and Update!");
-
-    return 1;
-}
-
-// --------------------------------------------------
-// Create global Planet table
-// --------------------------------------------------
-
-static void RegisterPlanetTable(lua_State *L)
-{
-    g_LuaCreateTable(L, 0, 2);
-
-    lua::TableAssoc(
-        L,
-        std::string("Test"),
-        Lua_Planet_Test);
-
-    g_LuaPushInteger(
-        L,
-        PLANET_PL_PRE_DRAW_STRING);
-
-    g_LuaSetField(
-        L,
-        -2,
-        "PL_PRE_DRAW_STRING");
-
-    g_LuaSetGlobal(
-        L,
-        "Planet");
-}
-
-// --------------------------------------------------
-// Log callback errors
-// --------------------------------------------------
-
-static void LogCallbackError(
-    int errorCode,
-    const char *message,
-    size_t length)
-{
-    FILE *file = fopen("C:\\MyNativeMod.log", "a");
-
-    if (!file)
-        return;
-
-    fprintf(
-        file,
-        "Isaac.RunAdditiveCallback error: %d\n",
-        errorCode);
-
-    if (message)
+    struct Vertex3
     {
-        fprintf(
-            file,
-            "%.*s\n",
-            static_cast<int>(length),
-            message);
+        float x;
+        float y;
+        float z;
+    };
+
+    struct Edge
+    {
+        uint32_t a;
+        uint32_t b;
+    };
+
+    static HMODULE g_Module = nullptr;
+
+    static bool g_MeshLoaded = false;
+    static std::vector<Vertex3> g_Vertices;
+    static std::vector<Edge> g_Edges;
+
+    static void LogMessage(const char *message)
+    {
+        FILE *file = fopen("C:\\MyNativeMod.log", "a");
+        if (!file)
+            return;
+
+        fprintf(file, "OBJ overlay: %s\n", message);
+        fclose(file);
     }
 
-    fclose(file);
-}
-
-// --------------------------------------------------
-// Call Isaac.RunAdditiveCallback
-// --------------------------------------------------
-
-static void ProcessDrawString(
-    const char *text,
-    Vector &pos,
-    Vector &scale,
-    KColor *color,
-    std::string &replacement)
-{
-    if (!g_LuaState || g_InStringCallback || !color)
-        return;
-
-    const int originalTop = g_LuaGetTop(g_LuaState);
-
-    g_InStringCallback = true;
-
-    // Isaac.RunAdditiveCallback
-    g_LuaGetGlobal(g_LuaState, "Isaac");
-    g_LuaGetField(g_LuaState, -1, "RunAdditiveCallback");
-
-    // Stack: Isaac, function
-    // Move function before Isaac.
-    g_LuaRotate(g_LuaState, -2, 1);
-
-    // Remove Isaac.
-    g_LuaSetTop(g_LuaState, -2);
-
-    // Callback ID
-    g_LuaPushInteger(
-        g_LuaState,
-        PLANET_PL_PRE_DRAW_STRING);
-
-    // Data table
-    g_LuaCreateTable(g_LuaState, 0, 4);
-
-    // text
-    g_LuaPushString(
-        g_LuaState,
-        text ? text : "");
-
-    g_LuaSetField(
-        g_LuaState,
-        -2,
-        "text");
-
-    // pos
-    PushVectorTable(
-        g_LuaState,
-        pos.x,
-        pos.y);
-
-    g_LuaSetField(
-        g_LuaState,
-        -2,
-        "pos");
-
-    // scale
-    PushVectorTable(
-        g_LuaState,
-        scale.x,
-        scale.y);
-
-    g_LuaSetField(
-        g_LuaState,
-        -2,
-        "scale");
-
-    // color
-    PushColorTable(
-        g_LuaState,
-        color);
-
-    g_LuaSetField(
-        g_LuaState,
-        -2,
-        "color");
-
-    // Isaac.RunAdditiveCallback(callbackID, data)
-    int errorCode = g_LuaPCallK(
-        g_LuaState,
-        2,
-        1,
-        0,
-        0,
-        nullptr);
-
-    if (errorCode != 0)
+    static std::string GetObjPath()
     {
-        size_t length = 0;
+        char modulePath[MAX_PATH] = {};
+        DWORD len = GetModuleFileNameA(g_Module, modulePath, MAX_PATH);
+        if (len == 0 || len >= MAX_PATH)
+            return "objectToRender.obj";
 
-        const char *error = g_LuaToLString(
-            g_LuaState,
-            -1,
-            &length);
+        std::string path(modulePath, len);
+        const size_t slash = path.find_last_of("\\/");
+        if (slash != std::string::npos)
+            path.resize(slash + 1);
 
-        if (!g_CallbackErrorLogged)
-        {
-            LogCallbackError(
-                errorCode,
-                error,
-                length);
-
-            g_CallbackErrorLogged = true;
-        }
-
-        g_LuaSetTop(g_LuaState, originalTop);
-        g_InStringCallback = false;
-        return;
+        return path + "objectToRender.obj";
     }
 
-    // Returned value must be a table.
-    if (g_LuaType(g_LuaState, -1) == LUA_TTABLE)
+    static bool ParseObjIndex(const std::string &token, size_t vertexCount, uint32_t &out)
     {
-        const int result = g_LuaGetTop(g_LuaState);
+        const size_t slash = token.find('/');
+        const std::string indexText = token.substr(0, slash);
 
-        // --------------------------------------------------
-        // Text
-        // --------------------------------------------------
+        if (indexText.empty())
+            return false;
 
-        g_LuaGetField(
-            g_LuaState,
-            result,
-            "text");
+        char *end = nullptr;
+        const long vIndex = strtol(indexText.c_str(), &end, 10);
 
-        if (g_LuaType(g_LuaState, -1) == LUA_TSTRING)
-        {
-            const char *newText = g_LuaToLString(
-                g_LuaState,
-                -1,
-                nullptr);
+        if (!end || *end != '\0' || vIndex == 0)
+            return false;
 
-            if (newText)
-                replacement.assign(newText);
-        }
+        const long resolved = (vIndex > 0)
+            ? (vIndex - 1)
+            : static_cast<long>(vertexCount) + vIndex;
 
-        g_LuaSetTop(g_LuaState, result);
+        if (resolved < 0 || static_cast<size_t>(resolved) >= vertexCount)
+            return false;
 
-        // --------------------------------------------------
-        // Position
-        // --------------------------------------------------
-
-        g_LuaGetField(
-            g_LuaState,
-            result,
-            "pos");
-
-        if (g_LuaType(g_LuaState, -1) == LUA_TTABLE)
-        {
-            pos.x = static_cast<float>(
-                GetNumberField(
-                    g_LuaState,
-                    -1,
-                    "x",
-                    pos.x));
-
-            pos.y = static_cast<float>(
-                GetNumberField(
-                    g_LuaState,
-                    -1,
-                    "y",
-                    pos.y));
-        }
-
-        g_LuaSetTop(g_LuaState, result);
-
-        // --------------------------------------------------
-        // Scale
-        // --------------------------------------------------
-
-        g_LuaGetField(
-            g_LuaState,
-            result,
-            "scale");
-
-        if (g_LuaType(g_LuaState, -1) == LUA_TTABLE)
-        {
-            scale.x = static_cast<float>(
-                GetNumberField(
-                    g_LuaState,
-                    -1,
-                    "x",
-                    scale.x));
-
-            scale.y = static_cast<float>(
-                GetNumberField(
-                    g_LuaState,
-                    -1,
-                    "y",
-                    scale.y));
-        }
-
-        g_LuaSetTop(g_LuaState, result);
-
-        // --------------------------------------------------
-        // Color
-        // --------------------------------------------------
-
-        g_LuaGetField(
-            g_LuaState,
-            result,
-            "color");
-
-        if (g_LuaType(g_LuaState, -1) == LUA_TTABLE)
-        {
-            color->_red = static_cast<float>(
-                GetNumberField(
-                    g_LuaState,
-                    -1,
-                    "r",
-                    color->_red));
-
-            color->_green = static_cast<float>(
-                GetNumberField(
-                    g_LuaState,
-                    -1,
-                    "g",
-                    color->_green));
-
-            color->_blue = static_cast<float>(
-                GetNumberField(
-                    g_LuaState,
-                    -1,
-                    "b",
-                    color->_blue));
-
-            color->_alpha = static_cast<float>(
-                GetNumberField(
-                    g_LuaState,
-                    -1,
-                    "a",
-                    color->_alpha));
-        }
+        out = static_cast<uint32_t>(resolved);
+        return true;
     }
 
-    g_LuaSetTop(g_LuaState, originalTop);
+    static void LoadOBJ()
+    {
+        const std::string path = GetObjPath();
+        std::ifstream input(path);
+        if (!input)
+        {
+            LogMessage("could not open objectToRender.obj");
+            return;
+        }
 
-    g_InStringCallback = false;
+        std::vector<Vertex3> rawVertices;
+        std::vector<uint32_t> faceIndices;
+        std::unordered_set<uint64_t> uniqueEdges;
+
+        std::string line;
+        while (std::getline(input, line))
+        {
+            if (line.empty() || line[0] == '#')
+                continue;
+
+            std::istringstream ss(line);
+            std::string type;
+            ss >> type;
+
+            if (type == "v")
+            {
+                Vertex3 v{};
+                if (ss >> v.x >> v.y >> v.z)
+                    rawVertices.push_back(v);
+            }
+            else if (type == "f")
+            {
+                std::vector<uint32_t> faceVerts;
+                std::string tok;
+
+                while (ss >> tok)
+                {
+                    uint32_t idx = 0;
+                    if (!ParseObjIndex(tok, rawVertices.size(), idx))
+                        continue;
+
+                    faceVerts.push_back(idx);
+                }
+
+                if (faceVerts.size() >= 3)
+                {
+                    for (size_t i = 0; i < faceVerts.size(); ++i)
+                    {
+                        const uint32_t a = faceVerts[i];
+                        const uint32_t b = faceVerts[(i + 1) % faceVerts.size()];
+
+                        if (a == b)
+                            continue;
+
+                        const uint32_t lo = std::min(a, b);
+                        const uint32_t hi = std::max(a, b);
+                        const uint64_t key = (static_cast<uint64_t>(lo) << 32) | hi;
+
+                        uniqueEdges.insert(key);
+                    }
+                }
+            }
+        }
+
+        if (rawVertices.empty() || uniqueEdges.empty())
+        {
+            LogMessage("OBJ contains no usable vertices/faces");
+            return;
+        }
+
+        // Center and scale the model to a nice screen-space size.
+        Vertex3 minV = rawVertices.front();
+        Vertex3 maxV = rawVertices.front();
+        for (const Vertex3 &v : rawVertices)
+        {
+            minV.x = std::min(minV.x, v.x);
+            minV.y = std::min(minV.y, v.y);
+            minV.z = std::min(minV.z, v.z);
+
+            maxV.x = std::max(maxV.x, v.x);
+            maxV.y = std::max(maxV.y, v.y);
+            maxV.z = std::max(maxV.z, v.z);
+        }
+
+        const float cx = (minV.x + maxV.x) * 0.5f;
+        const float cy = (minV.y + maxV.y) * 0.5f;
+        const float cz = (minV.z + maxV.z) * 0.5f;
+
+        const float sx = maxV.x - minV.x;
+        const float sy = maxV.y - minV.y;
+        const float sz = maxV.z - minV.z;
+        const float scale = 2.5f / std::max({ sx, sy, sz, 0.0001f });
+
+        g_Vertices.clear();
+        g_Vertices.reserve(rawVertices.size());
+        for (const Vertex3 &v : rawVertices)
+        {
+            g_Vertices.push_back({
+                (v.x - cx) * scale,
+                (v.y - cy) * scale,
+                (v.z - cz) * scale
+            });
+        }
+
+        g_Edges.clear();
+        g_Edges.reserve(uniqueEdges.size());
+        for (const uint64_t key : uniqueEdges)
+        {
+            g_Edges.push_back({
+                static_cast<uint32_t>(key >> 32),
+                static_cast<uint32_t>(key & 0xffffffffu)
+            });
+        }
+
+        g_MeshLoaded = true;
+
+        char temp[160];
+        snprintf(temp, sizeof(temp), "loaded %zu vertices and %zu edges", g_Vertices.size(), g_Edges.size());
+        LogMessage(temp);
+    }
+
+    static Vector Project3D(const Vertex3 &v, float angle, float centerX, float centerY, float focalLength)
+    {
+        // Simple rotation around Y, plus a slight pitch tilt.
+        const float c = std::cos(angle);
+        const float s = std::sin(angle);
+
+        const float rx = v.x * c - v.z * s;
+        const float rz = v.x * s + v.z * c;
+
+        const float pitch = -0.35f;
+        const float pc = std::cos(pitch);
+        const float ps = std::sin(pitch);
+
+        const float ry = v.y * pc - rz * ps;
+        const float depth = 5.0f + (v.y * ps + rz * pc);
+
+        const float safeDepth = std::max(0.5f, depth);
+        const float perspective = focalLength / safeDepth;
+
+        return {
+            centerX + rx * perspective,
+            centerY - ry * perspective
+        };
+    }
+
+    static void RenderOBJOverlay()
+    {
+        if (!g_ShapeRenderer)
+            return;
+
+        if (!g_MeshLoaded)
+        {
+            LoadOBJ();
+            if (!g_MeshLoaded)
+                return;
+        }
+
+        if (g_Vertices.empty() || g_Edges.empty())
+            return;
+
+        const float width = static_cast<float>(g_WindowSizeX);
+        const float height = static_cast<float>(g_WindowSizeY);
+
+        if (width <= 0.0f || height <= 0.0f)
+            return;
+
+        const float centerX = width * 0.5f;
+        const float centerY = height * 0.5f;
+        const float focalLength = std::min(width, height) * 0.70f;
+
+        const float angle = static_cast<float>(GetTickCount64()) * 0.0008f;
+
+        KColor color(0.35f, 0.85f, 1.0f, 1.0f);
+        const float thickness = 1.1f;
+
+        const size_t maxDraws = 256;
+        const size_t step = std::max<size_t>(1, g_Edges.size() / maxDraws);
+
+        for (size_t i = 0; i < g_Edges.size(); i += step)
+        {
+            const Edge &edge = g_Edges[i];
+            if (edge.a >= g_Vertices.size() || edge.b >= g_Vertices.size())
+                continue;
+
+            Vector p1 = Project3D(g_Vertices[edge.a], angle, centerX, centerY, focalLength);
+            Vector p2 = Project3D(g_Vertices[edge.b], angle, centerX, centerY, focalLength);
+
+            g_ShapeRenderer->RenderLine(&p1, &p2, &color, &color, thickness);
+        }
+    }
 }
 
-// --------------------------------------------------
-// LuaEngine::RegisterClasses
-// --------------------------------------------------
+// -----------------------------------------------------------------------------
+// Hook: render the OBJ as a screen overlay after inventory/heart HUD draws
+// -----------------------------------------------------------------------------
 
 HOOK_METHOD_PRIORITY(
-    LuaEngine,
-    RegisterClasses,
-    101,
-    ()->void)
-{
-    super();
-
-    g_LuaState = *reinterpret_cast<lua_State **>(
-        reinterpret_cast<unsigned char *>(this) + 0x18);
-
-    if (!g_LuaState)
-        return;
-
-    if (!InitializeLuaAPI())
-        return;
-
-    RegisterPlanetTable(g_LuaState);
-}
-
-// --------------------------------------------------
-// Font::DrawString hook
-// --------------------------------------------------
-
-HOOK_METHOD_PRIORITY(
-    Font,
-    DrawString,
+    PlayerHUD,
+    RenderHearts,
     100,
-    (const char *str, Vector pos, Vector scale,
-     KColor *color, FontSettings *settings)
-        ->void)
+    (Vector *unk, ANM2 *sprite, int playerHudLayout, float scale, Vector pos)
+        -> void)
 {
-    if (!str || !color || g_InStringCallback)
-    {
-        super(str, pos, scale, color, settings);
-        return;
-    }
+    super(unk, sprite, playerHudLayout, scale, pos);
 
-    // Preserve the original color.
-    KColor modifiedColor = *color;
-
-    // Persistent replacement text.
-    std::string replacement = str;
-
-    ProcessDrawString(
-        str,
-        pos,
-        scale,
-        &modifiedColor,
-        replacement);
-
-    super(
-        replacement.c_str(),
-        pos,
-        scale,
-        &modifiedColor,
-        settings);
+    // This keeps it from drawing once per player instance.
+    // if you want it on every HUD, remove this check.
+    if (this && (this->GetPlayer() != nullptr))
+        RenderOBJOverlay();
 }
 
-// --------------------------------------------------
-// Plugin entry point
-// --------------------------------------------------
+// -----------------------------------------------------------------------------
+// Entry points
+// -----------------------------------------------------------------------------
+
+BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID)
+{
+    if (reason == DLL_PROCESS_ATTACH)
+    {
+        g_Module = instance;
+        DisableThreadLibraryCalls(instance);
+    }
+    return TRUE;
+}
 
 extern "C" __declspec(dllexport) int ModInit()
 {
