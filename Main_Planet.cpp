@@ -25,6 +25,7 @@
 #include "stb_image.h"
 
 #pragma comment(lib, "opengl32.lib")
+#pragma comment(lib, "User32.lib")
 
 #ifndef GL_CURRENT_PROGRAM
 #define GL_CURRENT_PROGRAM 0x8B8D
