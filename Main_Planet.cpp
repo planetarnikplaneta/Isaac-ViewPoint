@@ -391,6 +391,14 @@ namespace
     // --------------------------------------------------
 static void RenderDiagnosticQuad()
 {
+    if (!EnsureContext())
+    {
+        LogMessage("Diagnostic quad: EnsureContext failed");
+        return;
+    }
+
+    LogMessage("Diagnostic quad: drawing");
+
     GLint oldProgram = 0;
     GLint oldMatrixMode = GL_MODELVIEW;
 
