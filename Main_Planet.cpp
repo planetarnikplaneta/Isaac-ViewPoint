@@ -417,7 +417,13 @@ const float right = left + side;
 const float bottom = top + side;
 
 glBegin(GL_QUADS);
+static bool compositeLogged = false;
 
+if (!compositeLogged)
+{
+    LogMessage("COMPOSITING: drawing framebuffer texture to game screen");
+    compositeLogged = true;
+}
 glTexCoord2f(0, 1);
 glVertex2f(left, top);
 
