@@ -883,52 +883,90 @@ HOOK_GLOBAL(OpenGL::wglSwapBuffers, (HDC hdc)->bool, __stdcall)
 
     if (swapCount < 30)
     {
-        char buffer[256];
+        GLint viewport[4] = {};
+        GLint oldProgram = 0;
+        GLint oldMatrixMode = GL_MODELVIEW;
+
+        glGetIntegerv(GL_VIEWPORT, viewport);
+        glGetIntegerv(GL_CURRENT_PROGRAM, &oldProgram);
+        glGetIntegerv(GL_MATRIX_MODE, &oldMatrixMode);
+
+        // Save the current rendering state.
+        glPushAttrib(GL_ALL_ATTRIB_BITS);
+
+        // Disable the game's shader.
+        if (g_UseProgram || LoadGLFunctions())
+        {
+            g_UseProgram(0);
+        }
+
+        // Set up an independent 2D projection.
+        glMatrixMode(GL_PROJECTION);
+        glPushMatrix();
+        glLoadIdentity();
+
+        glMatrixMode(GL_MODELVIEW);
+        glPushMatrix();
+        glLoadIdentity();
+
+        glDisable(GL_TEXTURE_2D);
+        glDisable(GL_DEPTH_TEST);
+        glDisable(GL_CULL_FACE);
+        glDisable(GL_BLEND);
+        glDisable(GL_SCISSOR_TEST);
+        glDisable(GL_ALPHA_TEST);
+        glDisable(GL_STENCIL_TEST);
+
+        glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+
+        // Draw a large magenta square in the center.
+        glColor4f(1.0f, 0.0f, 1.0f, 1.0f);
+
+        glBegin(GL_QUADS);
+
+        glVertex2f(-0.5f, -0.5f);
+        glVertex2f( 0.5f, -0.5f);
+        glVertex2f( 0.5f,  0.5f);
+        glVertex2f(-0.5f,  0.5f);
+
+        glEnd();
+
+        // Restore matrices.
+        glMatrixMode(GL_MODELVIEW);
+        glPopMatrix();
+
+        glMatrixMode(GL_PROJECTION);
+        glPopMatrix();
+
+        // Restore other OpenGL state.
+        glPopAttrib();
+
+        // Restore shader.
+        if (g_UseProgram)
+        {
+            g_UseProgram(static_cast<GLuint>(oldProgram));
+        }
+
+        // Restore original matrix mode.
+        if (oldMatrixMode == GL_MODELVIEW ||
+            oldMatrixMode == GL_PROJECTION ||
+            oldMatrixMode == GL_TEXTURE)
+        {
+            glMatrixMode(static_cast<GLenum>(oldMatrixMode));
+        }
+
+        char msg[256];
 
         snprintf(
-            buffer,
-            sizeof(buffer),
-            "Swap #%u HDC=%p",
+            msg,
+            sizeof(msg),
+            "Diagnostic square drawn before swap #%u; viewport=%dx%d",
             swapCount,
-            static_cast<void*>(hdc)
+            viewport[2],
+            viewport[3]
         );
 
-        LogMessage(buffer);
-
-        HGLRC context = wglGetCurrentContext();
-
-        if (context)
-        {
-            GLint framebuffer = -1;
-            GLint viewport[4] = {};
-
-            glGetIntegerv(
-                GL_FRAMEBUFFER_BINDING,
-                &framebuffer
-            );
-
-            glGetIntegerv(
-                GL_VIEWPORT,
-                viewport
-            );
-
-            snprintf(
-                buffer,
-                sizeof(buffer),
-                "Swap #%u: Context=%p FBO=%d Viewport=%dx%d",
-                swapCount,
-                static_cast<void*>(context),
-                framebuffer,
-                viewport[2],
-                viewport[3]
-            );
-
-            LogMessage(buffer);
-        }
-        else
-        {
-            LogMessage("Swap hook called without current OpenGL context");
-        }
+        LogMessage(msg);
     }
 
     ++swapCount;
