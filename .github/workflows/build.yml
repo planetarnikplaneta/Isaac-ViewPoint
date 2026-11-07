@@ -69,6 +69,7 @@ jobs:
             Resources\ResourceManager.cpp ^
             Models\OBJLoader.cpp ^
             Models\Texture.cpp ^
+            Models\GpuMesh.cpp ^
             ViewPointResources.res ^
             libzhl.lib ^
             /link /OUT:zhlMain_Planet.dll
