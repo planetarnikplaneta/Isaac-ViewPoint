@@ -44,6 +44,26 @@
 #define GL_READ_BUFFER 0x0C02
 #endif
 
+#ifndef GL_MAJOR_VERSION
+#define GL_MAJOR_VERSION 0x821B
+#endif
+
+#ifndef GL_MINOR_VERSION
+#define GL_MINOR_VERSION 0x821C
+#endif
+
+#ifndef GL_CONTEXT_PROFILE_MASK
+#define GL_CONTEXT_PROFILE_MASK 0x9126
+#endif
+
+#ifndef GL_CONTEXT_CORE_PROFILE_BIT
+#define GL_CONTEXT_CORE_PROFILE_BIT 0x00000001
+#endif
+
+#ifndef GL_CONTEXT_COMPATIBILITY_PROFILE_BIT
+#define GL_CONTEXT_COMPATIBILITY_PROFILE_BIT 0x00000002
+#endif
+
 using PFNGLUSEPROGRAMPROC = void (APIENTRY *)(GLuint);
 using PFNGLACTIVETEXTUREPROC = void (APIENTRY *)(GLenum);
 
@@ -423,100 +443,116 @@ static void CheckGLError(const char* stage)
 
 static void RenderDiagnosticQuad()
 {
-    if (!EnsureContext())
-        return;
+    HGLRC context = wglGetCurrentContext();
 
-    // Clear errors left by the game before our test.
+    if (!context)
+    {
+        LogMessage("No current OpenGL context");
+        return;
+    }
+
+    const GLubyte* version = glGetString(GL_VERSION);
+    const GLubyte* renderer = glGetString(GL_RENDERER);
+    const GLubyte* vendor = glGetString(GL_VENDOR);
+    const GLubyte* extensions = glGetString(GL_EXTENSIONS);
+
+    char msg[1024];
+
+    snprintf(
+        msg,
+        sizeof(msg),
+        "GL_VERSION: %s",
+        version
+            ? reinterpret_cast<const char*>(version)
+            : "NULL"
+    );
+
+    LogMessage(msg);
+
+    snprintf(
+        msg,
+        sizeof(msg),
+        "GL_RENDERER: %s",
+        renderer
+            ? reinterpret_cast<const char*>(renderer)
+            : "NULL"
+    );
+
+    LogMessage(msg);
+
+    snprintf(
+        msg,
+        sizeof(msg),
+        "GL_VENDOR: %s",
+        vendor
+            ? reinterpret_cast<const char*>(vendor)
+            : "NULL"
+    );
+
+    LogMessage(msg);
+
+    // Check whether GL_MATRIX_MODE is supported.
     while (glGetError() != GL_NO_ERROR)
     {
     }
 
-    GLint oldProgram = 0;
-    GLint oldMatrixMode = GL_MODELVIEW;
+    GLint matrixMode = -1;
 
-    glGetIntegerv(GL_CURRENT_PROGRAM, &oldProgram);
-    glGetIntegerv(GL_MATRIX_MODE, &oldMatrixMode);
-    char matrixMsg[128];
+    glGetIntegerv(GL_MATRIX_MODE, &matrixMode);
 
-snprintf(
-    matrixMsg,
-    sizeof(matrixMsg),
-    "Original matrix mode: 0x%X",
-    oldMatrixMode
-);
+    GLenum error = glGetError();
 
-LogMessage(matrixMsg);
+    snprintf(
+        msg,
+        sizeof(msg),
+        "GL_MATRIX_MODE: 0x%X, error: 0x%X",
+        matrixMode,
+        error
+    );
 
-    glPushAttrib(GL_ALL_ATTRIB_BITS);
-    CheckGLError("glPushAttrib");
+    LogMessage(msg);
 
-    if (g_UseProgram)
-        g_UseProgram(0);
+    // Check OpenGL context profile (OpenGL 3.2+).
+    GLint major = 0;
+    GLint minor = 0;
 
-    CheckGLError("glUseProgram");
+    glGetIntegerv(GL_MAJOR_VERSION, &major);
+    glGetIntegerv(GL_MINOR_VERSION, &minor);
 
-    glDisable(GL_DEPTH_TEST);
-    glDisable(GL_TEXTURE_2D);
-    glDisable(GL_BLEND);
-    glDisable(GL_ALPHA_TEST);
-    glDisable(GL_STENCIL_TEST);
-    glDisable(GL_SCISSOR_TEST);
-    glDisable(GL_CULL_FACE);
-    glDisable(GL_LIGHTING);
-    glDisable(GL_FOG);
+    snprintf(
+        msg,
+        sizeof(msg),
+        "OpenGL version numbers: %d.%d",
+        major,
+        minor
+    );
 
-    CheckGLError("glDisable states");
+    LogMessage(msg);
 
-    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    if (major > 3 || (major == 3 && minor >= 2))
+    {
+        GLint profile = 0;
 
-    CheckGLError("color mask and polygon mode");
+        glGetIntegerv(
+            GL_CONTEXT_PROFILE_MASK,
+            &profile
+        );
 
-    glMatrixMode(GL_PROJECTION);
-    CheckGLError("projection matrix mode");
+        snprintf(
+            msg,
+            sizeof(msg),
+            "GL_CONTEXT_PROFILE_MASK: 0x%X",
+            profile
+        );
 
-    glPushMatrix();
-    glLoadIdentity();
+        LogMessage(msg);
 
-    CheckGLError("projection matrix setup");
+        if (profile & GL_CONTEXT_CORE_PROFILE_BIT)
+            LogMessage("OpenGL Core Profile detected");
 
-    glMatrixMode(GL_MODELVIEW);
-    glPushMatrix();
-    glLoadIdentity();
-
-    CheckGLError("modelview matrix setup");
-
-    glColor4f(1.0f, 0.0f, 0.0f, 1.0f);
-
-    glBegin(GL_QUADS);
-
-        glVertex2f(-0.5f, -0.5f);
-        glVertex2f( 0.5f, -0.5f);
-        glVertex2f( 0.5f,  0.5f);
-        glVertex2f(-0.5f,  0.5f);
-
-    glEnd();
-
-    CheckGLError("quad drawing");
-
-    glPopMatrix();
-CheckGLError("pop modelview matrix");
-
-glMatrixMode(GL_PROJECTION);
-CheckGLError("switch to projection matrix");
-
-glPopMatrix();
-CheckGLError("pop projection matrix");
-
-glMatrixMode(oldMatrixMode);
-CheckGLError("restore original matrix mode");
-
-    glPopAttrib();
-
-    if (g_UseProgram)
-        g_UseProgram(static_cast<GLuint>(oldProgram));
-
-    CheckGLError("OpenGL state restoration");
+        if (profile & GL_CONTEXT_COMPATIBILITY_PROFILE_BIT)
+            LogMessage("OpenGL Compatibility Profile detected");
+    }
 }
 
     static void RenderTriangleMesh()
