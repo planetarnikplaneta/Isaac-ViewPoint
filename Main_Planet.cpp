@@ -138,11 +138,32 @@ namespace
     // --------------------------------------------------
     // Logging
     // --------------------------------------------------
-
+    
+    constexpr char LOG_FILE[] = "C:\\IsaacViewPoint.log";
+    
+    static bool ResetLogFile()
+    {
+        FILE *file = fopen(LOG_FILE, "w");
+    
+        if (!file)
+        {
+            OutputDebugStringA(
+                "Isaac ViewPoint: Failed to reset log file.\n"
+            );
+    
+            return false;
+        }
+    
+        fprintf(file, "Isaac ViewPoint: Log started\n");
+        fclose(file);
+    
+        return true;
+    }
+    
     static void LogMessage(const char *message)
     {
-        FILE *file = fopen("C:\\MyNativeMod.log", "a");
-
+        FILE *file = fopen(LOG_FILE, "a");
+    
         if (file)
         {
             fprintf(file, "Isaac ViewPoint: %s\n", message);
@@ -1656,8 +1677,13 @@ static void DiagnoseEmbeddedResources()
 
 extern "C" __declspec(dllexport) int ModInit()
 {
+    ResetLogFile();
+
     LogMessage("Isaac: ViewPoint initialized");
-    LogMessage(("Default model: " + std::string(DEFAULT_OBJECT)).c_str());
+    LogMessage(
+        ("Default model: " +
+         std::string(DEFAULT_OBJECT)).c_str()
+    );
 
     DiagnoseEmbeddedResources();
 
