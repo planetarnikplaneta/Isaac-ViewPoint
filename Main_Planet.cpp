@@ -1636,63 +1636,78 @@ static BOOL CALLBACK EnumerateResourceNames(
     HMODULE module,
     LPCSTR type,
     LPSTR name,
-    LONG_PTR
-)
+    LONG_PTR)
 {
+    char message[512];
+
     if (IS_INTRESOURCE(name))
     {
-        char message[128];
+        snprintf(
+            message,
+            sizeof(message),
+            "Embedded numeric resource ID: %u",
+            static_cast<unsigned>(reinterpret_cast<ULONG_PTR>(name))
+        );
 
+        LogMessage(message);
+        return TRUE;
+    }
 
-snprintf(
-message,
-sizeof(message),
-"Embedded numeric resource ID: %u",
-static_cast<unsigned>(reinterpret_cast<ULONG_PTR>(name))
-);
+    snprintf(
+        message,
+        sizeof(message),
+        "Enumerated resource: module=%p, name=\"%s\"",
+        static_cast<void*>(module),
+        name
+    );
 
-LogMessage(message);
+    LogMessage(message);
+
+    SetLastError(ERROR_SUCCESS);
+
+    HRSRC resource = FindResourceA(
+        module,
+        name,
+        type
+    );
+
+    if (resource)
+    {
+        LogMessage("Lookup using enumerated name: SUCCESS");
+    }
+    else
+    {
+        snprintf(
+            message,
+            sizeof(message),
+            "Lookup using enumerated name: FAILED, error=%lu",
+            static_cast<unsigned long>(GetLastError())
+        );
+
+        LogMessage(message);
+    }
+
+    return TRUE;
 }
-else
-{
-LogMessage(
-(std::string("Embedded resource name: ") + name).c_str()
-);
-}
-
-return TRUE;
-}
-
 static void DiagnoseEmbeddedResources()
 {
-LogMessage("Enumerating embedded RCDATA resources...");
+    char message[256];
 
-if (!g_Module)
-{
-LogMessage("ERROR: g_Module is null");
-return;
-}
+    snprintf(
+        message,
+        sizeof(message),
+        "Resource enumeration module: %p",
+        static_cast<void*>(g_Module)
+    );
 
-if (!EnumResourceNamesA(
-g_Module,
-RT_RCDATA,
-EnumerateResourceNames,
-0))
-{
-char message[128];
+    LogMessage(message);
 
-snprintf(
-message,
-sizeof(message),
-"EnumResourceNamesA failed: %lu",
-GetLastError()
-);
-
-LogMessage(message);
-return;
-}
-
-LogMessage("Resource enumeration finished.");
+    EnumResourceNamesA(
+        g_Module,
+        RT_RCDATA,
+        EnumerateResourceNames,
+        0
+    );
 }
 // --------------------------------------------------
 // Mod initialization
