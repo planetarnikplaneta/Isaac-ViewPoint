@@ -1015,7 +1015,7 @@ namespace ViewPoint
     }
  // MAIN RENDERER
 
-    static void RenderTriangleMesh(HWND window)
+    void RenderTriangleMesh(HWND window)
     {
         if (!EnsureContext())
             return;
