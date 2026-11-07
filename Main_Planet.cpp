@@ -390,7 +390,7 @@ namespace
     // Mesh rendering
     // --------------------------------------------------
 
-    void RenderTriangleMesh()
+void RenderTriangleMesh()
 {
     GLint viewport[4] = { 0, 0, 0, 0 };
     GLint oldMatrixMode = GL_MODELVIEW;
@@ -466,6 +466,7 @@ namespace
         glUseProgram(oldProgram);
 
     glMatrixMode(oldMatrixMode);
+}
 }
 
 // --------------------------------------------------
