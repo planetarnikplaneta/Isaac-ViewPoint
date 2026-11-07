@@ -881,29 +881,75 @@ HOOK_GLOBAL(OpenGL::wglSwapBuffers, (HDC hdc)->bool, __stdcall)
 {
     static unsigned int swapCount = 0;
 
-    GLint viewport[4] = {};
-    GLint framebuffer = -1;
-    GLint drawBuffer = -1;
+    GLint oldMatrixMode = GL_MODELVIEW;
+    GLint oldProgram = 0;
 
-    glGetIntegerv(GL_VIEWPORT, viewport);
-    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &framebuffer);
-    glGetIntegerv(GL_DRAW_BUFFER, &drawBuffer);
+    glGetIntegerv(GL_MATRIX_MODE, &oldMatrixMode);
+    glGetIntegerv(GL_CURRENT_PROGRAM, &oldProgram);
 
-    char msg[256];
+    glPushAttrib(GL_ALL_ATTRIB_BITS);
 
-    snprintf(
-        msg,
-        sizeof(msg),
-        "SWAP #%u | HDC=%p | FBO=%d | DRAW=0x%X | VIEWPORT=%dx%d",
-        swapCount,
-        static_cast<void*>(hdc),
-        framebuffer,
-        drawBuffer,
-        viewport[2],
-        viewport[3]
-    );
+    if (LoadGLFunctions())
+        g_UseProgram(0);
 
-    LogMessage(msg);
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+
+    glDisable(GL_TEXTURE_2D);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
+    glDisable(GL_BLEND);
+    glDisable(GL_SCISSOR_TEST);
+    glDisable(GL_ALPHA_TEST);
+    glDisable(GL_STENCIL_TEST);
+
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+
+    glColor4f(1.0f, 0.0f, 1.0f, 1.0f);
+
+    glBegin(GL_QUADS);
+        glVertex2f(-0.5f, -0.5f);
+        glVertex2f( 0.5f, -0.5f);
+        glVertex2f( 0.5f,  0.5f);
+        glVertex2f(-0.5f,  0.5f);
+    glEnd();
+
+    glMatrixMode(GL_MODELVIEW);
+    glPopMatrix();
+
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+
+    glPopAttrib();
+
+    if (g_UseProgram)
+        g_UseProgram(static_cast<GLuint>(oldProgram));
+
+    if (oldMatrixMode == GL_MODELVIEW ||
+        oldMatrixMode == GL_PROJECTION ||
+        oldMatrixMode == GL_TEXTURE)
+    {
+        glMatrixMode(static_cast<GLenum>(oldMatrixMode));
+    }
+
+    if (swapCount < 5)
+    {
+        char msg[128];
+
+        snprintf(
+            msg,
+            sizeof(msg),
+            "Diagnostic square drawn on swap #%u",
+            swapCount
+        );
+
+        LogMessage(msg);
+    }
 
     ++swapCount;
 
