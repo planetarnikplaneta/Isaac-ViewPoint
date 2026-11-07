@@ -356,25 +356,13 @@ glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glRotatef(-12, 1, 0, 0);
         glRotatef(static_cast<float>(GetTickCount64()) * 0.012f, 0, 1, 0);
 
-        const float lx = -0.35f, ly = 0.55f, lz = -0.76f;
-        const float lightLen = std::sqrt(lx*lx + ly*ly + lz*lz);
-        glBegin(GL_TRIANGLES);
-        for (const Triangle &t : g_Triangles)
-        {
-            if (t.a >= g_Vertices.size() || t.b >= g_Vertices.size() || t.c >= g_Vertices.size()) continue;
-            const Vertex3 &a = g_Vertices[t.a], &b = g_Vertices[t.b], &c = g_Vertices[t.c];
-            const float ux=b.x-a.x, uy=b.y-a.y, uz=b.z-a.z;
-            const float vx=c.x-a.x, vy=c.y-a.y, vz=c.z-a.z;
-            float nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;
-            const float nl=std::sqrt(nx*nx+ny*ny+nz*nz);
-            if (nl < 1e-8f) continue;
-            nx/=nl; ny/=nl; nz/=nl;
-            const float diffuse=std::max(0.0f,(nx*lx+ny*ly+nz*lz)/lightLen);
-            const float brightness=0.25f+0.75f*diffuse;
-            glColor4f(0.18f*brightness, 0.52f*brightness, 0.82f*brightness, 1.0f);
-            glNormal3f(nx,ny,nz);
-            glVertex3f(a.x,a.y,a.z); glVertex3f(b.x,b.y,b.z); glVertex3f(c.x,c.y,c.z);
-        }
+// TEST: Fill the entire offscreen framebuffer with solid red.
+glDisable(GL_DEPTH_TEST);
+glDisable(GL_TEXTURE_2D);
+glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+
+glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
+glClear(GL_COLOR_BUFFER_BIT);
         glEnd();
 
         // Composite the isolated render target.
