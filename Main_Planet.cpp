@@ -436,6 +436,16 @@ static void RenderDiagnosticQuad()
 
     glGetIntegerv(GL_CURRENT_PROGRAM, &oldProgram);
     glGetIntegerv(GL_MATRIX_MODE, &oldMatrixMode);
+    char matrixMsg[128];
+
+snprintf(
+    matrixMsg,
+    sizeof(matrixMsg),
+    "Original matrix mode: 0x%X",
+    oldMatrixMode
+);
+
+LogMessage(matrixMsg);
 
     glPushAttrib(GL_ALL_ATTRIB_BITS);
     CheckGLError("glPushAttrib");
