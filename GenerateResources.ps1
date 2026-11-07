@@ -85,13 +85,3 @@ Write-Host ""
 Write-Host "Resource compilation successful."
 Write-Host "Embedded files: $($files.Count)"
 Write-Host "Output: $OutputRes"
-
-Write-Host "=== Generated resource script ==="
-Get-Content ViewPointResources.rc
-
-Write-Host "=== Compiled resource file ==="
-Get-Item ViewPointResources.res | Format-List FullName, Length
-
-if ((Get-Item ViewPointResources.res).Length -eq 0) {
-    throw "ViewPointResources.res is empty"
-}
