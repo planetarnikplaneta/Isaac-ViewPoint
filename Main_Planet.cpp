@@ -48,11 +48,14 @@ namespace
 {
     namespace fs = std::filesystem;
 
-    // --------------------------------------------------
-    // Configuration
-    // --------------------------------------------------
+    // ==================================================
+    // CONFIGURATION
+    // ==================================================
 
     constexpr char DEFAULT_OBJECT[] = "objects/sphere.obj";
+
+    constexpr char LOG_FILE[] = "C:\\IsaacViewPoint.log";
+    constexpr char CONFIG_FILE[] = "IsaacViewPoint.ini";
 
     constexpr float OBJECT_DISTANCE = 5.0f;
     constexpr float OBJECT_ROTATION_SPEED = 0.012f;
@@ -66,18 +69,21 @@ namespace
     constexpr float AMBIENT_LIGHT = 0.40f;
     constexpr float DIFFUSE_LIGHT = 0.60f;
 
-    // --------------------------------------------------
-    // Structures
-    // --------------------------------------------------
+    // ==================================================
+    // STRUCTURES
+    // ==================================================
 
     struct Vertex3
     {
-        float x, y, z;
+        float x = 0.0f;
+        float y = 0.0f;
+        float z = 0.0f;
     };
 
     struct Vertex2
     {
-        float u, v;
+        float u = 0.0f;
+        float v = 0.0f;
     };
 
     struct ObjCorner
@@ -97,15 +103,23 @@ namespace
     {
         std::string name;
 
-        float ambient[3] = {0.2f, 0.2f, 0.2f};
-        float diffuse[3] = {1.0f, 1.0f, 1.0f};
-        float specular[3] = {0.0f, 0.0f, 0.0f};
+        float ambient[3] = {
+            0.2f, 0.2f, 0.2f
+        };
+
+        float diffuse[3] = {
+            1.0f, 1.0f, 1.0f
+        };
+
+        float specular[3] = {
+            0.0f, 0.0f, 0.0f
+        };
 
         float shininess = 32.0f;
 
         std::string diffuseTexturePath;
 
-        unsigned char *pixels = nullptr;
+        std::vector<unsigned char> pixels;
 
         int width = 0;
         int height = 0;
@@ -115,81 +129,129 @@ namespace
         bool textureAttempted = false;
     };
 
-    // --------------------------------------------------
-    // Global state
-    // --------------------------------------------------
+    // Every model owns its own geometry and materials.
+    struct Model
+    {
+        std::string path;
+
+        std::vector<Vertex3> vertices;
+        std::vector<Vertex2> texcoords;
+        std::vector<Vertex3> normals;
+
+        std::vector<Triangle> triangles;
+        std::vector<Material> materials;
+
+        bool attempted = false;
+        bool loaded = false;
+    };
+
+    // ==================================================
+    // GLOBAL STATE
+    // ==================================================
 
     static HMODULE g_Module = nullptr;
+
     static HGLRC g_ResourceContext = nullptr;
 
     static PFNGLUSEPROGRAMPROC g_UseProgram = nullptr;
     static PFNGLACTIVETEXTUREPROC g_ActiveTexture = nullptr;
 
-    static bool g_MeshAttempted = false;
-    static bool g_MeshLoaded = false;
+    static Model g_Model;
 
-    static std::vector<Vertex3> g_Vertices;
-    static std::vector<Vertex2> g_Texcoords;
-    static std::vector<Vertex3> g_Normals;
+    static std::string g_ModelPath = DEFAULT_OBJECT;
 
-    static std::vector<Triangle> g_Triangles;
-    static std::vector<Material> g_Materials;
+    // ==================================================
+    // LOGGING
+    // ==================================================
 
-    // --------------------------------------------------
-    // Logging
-    // --------------------------------------------------
-    
-    constexpr char LOG_FILE[] = "C:\\IsaacViewPoint.log";
-    
     static bool ResetLogFile()
     {
-        FILE *file = fopen(LOG_FILE, "w");
-    
+        FILE* file = fopen(LOG_FILE, "w");
+
         if (!file)
         {
             OutputDebugStringA(
-                "Isaac ViewPoint: Failed to reset log file.\n"
+                "Isaac ViewPoint: Cannot reset log file.\n"
             );
-    
+
             return false;
         }
-    
+
         fprintf(file, "Isaac ViewPoint: Log started\n");
         fclose(file);
-    
+
         return true;
     }
-    
-    static void LogMessage(const char *message)
+
+    static void LogMessage(const char* message)
     {
-        FILE *file = fopen(LOG_FILE, "a");
-    
-        if (file)
+        FILE* file = fopen(LOG_FILE, "a");
+
+        if (!file)
         {
-            fprintf(file, "Isaac ViewPoint: %s\n", message);
-            fclose(file);
+            OutputDebugStringA(
+                "Isaac ViewPoint: Cannot write log.\n"
+            );
+
+            return;
         }
+
+        fprintf(
+            file,
+            "Isaac ViewPoint: %s\n",
+            message
+        );
+
+        fclose(file);
     }
 
-    // --------------------------------------------------
-    // String helpers
-    // --------------------------------------------------
-
-    static std::string Trim(const std::string &text)
+    static void LogNumber(
+        const char* label,
+        size_t value)
     {
-        const size_t first = text.find_first_not_of(" \t\r\n");
+        char message[256];
+
+        snprintf(
+            message,
+            sizeof(message),
+            "%s: %zu",
+            label,
+            value
+        );
+
+        LogMessage(message);
+    }
+
+    // ==================================================
+    // STRING HELPERS
+    // ==================================================
+
+    static std::string Trim(const std::string& text)
+    {
+        const size_t first =
+            text.find_first_not_of(" \t\r\n");
 
         if (first == std::string::npos)
             return {};
 
-        const size_t last = text.find_last_not_of(" \t\r\n");
+        const size_t last =
+            text.find_last_not_of(" \t\r\n");
 
-        return text.substr(first, last - first + 1);
+        return text.substr(
+            first,
+            last - first + 1
+        );
     }
 
-    static std::string NormalizeAssetPath(std::string path)
+    static std::string NormalizeAssetPath(
+        std::string path)
     {
-        std::replace(path.begin(), path.end(), '\\', '/');
+        std::replace(
+            path.begin(),
+            path.end(),
+            '\\',
+            '/'
+        );
 
         while (path.rfind("./", 0) == 0)
             path.erase(0, 2);
@@ -202,6 +264,7 @@ namespace
         }
 
         std::stringstream stream(path);
+
         std::string part;
         std::vector<std::string> parts;
 
@@ -218,7 +281,7 @@ namespace
 
         std::string result;
 
-        for (const std::string &p : parts)
+        for (const std::string& p : parts)
         {
             if (!result.empty())
                 result += '/';
@@ -230,8 +293,8 @@ namespace
     }
 
     static std::string ResolveRelativeAsset(
-        const std::string &parent,
-        const std::string &child)
+        const std::string& parent,
+        const std::string& child)
     {
         std::string normalizedChild = child;
 
@@ -239,7 +302,8 @@ namespace
             normalizedChild.begin(),
             normalizedChild.end(),
             '\\',
-            '/');
+            '/'
+        );
 
         if (normalizedChild.empty() ||
             normalizedChild[0] == '/' ||
@@ -249,19 +313,40 @@ namespace
             return {};
         }
 
-        const size_t slash = parent.find_last_of('/');
+        const size_t slash =
+            parent.find_last_of('/');
 
         const std::string directory =
             slash == std::string::npos
                 ? ""
                 : parent.substr(0, slash + 1);
 
-        return NormalizeAssetPath(directory + normalizedChild);
+        return NormalizeAssetPath(
+            directory + normalizedChild
+        );
     }
 
-    // --------------------------------------------------
-    // DLL directory
-    // --------------------------------------------------
+    static std::string ToUpperResourceName(
+        const std::string& name)
+    {
+        std::string result = name;
+
+        for (char& c : result)
+        {
+            if (c >= 'a' && c <= 'z')
+            {
+                c = static_cast<char>(
+                    c - 'a' + 'A'
+                );
+            }
+        }
+
+        return result;
+    }
+
+    // ==================================================
+    // DLL DIRECTORY
+    // ==================================================
 
     static fs::path GetDllDirectory()
     {
@@ -270,94 +355,143 @@ namespace
         DWORD length = GetModuleFileNameA(
             g_Module,
             modulePath,
-            MAX_PATH);
+            MAX_PATH
+        );
 
         if (!length || length >= MAX_PATH)
             return fs::current_path();
 
         return fs::path(
-                   std::string(modulePath, length))
-            .parent_path();
+            std::string(modulePath, length)
+        ).parent_path();
     }
 
-    // --------------------------------------------------
-    // Asset loading
-    // --------------------------------------------------
+    // ==================================================
+    // CONFIGURATION FILE
+    // ==================================================
 
-    // First checks:
-    // <DLL directory>/resources_ViewPoint/<asset path>
-    //
-    // If the external file does not exist, checks the
-    // embedded Windows resource with the same name.
-    static std::string ToUpperResourceName(const std::string &name)
+    static void LoadConfiguration()
     {
-        std::string result = name;
+        const fs::path configPath =
+            GetDllDirectory() / CONFIG_FILE;
 
-        for (char &c : result)
+        std::ifstream file(configPath);
+
+        if (!file)
         {
-            if (c >= 'a' && c <= 'z')
-                c = static_cast<char>(c - 'a' + 'A');
+            LogMessage(
+                "Configuration file not found; using default model."
+            );
+
+            g_ModelPath = DEFAULT_OBJECT;
+            return;
         }
 
-        return result;
+        std::string line;
+
+        while (std::getline(file, line))
+        {
+            line = Trim(line);
+
+            if (line.empty() ||
+                line[0] == '#' ||
+                line[0] == ';' ||
+                line[0] == '[')
+            {
+                continue;
+            }
+
+            const size_t equals =
+                line.find('=');
+
+            if (equals == std::string::npos)
+                continue;
+
+            const std::string key =
+                Trim(line.substr(0, equals));
+
+            const std::string value =
+                Trim(line.substr(equals + 1));
+
+            if (key == "Model")
+            {
+                const std::string normalized =
+                    NormalizeAssetPath(value);
+
+                if (!normalized.empty())
+                {
+                    g_ModelPath = normalized;
+                }
+            }
+        }
+
+        LogMessage(
+            ("Configured model: " + g_ModelPath).c_str()
+        );
     }
 
-   static HRSRC FindEmbeddedResource(
-    HMODULE module,
-    const std::string& assetPath)
+    // ==================================================
+    // EMBEDDED RESOURCE LOOKUP
+    // ==================================================
+
+    static HRSRC FindEmbeddedResource(
+        HMODULE module,
+        const std::string& assetPath)
     {
         const std::string resourceName =
             ToUpperResourceName(assetPath);
-    
-        // First try the normal resource name.
+
         HRSRC resource = FindResourceA(
             module,
             resourceName.c_str(),
             RT_RCDATA
         );
-    
+
         if (resource)
             return resource;
-    
-        // Some generated resources may contain literal quotes.
-        const std::string quotedResourceName =
+
+        // The current generated resources use literal
+        // quotation marks in their resource names.
+        const std::string quotedName =
             "\"" + resourceName + "\"";
-    
+
         resource = FindResourceA(
             module,
-            quotedResourceName.c_str(),
+            quotedName.c_str(),
             RT_RCDATA
         );
-    
+
         if (resource)
         {
             LogMessage(
                 ("Found quoted resource name: " +
-                 quotedResourceName).c_str()
+                 quotedName).c_str()
             );
-    
+
             return resource;
         }
-    
+
         char message[512];
-    
+
         snprintf(
             message,
             sizeof(message),
-            "Resource not found: \"%s\" or \"%s\", error=%lu",
-            resourceName.c_str(),
-            quotedResourceName.c_str(),
-            static_cast<unsigned long>(GetLastError())
+            "Resource not found: %s",
+            assetPath.c_str()
         );
-    
+
         LogMessage(message);
-    
+
         return nullptr;
     }
 
+    // ==================================================
+    // ASSET LOADING
+    // ==================================================
+
     static bool ReadAsset(
-        const std::string &requestedPath,
-        std::vector<unsigned char> &output)
+        const std::string& requestedPath,
+        std::vector<unsigned char>& output)
     {
         const std::string assetPath =
             NormalizeAssetPath(requestedPath);
@@ -368,7 +502,7 @@ namespace
         output.clear();
 
         // ----------------------------------------------
-        // External resource
+        // External assets override embedded assets.
         // ----------------------------------------------
 
         try
@@ -383,13 +517,15 @@ namespace
             {
                 std::ifstream file(
                     externalPath,
-                    std::ios::binary);
+                    std::ios::binary
+                );
 
                 if (file)
                 {
                     file.seekg(0, std::ios::end);
 
-                    const std::streamoff size = file.tellg();
+                    const std::streamoff size =
+                        file.tellg();
 
                     if (size <= 0)
                         return false;
@@ -397,14 +533,25 @@ namespace
                     file.seekg(0, std::ios::beg);
 
                     output.resize(
-                        static_cast<size_t>(size));
+                        static_cast<size_t>(size)
+                    );
 
                     file.read(
-                        reinterpret_cast<char *>(output.data()),
-                        size);
+                        reinterpret_cast<char*>(
+                            output.data()
+                        ),
+                        size
+                    );
 
                     if (file)
+                    {
+                        LogMessage(
+                            ("Loaded external asset: " +
+                             assetPath).c_str()
+                        );
+
                         return true;
+                    }
 
                     output.clear();
                 }
@@ -412,64 +559,75 @@ namespace
         }
         catch (...)
         {
-            LogMessage("External asset access failed");
+            LogMessage(
+                "External asset access failed."
+            );
         }
 
         // ----------------------------------------------
-        // Embedded resource
+        // Embedded Windows resource.
         // ----------------------------------------------
 
         HRSRC resource = FindEmbeddedResource(
             g_Module,
-            assetPath);
+            assetPath
+        );
 
         if (!resource)
         {
             LogMessage(
-                ("Embedded asset not found: " + assetPath).c_str());
+                ("Asset not found: " +
+                 assetPath).c_str()
+            );
 
             return false;
         }
 
         HGLOBAL loaded = LoadResource(
             g_Module,
-            resource);
+            resource
+        );
 
         if (!loaded)
             return false;
 
         const DWORD size = SizeofResource(
             g_Module,
-            resource);
+            resource
+        );
 
-        const void *data = LockResource(loaded);
+        const void* data = LockResource(loaded);
 
         if (!data || size == 0)
             return false;
 
-        const unsigned char *bytes =
-            static_cast<const unsigned char *>(data);
+        const unsigned char* bytes =
+            static_cast<const unsigned char*>(data);
 
-        output.assign(bytes, bytes + size);
+        output.assign(
+            bytes,
+            bytes + size
+        );
 
         return true;
     }
 
-    // --------------------------------------------------
-    // OBJ index parsing
-    // --------------------------------------------------
+    // ==================================================
+    // OBJ INDEX PARSING
+    // ==================================================
 
     static bool ParseObjIndex(
-        const std::string &token,
+        const std::string& token,
         int component,
         size_t count,
-        int32_t &output)
+        int32_t& output)
     {
         size_t start = 0;
 
         for (int i = 0; i < component; ++i)
         {
-            size_t slash = token.find('/', start);
+            const size_t slash =
+                token.find('/', start);
 
             if (slash == std::string::npos)
                 return false;
@@ -477,7 +635,8 @@ namespace
             start = slash + 1;
         }
 
-        size_t end = token.find('/', start);
+        size_t end =
+            token.find('/', start);
 
         if (end == std::string::npos)
             end = token.size();
@@ -485,23 +644,24 @@ namespace
         if (start >= end)
             return false;
 
-        std::string number = token.substr(
-            start,
-            end - start);
+        const std::string number =
+            token.substr(start, end - start);
 
-        char *parseEnd = nullptr;
+        char* parseEnd = nullptr;
 
-        long value = strtol(
+        const long value = strtol(
             number.c_str(),
             &parseEnd,
-            10);
+            10
+        );
 
         if (!parseEnd || *parseEnd || value == 0)
             return false;
 
-        long resolved = value > 0
-                            ? value - 1
-                            : static_cast<long>(count) + value;
+        const long resolved =
+            value > 0
+                ? value - 1
+                : static_cast<long>(count) + value;
 
         if (resolved < 0 ||
             static_cast<size_t>(resolved) >= count)
@@ -514,13 +674,14 @@ namespace
         return true;
     }
 
-    // --------------------------------------------------
-    // Material management
-    // --------------------------------------------------
+    // ==================================================
+    // MATERIAL MANAGEMENT
+    // ==================================================
 
     static int FindOrCreateMaterial(
-        const std::string &name,
-        std::map<std::string, int> &lookup)
+        const std::string& name,
+        std::map<std::string, int>& lookup,
+        Model& model)
     {
         auto found = lookup.find(name);
 
@@ -530,37 +691,130 @@ namespace
         Material material;
         material.name = name;
 
-        const int index = static_cast<int>(
-            g_Materials.size());
+        const int index =
+            static_cast<int>(model.materials.size());
 
-        g_Materials.push_back(material);
+        model.materials.push_back(
+            std::move(material)
+        );
 
         lookup[name] = index;
 
         return index;
     }
 
-    // --------------------------------------------------
-    // MTL loading
-    // --------------------------------------------------
+    // ==================================================
+    // MTL TEXTURE PATH PARSING
+    // ==================================================
+
+    static std::string GetMapFilename(
+        std::istringstream& stream)
+    {
+        std::vector<std::string> tokens;
+
+        std::string token;
+
+        while (stream >> token)
+            tokens.push_back(token);
+
+        if (tokens.empty())
+            return {};
+
+        // Handle common MTL map options.
+        size_t i = 0;
+
+        while (i < tokens.size())
+        {
+            const std::string& option = tokens[i];
+
+            if (option.empty() || option[0] != '-')
+                break;
+
+            size_t argumentCount = 0;
+
+            if (option == "-blendu" ||
+                option == "-blendv" ||
+                option == "-cc" ||
+                option == "-clamp" ||
+                option == "-texres" ||
+                option == "-bm" ||
+                option == "-imfchan" ||
+                option == "-type")
+            {
+                argumentCount = 1;
+            }
+            else if (option == "-mm")
+            {
+                argumentCount = 2;
+            }
+            else if (option == "-o" ||
+                     option == "-s" ||
+                     option == "-t")
+            {
+                argumentCount = 3;
+            }
+            else
+            {
+                // Unknown option: use the final token
+                // as the texture filename.
+                return tokens.back();
+            }
+
+            ++i;
+
+            for (size_t n = 0;
+                 n < argumentCount && i < tokens.size();
+                 ++n)
+            {
+                // Vector options may provide one,
+                // two or three values.
+                if ((option == "-o" ||
+                     option == "-s" ||
+                     option == "-t") &&
+                    i < tokens.size() &&
+                    !tokens[i].empty() &&
+                    tokens[i][0] == '-')
+                {
+                    break;
+                }
+
+                ++i;
+            }
+        }
+
+        if (i >= tokens.size())
+            return {};
+
+        // Filenames containing spaces are not supported
+        // by this simple whitespace-based parser.
+        return tokens[i];
+    }
+
+    // ==================================================
+    // MTL LOADING
+    // ==================================================
 
     static void LoadMTL(
-        const std::string &mtlPath,
-        std::map<std::string, int> &lookup)
+        Model& model,
+        const std::string& mtlPath,
+        std::map<std::string, int>& lookup)
     {
         std::vector<unsigned char> bytes;
 
         if (!ReadAsset(mtlPath, bytes))
         {
             LogMessage(
-                ("Cannot load MTL: " + mtlPath).c_str());
+                ("Cannot load MTL: " +
+                 mtlPath).c_str()
+            );
 
             return;
         }
 
-        std::string source(
-            reinterpret_cast<const char *>(bytes.data()),
-            bytes.size());
+        const std::string source(
+            reinterpret_cast<const char*>(bytes.data()),
+            bytes.size()
+        );
 
         std::istringstream input(source);
 
@@ -580,10 +834,6 @@ namespace
             std::string command;
             stream >> command;
 
-            // ------------------------------------------
-            // Material name
-            // ------------------------------------------
-
             if (command == "newmtl")
             {
                 std::string name;
@@ -594,7 +844,11 @@ namespace
                 if (!name.empty())
                 {
                     currentMaterial =
-                        FindOrCreateMaterial(name, lookup);
+                        FindOrCreateMaterial(
+                            name,
+                            lookup,
+                            model
+                        );
                 }
 
                 continue;
@@ -603,12 +857,8 @@ namespace
             if (currentMaterial < 0)
                 continue;
 
-            Material &material =
-                g_Materials[currentMaterial];
-
-            // ------------------------------------------
-            // Ambient
-            // ------------------------------------------
+            Material& material =
+                model.materials[currentMaterial];
 
             if (command == "Ka")
             {
@@ -617,11 +867,6 @@ namespace
                     material.ambient[1] >>
                     material.ambient[2];
             }
-
-            // ------------------------------------------
-            // Diffuse
-            // ------------------------------------------
-
             else if (command == "Kd")
             {
                 stream >>
@@ -629,11 +874,6 @@ namespace
                     material.diffuse[1] >>
                     material.diffuse[2];
             }
-
-            // ------------------------------------------
-            // Specular
-            // ------------------------------------------
-
             else if (command == "Ks")
             {
                 stream >>
@@ -641,55 +881,43 @@ namespace
                     material.specular[1] >>
                     material.specular[2];
             }
-
-            // ------------------------------------------
-            // Shininess
-            // ------------------------------------------
-
             else if (command == "Ns")
             {
                 stream >> material.shininess;
             }
-
-            // ------------------------------------------
-            // Diffuse texture
-            // ------------------------------------------
-
             else if (command == "map_Kd")
             {
-                // Supports:
-                // map_Kd texture.png
-                //
-                // Also tolerates common map options by
-                // using the final whitespace-separated token.
-                std::string texture;
-                std::string token;
-
-                while (stream >> token)
-                    texture = token;
+                const std::string texture =
+                    GetMapFilename(stream);
 
                 if (!texture.empty())
                 {
                     material.diffuseTexturePath =
                         ResolveRelativeAsset(
                             mtlPath,
-                            texture);
+                            texture
+                        );
+
                     LogMessage(
-    ("Resolved diffuse texture: " +
-     material.diffuseTexturePath).c_str());
+                        ("Material texture: " +
+                         material.name + " -> " +
+                         material.diffuseTexturePath).c_str()
+                    );
                 }
             }
         }
 
         LogMessage(
-            ("Loaded MTL: " + mtlPath).c_str());
+            ("Loaded MTL: " + mtlPath).c_str()
+        );
     }
 
-    // --------------------------------------------------
-    // PNG loading
-    // --------------------------------------------------
+    // ==================================================
+    // TEXTURE LOADING
+    // ==================================================
 
-    static void LoadMaterialTexture(Material &material)
+    static void LoadMaterialTexture(
+        Material& material)
     {
         if (material.textureAttempted)
             return;
@@ -707,58 +935,78 @@ namespace
         {
             LogMessage(
                 ("Cannot load texture: " +
-                 material.diffuseTexturePath)
-                    .c_str());
+                 material.diffuseTexturePath).c_str()
+            );
 
             return;
         }
 
-        if (bytes.size() > static_cast<size_t>(INT_MAX))
+        if (bytes.size() >
+            static_cast<size_t>(INT_MAX))
+        {
+            LogMessage("Texture file is too large.");
             return;
+        }
+
+        int channels = 0;
 
         stbi_set_flip_vertically_on_load(1);
 
-        material.pixels = stbi_load_from_memory(
+        unsigned char* decoded = stbi_load_from_memory(
             bytes.data(),
             static_cast<int>(bytes.size()),
             &material.width,
             &material.height,
-            nullptr,
-            4);
+            &channels,
+            4
+        );
 
-        if (!material.pixels)
+        if (!decoded)
         {
             LogMessage(
                 ("PNG decoding failed: " +
-                 material.diffuseTexturePath)
-                    .c_str());
+                 material.diffuseTexturePath).c_str()
+            );
 
             return;
         }
 
-char message[256];
+        const size_t pixelSize =
+            static_cast<size_t>(material.width) *
+            static_cast<size_t>(material.height) * 4;
 
-snprintf(
-    message,
-    sizeof(message),
-    "Decoded PNG: %s (%dx%d)",
-    material.diffuseTexturePath.c_str(),
-    material.width,
-    material.height
-);
+        material.pixels.assign(
+            decoded,
+            decoded + pixelSize
+        );
 
-LogMessage(message);
+        stbi_image_free(decoded);
+
+        char message[256];
+
+        snprintf(
+            message,
+            sizeof(message),
+            "Decoded texture: %s (%dx%d, source channels=%d)",
+            material.diffuseTexturePath.c_str(),
+            material.width,
+            material.height,
+            channels
+        );
+
+        LogMessage(message);
     }
 
-    // --------------------------------------------------
-    // OpenGL texture upload
-    // --------------------------------------------------
+    // ==================================================
+    // TEXTURE UPLOAD
+    // ==================================================
 
-    static bool UploadMaterialTexture(Material &material)
+    static bool UploadMaterialTexture(
+        Material& material)
     {
         LoadMaterialTexture(material);
 
-        if (!material.pixels)
+        if (material.pixels.empty())
             return false;
 
         if (material.textureId != 0)
@@ -766,38 +1014,45 @@ LogMessage(message);
 
         glGenTextures(
             1,
-            &material.textureId);
+            &material.textureId
+        );
 
         if (!material.textureId)
             return false;
 
         glBindTexture(
             GL_TEXTURE_2D,
-            material.textureId);
+            material.textureId
+        );
 
         glPixelStorei(
             GL_UNPACK_ALIGNMENT,
-            1);
+            1
+        );
 
         glTexParameteri(
             GL_TEXTURE_2D,
             GL_TEXTURE_MIN_FILTER,
-            GL_LINEAR);
+            GL_LINEAR
+        );
 
         glTexParameteri(
             GL_TEXTURE_2D,
             GL_TEXTURE_MAG_FILTER,
-            GL_LINEAR);
+            GL_LINEAR
+        );
 
         glTexParameteri(
             GL_TEXTURE_2D,
             GL_TEXTURE_WRAP_S,
-            GL_REPEAT);
+            GL_REPEAT
+        );
 
         glTexParameteri(
             GL_TEXTURE_2D,
             GL_TEXTURE_WRAP_T,
-            GL_REPEAT);
+            GL_REPEAT
+        );
 
         glTexImage2D(
             GL_TEXTURE_2D,
@@ -808,7 +1063,8 @@ LogMessage(message);
             0,
             GL_RGBA,
             GL_UNSIGNED_BYTE,
-            material.pixels);
+            material.pixels.data()
+        );
 
         const GLenum error = glGetError();
 
@@ -820,13 +1076,15 @@ LogMessage(message);
                 message,
                 sizeof(message),
                 "Texture upload failed: 0x%X",
-                error);
+                error
+            );
 
             LogMessage(message);
 
             glDeleteTextures(
                 1,
-                &material.textureId);
+                &material.textureId
+            );
 
             material.textureId = 0;
 
@@ -836,29 +1094,79 @@ LogMessage(message);
         return true;
     }
 
-    // --------------------------------------------------
-    // OBJ loading
-    // --------------------------------------------------
+    // ==================================================
+    // MODEL BOUNDING BOX / NORMALIZATION
+    // ==================================================
 
-    static void LoadOBJ()
+    static void NormalizeModel(Model& model)
     {
-        g_MeshAttempted = true;
+        if (model.vertices.empty())
+            return;
+
+        Vertex3 lo = model.vertices.front();
+        Vertex3 hi = model.vertices.front();
+
+        for (const Vertex3& v : model.vertices)
+        {
+            lo.x = (std::min)(lo.x, v.x);
+            lo.y = (std::min)(lo.y, v.y);
+            lo.z = (std::min)(lo.z, v.z);
+
+            hi.x = (std::max)(hi.x, v.x);
+            hi.y = (std::max)(hi.y, v.y);
+            hi.z = (std::max)(hi.z, v.z);
+        }
+
+        const float cx = (lo.x + hi.x) * 0.5f;
+        const float cy = (lo.y + hi.y) * 0.5f;
+        const float cz = (lo.z + hi.z) * 0.5f;
+
+        const float extent = (std::max)(
+            (std::max)(hi.x - lo.x, hi.y - lo.y),
+            (std::max)(hi.z - lo.z, 0.0001f)
+        );
+
+        const float scale = 2.0f / extent;
+
+        for (Vertex3& v : model.vertices)
+        {
+            v.x = (v.x - cx) * scale;
+            v.y = (v.y - cy) * scale;
+            v.z = (v.z - cz) * scale;
+        }
+    }
+
+    // ==================================================
+    // OBJ LOADING
+    // ==================================================
+
+    static bool LoadOBJ(Model& model)
+    {
+        model.attempted = true;
+        model.loaded = false;
+
+        model.vertices.clear();
+        model.texcoords.clear();
+        model.normals.clear();
+        model.triangles.clear();
+        model.materials.clear();
 
         std::vector<unsigned char> bytes;
 
-        if (!ReadAsset(DEFAULT_OBJECT, bytes))
+        if (!ReadAsset(model.path, bytes))
         {
             LogMessage(
                 ("Cannot load OBJ: " +
-                 std::string(DEFAULT_OBJECT))
-                    .c_str());
+                 model.path).c_str()
+            );
 
-            return;
+            return false;
         }
 
-        std::string source(
-            reinterpret_cast<const char *>(bytes.data()),
-            bytes.size());
+        const std::string source(
+            reinterpret_cast<const char*>(bytes.data()),
+            bytes.size()
+        );
 
         std::istringstream input(source);
 
@@ -866,20 +1174,19 @@ LogMessage(message);
 
         std::map<std::string, int> materialLookup;
 
-        g_Vertices.clear();
-        g_Texcoords.clear();
-        g_Normals.clear();
-        g_Triangles.clear();
-        g_Materials.clear();
-
-        // Default material for faces without usemtl.
         Material defaultMaterial;
         defaultMaterial.name = "__default";
 
-        g_Materials.push_back(defaultMaterial);
+        model.materials.push_back(
+            std::move(defaultMaterial)
+        );
+
         materialLookup["__default"] = 0;
 
         int activeMaterial = 0;
+
+        size_t facesWithoutUV = 0;
+        size_t facesWithoutNormals = 0;
 
         while (std::getline(input, line))
         {
@@ -894,74 +1201,76 @@ LogMessage(message);
             stream >> command;
 
             // ------------------------------------------
-            // Position
+            // Vertex position
             // ------------------------------------------
 
             if (command == "v")
             {
-                Vertex3 vertex{};
+                Vertex3 vertex;
 
                 if (stream >>
                     vertex.x >>
                     vertex.y >>
                     vertex.z)
                 {
-                    g_Vertices.push_back(vertex);
+                    model.vertices.push_back(vertex);
                 }
             }
 
             // ------------------------------------------
-            // UV
+            // Texture coordinates
             // ------------------------------------------
 
             else if (command == "vt")
             {
-                Vertex2 uv{};
+                Vertex2 uv;
 
                 if (stream >> uv.u >> uv.v)
-                    g_Texcoords.push_back(uv);
+                {
+                    model.texcoords.push_back(uv);
+                }
             }
 
             // ------------------------------------------
-            // Normal
+            // Normals
             // ------------------------------------------
 
             else if (command == "vn")
             {
-                Vertex3 normal{};
+                Vertex3 normal;
 
                 if (stream >>
                     normal.x >>
                     normal.y >>
                     normal.z)
                 {
-                    g_Normals.push_back(normal);
+                    model.normals.push_back(normal);
                 }
             }
 
             // ------------------------------------------
-            // Material library
+            // Material libraries
             // ------------------------------------------
 
             else if (command == "mtllib")
             {
                 std::string filename;
 
-                std::getline(stream, filename);
-                filename = Trim(filename);
-
-                if (!filename.empty())
+                while (stream >> filename)
                 {
                     const std::string mtlPath =
                         ResolveRelativeAsset(
-                            DEFAULT_OBJECT,
-                            filename);
+                            model.path,
+                            filename
+                        );
 
                     if (!mtlPath.empty())
                     {
                         LoadMTL(
+                            model,
                             mtlPath,
-                            materialLookup);
+                            materialLookup
+                        );
                     }
                 }
             }
@@ -977,12 +1286,22 @@ LogMessage(message);
                 std::getline(stream, name);
                 name = Trim(name);
 
-                auto found = materialLookup.find(name);
+                auto found =
+                    materialLookup.find(name);
 
-                activeMaterial =
-                    found != materialLookup.end()
-                        ? found->second
-                        : 0;
+                if (found != materialLookup.end())
+                {
+                    activeMaterial = found->second;
+                }
+                else
+                {
+                    activeMaterial = 0;
+
+                    LogMessage(
+                        ("Unknown material: " +
+                         name).c_str()
+                    );
+                }
             }
 
             // ------------------------------------------
@@ -995,6 +1314,9 @@ LogMessage(message);
 
                 std::string token;
 
+                bool faceHasUV = true;
+                bool faceHasNormals = true;
+
                 while (stream >> token)
                 {
                     ObjCorner corner;
@@ -1002,29 +1324,53 @@ LogMessage(message);
                     if (!ParseObjIndex(
                             token,
                             0,
-                            g_Vertices.size(),
+                            model.vertices.size(),
                             corner.position))
                     {
-                        continue;
+                        LogMessage(
+                            "Invalid OBJ position index."
+                        );
+
+                        face.clear();
+                        break;
                     }
 
-                    ParseObjIndex(
-                        token,
-                        1,
-                        g_Texcoords.size(),
-                        corner.texcoord);
+                    if (!ParseObjIndex(
+                            token,
+                            1,
+                            model.texcoords.size(),
+                            corner.texcoord))
+                    {
+                        corner.texcoord = -1;
+                        faceHasUV = false;
+                    }
 
-                    ParseObjIndex(
-                        token,
-                        2,
-                        g_Normals.size(),
-                        corner.normal);
+                    if (!ParseObjIndex(
+                            token,
+                            2,
+                            model.normals.size(),
+                            corner.normal))
+                    {
+                        corner.normal = -1;
+                        faceHasNormals = false;
+                    }
 
                     face.push_back(corner);
                 }
 
-                // Triangulate polygon faces.
-                for (size_t i = 1; i + 1 < face.size(); ++i)
+                if (face.size() < 3)
+                    continue;
+
+                if (!faceHasUV)
+                    ++facesWithoutUV;
+
+                if (!faceHasNormals)
+                    ++facesWithoutNormals;
+
+                // Fan triangulation.
+                for (size_t i = 1;
+                     i + 1 < face.size();
+                     ++i)
                 {
                     Triangle triangle{};
 
@@ -1032,82 +1378,113 @@ LogMessage(message);
                     triangle.corners[1] = face[i];
                     triangle.corners[2] = face[i + 1];
 
-                    triangle.materialIndex = activeMaterial;
+                    triangle.materialIndex =
+                        activeMaterial;
 
-                    g_Triangles.push_back(triangle);
+                    model.triangles.push_back(triangle);
                 }
             }
         }
 
         // ----------------------------------------------
-        // Validate mesh
+        // Validation
         // ----------------------------------------------
 
-        if (g_Vertices.empty() || g_Triangles.empty())
+        if (model.vertices.empty() ||
+            model.triangles.empty())
         {
-            LogMessage("OBJ has no usable vertices or faces");
-            return;
+            LogMessage(
+                "OBJ contains no usable geometry."
+            );
+
+            return false;
         }
 
         // ----------------------------------------------
-        // Bounding box
+        // Normalize geometry
         // ----------------------------------------------
 
-        Vertex3 lo = g_Vertices.front();
-        Vertex3 hi = g_Vertices.front();
+        NormalizeModel(model);
 
-        for (const Vertex3 &v : g_Vertices)
-        {
-            lo.x = (std::min)(lo.x, v.x);
-            lo.y = (std::min)(lo.y, v.y);
-            lo.z = (std::min)(lo.z, v.z);
+        model.loaded = true;
 
-            hi.x = (std::max)(hi.x, v.x);
-            hi.y = (std::max)(hi.y, v.y);
-            hi.z = (std::max)(hi.z, v.z);
-        }
+        // ----------------------------------------------
+        // Diagnostics
+        // ----------------------------------------------
 
-        const float cx = (lo.x + hi.x) * 0.5f;
-        const float cy = (lo.y + hi.y) * 0.5f;
-        const float cz = (lo.z + hi.z) * 0.5f;
-
-        const float extent = (std::max)((std::max)(hi.x - lo.x, hi.y - lo.y),
-                                        (std::max)(hi.z - lo.z, 0.0001f));
-
-        const float scale = 2.0f / extent;
-
-        for (Vertex3 &v : g_Vertices)
-        {
-            v.x = (v.x - cx) * scale;
-            v.y = (v.y - cy) * scale;
-            v.z = (v.z - cz) * scale;
-        }
-
-        g_MeshLoaded = true;
-
-        char message[256];
+        char message[512];
 
         snprintf(
             message,
             sizeof(message),
-            "Loaded OBJ: %zu vertices, %zu UVs, %zu normals, %zu triangles, %zu materials",
-            g_Vertices.size(),
-            g_Texcoords.size(),
-            g_Normals.size(),
-            g_Triangles.size(),
-            g_Materials.size());
+            "Loaded OBJ: %s",
+            model.path.c_str()
+        );
 
         LogMessage(message);
+
+        LogNumber(
+            "Vertex count",
+            model.vertices.size()
+        );
+
+        LogNumber(
+            "UV count",
+            model.texcoords.size()
+        );
+
+        LogNumber(
+            "Normal count",
+            model.normals.size()
+        );
+
+        LogNumber(
+            "Triangle count",
+            model.triangles.size()
+        );
+
+        LogNumber(
+            "Material count",
+            model.materials.size()
+        );
+
+        LogNumber(
+            "Faces without UV coordinates",
+            facesWithoutUV
+        );
+
+        LogNumber(
+            "Faces without normals",
+            facesWithoutNormals
+        );
+
+        for (const Material& material : model.materials)
+        {
+            LogMessage(
+                ("Material loaded: " +
+                 material.name).c_str()
+            );
+
+            if (material.diffuseTexturePath.empty())
+            {
+                LogMessage(
+                    ("Material has no diffuse texture: " +
+                     material.name).c_str()
+                );
+            }
+        }
+
+        return true;
     }
 
-    // --------------------------------------------------
-    // Normal calculations
-    // --------------------------------------------------
+    // ==================================================
+    // NORMAL CALCULATIONS
+    // ==================================================
 
     static Vertex3 CalculateFaceNormal(
-        const Vertex3 &a,
-        const Vertex3 &b,
-        const Vertex3 &c)
+        const Vertex3& a,
+        const Vertex3& b,
+        const Vertex3& c)
     {
         const float ux = b.x - a.x;
         const float uy = b.y - a.y;
@@ -1117,7 +1494,7 @@ LogMessage(message);
         const float vy = c.y - a.y;
         const float vz = c.z - a.z;
 
-        Vertex3 normal{};
+        Vertex3 normal;
 
         normal.x = uy * vz - uz * vy;
         normal.y = uz * vx - ux * vz;
@@ -1126,7 +1503,8 @@ LogMessage(message);
         const float length = std::sqrt(
             normal.x * normal.x +
             normal.y * normal.y +
-            normal.z * normal.z);
+            normal.z * normal.z
+        );
 
         if (length < 1e-8f)
             return {0.0f, 0.0f, 1.0f};
@@ -1138,12 +1516,14 @@ LogMessage(message);
         return normal;
     }
 
-    static Vertex3 NormalizeNormal(const Vertex3 &normal)
+    static Vertex3 NormalizeNormal(
+        const Vertex3& normal)
     {
         const float length = std::sqrt(
             normal.x * normal.x +
             normal.y * normal.y +
-            normal.z * normal.z);
+            normal.z * normal.z
+        );
 
         if (length < 1e-8f)
             return {0.0f, 0.0f, 1.0f};
@@ -1151,36 +1531,43 @@ LogMessage(message);
         return {
             normal.x / length,
             normal.y / length,
-            normal.z / length};
+            normal.z / length
+        };
     }
 
-    // --------------------------------------------------
-    // Lighting
-    // --------------------------------------------------
+    // ==================================================
+    // LIGHTING
+    // ==================================================
 
-    static float CalculateBrightness(const Vertex3 &normal)
+    static float CalculateBrightness(
+        const Vertex3& normal)
     {
         const float lightLength = std::sqrt(
             LIGHT_X * LIGHT_X +
             LIGHT_Y * LIGHT_Y +
-            LIGHT_Z * LIGHT_Z);
+            LIGHT_Z * LIGHT_Z
+        );
 
-        const float diffuse = (std::max)(0.0f,
-                                         (
-                                             normal.x * LIGHT_X +
-                                             normal.y * LIGHT_Y +
-                                             normal.z * LIGHT_Z) /
-                                             lightLength);
+        const float diffuse = (std::max)(
+            0.0f,
+            (
+                normal.x * LIGHT_X +
+                normal.y * LIGHT_Y +
+                normal.z * LIGHT_Z
+            ) / lightLength
+        );
 
-        return (std::min)(1.0f,
-                          AMBIENT_LIGHT + DIFFUSE_LIGHT * diffuse);
+        return (std::min)(
+            1.0f,
+            AMBIENT_LIGHT + DIFFUSE_LIGHT * diffuse
+        );
     }
 
-    // --------------------------------------------------
-    // OpenGL function loading
-    // --------------------------------------------------
+    // ==================================================
+    // OPENGL FUNCTION LOADING
+    // ==================================================
 
-    static PROC GetGLProc(const char *name)
+    static PROC GetGLProc(const char* name)
     {
         PROC proc = wglGetProcAddress(name);
 
@@ -1190,11 +1577,12 @@ LogMessage(message);
             proc == reinterpret_cast<PROC>(3) ||
             proc == reinterpret_cast<PROC>(-1))
         {
-            HMODULE gl = GetModuleHandleA("opengl32.dll");
+            HMODULE gl =
+                GetModuleHandleA("opengl32.dll");
 
             proc = gl
-                       ? GetProcAddress(gl, name)
-                       : nullptr;
+                ? GetProcAddress(gl, name)
+                : nullptr;
         }
 
         return proc;
@@ -1214,79 +1602,89 @@ LogMessage(message);
             g_UseProgram = nullptr;
             g_ActiveTexture = nullptr;
 
-            // Texture IDs belong to their OpenGL context.
-            for (Material &material : g_Materials)
+            for (Material& material : g_Model.materials)
                 material.textureId = 0;
 
-            LogMessage("OpenGL context changed");
+            LogMessage("OpenGL context changed.");
         }
 
         if (!g_UseProgram)
         {
             g_UseProgram =
                 reinterpret_cast<PFNGLUSEPROGRAMPROC>(
-                    GetGLProc("glUseProgram"));
+                    GetGLProc("glUseProgram")
+                );
         }
 
         if (!g_ActiveTexture)
         {
             g_ActiveTexture =
                 reinterpret_cast<PFNGLACTIVETEXTUREPROC>(
-                    GetGLProc("glActiveTexture"));
+                    GetGLProc("glActiveTexture")
+                );
         }
 
         if (!g_UseProgram)
         {
-            LogMessage("glUseProgram unavailable");
+            LogMessage("glUseProgram unavailable.");
             return false;
         }
 
         return true;
     }
 
-    // --------------------------------------------------
-    // Triangle rendering
-    // --------------------------------------------------
+    // ==================================================
+    // TRIANGLE RENDERING
+    // ==================================================
 
-    static void RenderTriangle(const Triangle &triangle)
+    static void RenderTriangle(
+        const Model& model,
+        const Triangle& triangle)
     {
-        const ObjCorner *corners[3] = {
+        const ObjCorner* corners[3] = {
             &triangle.corners[0],
             &triangle.corners[1],
-            &triangle.corners[2]};
+            &triangle.corners[2]
+        };
 
-        const Vertex3 *positions[3] = {
-            &g_Vertices[corners[0]->position],
-            &g_Vertices[corners[1]->position],
-            &g_Vertices[corners[2]->position]};
+        const Vertex3* positions[3] = {
+            &model.vertices[corners[0]->position],
+            &model.vertices[corners[1]->position],
+            &model.vertices[corners[2]->position]
+        };
 
-        const Vertex3 faceNormal = CalculateFaceNormal(
-            *positions[0],
-            *positions[1],
-            *positions[2]);
+        const Vertex3 faceNormal =
+            CalculateFaceNormal(
+                *positions[0],
+                *positions[1],
+                *positions[2]
+            );
 
         const int materialIndex =
             triangle.materialIndex >= 0 &&
-                    static_cast<size_t>(triangle.materialIndex) <
-                        g_Materials.size()
+            static_cast<size_t>(
+                triangle.materialIndex
+            ) < model.materials.size()
                 ? triangle.materialIndex
                 : 0;
 
-        const Material &material =
-            g_Materials[materialIndex];
+        const Material& material =
+            model.materials[materialIndex];
 
         for (int i = 0; i < 3; ++i)
         {
-            const ObjCorner &corner = *corners[i];
+            const ObjCorner& corner =
+                *corners[i];
 
             Vertex3 normal = faceNormal;
 
             if (corner.normal >= 0 &&
                 static_cast<size_t>(corner.normal) <
-                    g_Normals.size())
+                    model.normals.size())
             {
                 normal = NormalizeNormal(
-                    g_Normals[corner.normal]);
+                    model.normals[corner.normal]
+                );
             }
 
             const float brightness =
@@ -1296,19 +1694,21 @@ LogMessage(message);
                 material.diffuse[0] * brightness,
                 material.diffuse[1] * brightness,
                 material.diffuse[2] * brightness,
-                1.0f);
+                1.0f
+            );
 
             glNormal3f(
                 normal.x,
                 normal.y,
-                normal.z);
+                normal.z
+            );
 
             if (corner.texcoord >= 0 &&
                 static_cast<size_t>(corner.texcoord) <
-                    g_Texcoords.size())
+                    model.texcoords.size())
             {
-                const Vertex2 &uv =
-                    g_Texcoords[corner.texcoord];
+                const Vertex2& uv =
+                    model.texcoords[corner.texcoord];
 
                 glTexCoord2f(uv.u, uv.v);
             }
@@ -1320,23 +1720,18 @@ LogMessage(message);
             glVertex3f(
                 positions[i]->x,
                 positions[i]->y,
-                positions[i]->z);
+                positions[i]->z
+            );
         }
     }
 
-    // --------------------------------------------------
-    // Main renderer
-    // --------------------------------------------------
+    // ==================================================
+    // MODEL RENDERING
+    // ==================================================
 
-    static void RenderTriangleMesh()
+    static void RenderModel(Model& model)
     {
-        if (!EnsureContext())
-            return;
-
-        if (!g_MeshAttempted)
-            LoadOBJ();
-
-        if (!g_MeshLoaded)
+        if (!model.loaded)
             return;
 
         GLint viewport[4] = {};
@@ -1346,14 +1741,31 @@ LogMessage(message);
         GLint oldActiveTexture = GL_TEXTURE0;
         GLint depthBits = 0;
 
-        glGetIntegerv(GL_VIEWPORT, viewport);
+        glGetIntegerv(
+            GL_VIEWPORT,
+            viewport
+        );
 
-        if (viewport[2] <= 0 || viewport[3] <= 0)
+        if (viewport[2] <= 0 ||
+            viewport[3] <= 0)
+        {
             return;
+        }
 
-        glGetIntegerv(GL_CURRENT_PROGRAM, &oldProgram);
-        glGetIntegerv(GL_MATRIX_MODE, &oldMatrixMode);
-        glGetIntegerv(GL_DEPTH_BITS, &depthBits);
+        glGetIntegerv(
+            GL_CURRENT_PROGRAM,
+            &oldProgram
+        );
+
+        glGetIntegerv(
+            GL_MATRIX_MODE,
+            &oldMatrixMode
+        );
+
+        glGetIntegerv(
+            GL_DEPTH_BITS,
+            &depthBits
+        );
 
         if (depthBits <= 0)
             return;
@@ -1369,11 +1781,12 @@ LogMessage(message);
         {
             glGetIntegerv(
                 GL_ACTIVE_TEXTURE,
-                &oldActiveTexture);
+                &oldActiveTexture
+            );
         }
 
         // ----------------------------------------------
-        // Save OpenGL state
+        // Save state
         // ----------------------------------------------
 
         glPushAttrib(GL_ALL_ATTRIB_BITS);
@@ -1388,7 +1801,7 @@ LogMessage(message);
         glPushMatrix();
 
         // ----------------------------------------------
-        // Configure rendering
+        // Rendering configuration
         // ----------------------------------------------
 
         g_UseProgram(0);
@@ -1401,22 +1814,28 @@ LogMessage(message);
         glDisable(GL_COLOR_LOGIC_OP);
         glDisable(GL_POLYGON_OFFSET_FILL);
 
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        glPolygonMode(
+            GL_FRONT_AND_BACK,
+            GL_FILL
+        );
 
         glColorMask(
             GL_TRUE,
             GL_TRUE,
             GL_TRUE,
-            GL_TRUE);
+            GL_TRUE
+        );
 
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LEQUAL);
         glDepthMask(GL_TRUE);
 
         glEnable(GL_BLEND);
+
         glBlendFunc(
             GL_SRC_ALPHA,
-            GL_ONE_MINUS_SRC_ALPHA);
+            GL_ONE_MINUS_SRC_ALPHA
+        );
 
         glEnable(GL_ALPHA_TEST);
         glAlphaFunc(GL_GREATER, 0.01f);
@@ -1425,7 +1844,7 @@ LogMessage(message);
         glClear(GL_DEPTH_BUFFER_BIT);
 
         // ----------------------------------------------
-        // Perspective
+        // Projection
         // ----------------------------------------------
 
         const double aspect =
@@ -1454,7 +1873,8 @@ LogMessage(message);
             -halfHeight,
             halfHeight,
             nearPlane,
-            farPlane);
+            farPlane
+        );
 
         // ----------------------------------------------
         // Model transformation
@@ -1466,31 +1886,34 @@ LogMessage(message);
         glTranslatef(
             0.0f,
             0.0f,
-            -OBJECT_DISTANCE);
+            -OBJECT_DISTANCE
+        );
 
         glRotatef(
             OBJECT_TILT,
             1.0f,
             0.0f,
-            0.0f);
+            0.0f
+        );
 
         glRotatef(
             static_cast<float>(GetTickCount64()) *
                 OBJECT_ROTATION_SPEED,
             0.0f,
             1.0f,
-            0.0f);
+            0.0f
+        );
 
         // ----------------------------------------------
-        // Render each material separately
+        // Render materials
         // ----------------------------------------------
 
         for (size_t materialIndex = 0;
-             materialIndex < g_Materials.size();
+             materialIndex < model.materials.size();
              ++materialIndex)
         {
-            Material &material =
-                g_Materials[materialIndex];
+            Material& material =
+                model.materials[materialIndex];
 
             const bool textured =
                 UploadMaterialTexture(material);
@@ -1501,12 +1924,14 @@ LogMessage(message);
 
                 glBindTexture(
                     GL_TEXTURE_2D,
-                    material.textureId);
+                    material.textureId
+                );
 
                 glTexEnvi(
                     GL_TEXTURE_ENV,
                     GL_TEXTURE_ENV_MODE,
-                    GL_MODULATE);
+                    GL_MODULATE
+                );
             }
             else
             {
@@ -1515,7 +1940,8 @@ LogMessage(message);
 
             glBegin(GL_TRIANGLES);
 
-            for (const Triangle &triangle : g_Triangles)
+            for (const Triangle& triangle :
+                 model.triangles)
             {
                 if (triangle.materialIndex !=
                     static_cast<int>(materialIndex))
@@ -1525,11 +1951,13 @@ LogMessage(message);
 
                 bool valid = true;
 
-                for (const ObjCorner &corner : triangle.corners)
+                for (const ObjCorner& corner :
+                     triangle.corners)
                 {
                     if (corner.position < 0 ||
-                        static_cast<size_t>(corner.position) >=
-                            g_Vertices.size())
+                        static_cast<size_t>(
+                            corner.position
+                        ) >= model.vertices.size())
                     {
                         valid = false;
                         break;
@@ -1537,14 +1965,19 @@ LogMessage(message);
                 }
 
                 if (valid)
-                    RenderTriangle(triangle);
+                {
+                    RenderTriangle(
+                        model,
+                        triangle
+                    );
+                }
             }
 
             glEnd();
         }
 
         // ----------------------------------------------
-        // Restore OpenGL state
+        // Restore state
         // ----------------------------------------------
 
         glMatrixMode(GL_MODELVIEW);
@@ -1556,24 +1989,141 @@ LogMessage(message);
         glPopAttrib();
 
         g_UseProgram(
-            static_cast<GLuint>(oldProgram));
+            static_cast<GLuint>(oldProgram)
+        );
 
         if (g_ActiveTexture)
         {
             g_ActiveTexture(
-                static_cast<GLenum>(oldActiveTexture));
+                static_cast<GLenum>(oldActiveTexture)
+            );
         }
 
         glMatrixMode(
-            static_cast<GLenum>(oldMatrixMode));
+            static_cast<GLenum>(oldMatrixMode)
+        );
+    }
+
+    // ==================================================
+    // MAIN RENDERER
+    // ==================================================
+
+    static void RenderTriangleMesh()
+    {
+        if (!EnsureContext())
+            return;
+
+        if (!g_Model.attempted)
+        {
+            g_Model.path = g_ModelPath;
+
+            LoadOBJ(g_Model);
+        }
+
+        if (!g_Model.loaded)
+            return;
+
+        RenderModel(g_Model);
+    }
+
+    // ==================================================
+    // RESOURCE DIAGNOSTICS
+    // ==================================================
+
+    static BOOL CALLBACK EnumerateResourceNames(
+        HMODULE module,
+        LPCSTR type,
+        LPSTR name,
+        LONG_PTR)
+    {
+        char message[512];
+
+        if (IS_INTRESOURCE(name))
+        {
+            snprintf(
+                message,
+                sizeof(message),
+                "Embedded numeric resource ID: %u",
+                static_cast<unsigned>(
+                    reinterpret_cast<ULONG_PTR>(name)
+                )
+            );
+
+            LogMessage(message);
+            return TRUE;
+        }
+
+        snprintf(
+            message,
+            sizeof(message),
+            "Enumerated resource: %s",
+            name
+        );
+
+        LogMessage(message);
+
+        SetLastError(ERROR_SUCCESS);
+
+        HRSRC resource = FindResourceA(
+            module,
+            name,
+            type
+        );
+
+        if (resource)
+        {
+            LogMessage(
+                "Lookup using enumerated name: SUCCESS"
+            );
+        }
+        else
+        {
+            snprintf(
+                message,
+                sizeof(message),
+                "Resource lookup failed: %lu",
+                static_cast<unsigned long>(
+                    GetLastError()
+                )
+            );
+
+            LogMessage(message);
+        }
+
+        return TRUE;
+    }
+
+    static void DiagnoseEmbeddedResources()
+    {
+        char message[256];
+
+        snprintf(
+            message,
+            sizeof(message),
+            "Resource enumeration module: %p",
+            static_cast<void*>(g_Module)
+        );
+
+        LogMessage(message);
+
+        EnumResourceNamesA(
+            g_Module,
+            RT_RCDATA,
+            EnumerateResourceNames,
+            0
+        );
     }
 }
 
-// --------------------------------------------------
-// REPENTOGON hook
-// --------------------------------------------------
+// ==================================================
+// REPENTOGON HOOK
+// ==================================================
 
-HOOK_GLOBAL(OpenGL::wglSwapBuffers, (HDC hdc)->bool, __stdcall)
+HOOK_GLOBAL(
+    OpenGL::wglSwapBuffers,
+    (HDC hdc)->bool,
+    __stdcall
+)
 {
     if (wglGetCurrentContext())
         RenderTriangleMesh();
@@ -1581,9 +2131,9 @@ HOOK_GLOBAL(OpenGL::wglSwapBuffers, (HDC hdc)->bool, __stdcall)
     return super(hdc);
 }
 
-// --------------------------------------------------
-// DLL entry point
-// --------------------------------------------------
+// ==================================================
+// DLL ENTRY POINT
+// ==================================================
 
 BOOL WINAPI DllMain(
     HINSTANCE instance,
@@ -1599,90 +2149,31 @@ BOOL WINAPI DllMain(
 
     return TRUE;
 }
-// some debug
-static BOOL CALLBACK EnumerateResourceNames(
-    HMODULE module,
-    LPCSTR type,
-    LPSTR name,
-    LONG_PTR)
+
+// ==================================================
+// MOD INITIALIZATION
+// ==================================================
+
+extern "C" __declspec(dllexport)
+int ModInit()
 {
-    char message[512];
-
-    if (IS_INTRESOURCE(name))
-    {
-        snprintf(
-            message,
-            sizeof(message),
-            "Embedded numeric resource ID: %u",
-            static_cast<unsigned>(reinterpret_cast<ULONG_PTR>(name)));
-
-        LogMessage(message);
-        return TRUE;
-    }
-
-    snprintf(
-        message,
-        sizeof(message),
-        "Enumerated resource: module=%p, name=\"%s\"",
-        static_cast<void *>(module),
-        name);
-
-    LogMessage(message);
-
-    SetLastError(ERROR_SUCCESS);
-
-    HRSRC resource = FindResourceA(
-        module,
-        name,
-        type);
-
-    if (resource)
-    {
-        LogMessage("Lookup using enumerated name: SUCCESS");
-    }
-    else
-    {
-        snprintf(
-            message,
-            sizeof(message),
-            "Lookup using enumerated name: FAILED, error=%lu",
-            static_cast<unsigned long>(GetLastError()));
-
-        LogMessage(message);
-    }
-
-    return TRUE;
-}
-static void DiagnoseEmbeddedResources()
-{
-    char message[256];
-
-    snprintf(
-        message,
-        sizeof(message),
-        "Resource enumeration module: %p",
-        static_cast<void *>(g_Module));
-
-    LogMessage(message);
-
-    EnumResourceNamesA(
-        g_Module,
-        RT_RCDATA,
-        EnumerateResourceNames,
-        0);
-}
-// --------------------------------------------------
-// Mod initialization
-// --------------------------------------------------
-
-extern "C" __declspec(dllexport) int ModInit()
-{
+    // Reset the log before writing initialization data.
     ResetLogFile();
 
-    LogMessage("Isaac: ViewPoint initialized");
+    LogMessage(
+        "Isaac: ViewPoint initialized."
+    );
+
+    LoadConfiguration();
+
     LogMessage(
         ("Default model: " +
          std::string(DEFAULT_OBJECT)).c_str()
+    );
+
+    LogMessage(
+        ("Selected model: " +
+         g_ModelPath).c_str()
     );
 
     DiagnoseEmbeddedResources();
