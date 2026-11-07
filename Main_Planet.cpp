@@ -1,4 +1,3 @@
-
 #define NOMINMAX
 
 #include <Windows.h>
@@ -40,32 +39,12 @@
 #define GL_DRAW_BUFFER 0x0C01
 #endif
 
-#ifndef GL_READ_BUFFER
-#define GL_READ_BUFFER 0x0C02
-#endif
-
-#ifndef GL_MAJOR_VERSION
-#define GL_MAJOR_VERSION 0x821B
-#endif
-
-#ifndef GL_MINOR_VERSION
-#define GL_MINOR_VERSION 0x821C
-#endif
-
-#ifndef GL_CONTEXT_PROFILE_MASK
-#define GL_CONTEXT_PROFILE_MASK 0x9126
-#endif
-
-#ifndef GL_CONTEXT_CORE_PROFILE_BIT
-#define GL_CONTEXT_CORE_PROFILE_BIT 0x00000001
-#endif
-
-#ifndef GL_CONTEXT_COMPATIBILITY_PROFILE_BIT
-#define GL_CONTEXT_COMPATIBILITY_PROFILE_BIT 0x00000002
-#endif
-
 using PFNGLUSEPROGRAMPROC = void (APIENTRY *)(GLuint);
 using PFNGLACTIVETEXTUREPROC = void (APIENTRY *)(GLenum);
+
+// --------------------------------------------------
+// Game structures
+// --------------------------------------------------
 
 struct Vector
 {
@@ -149,6 +128,26 @@ namespace
         {
             fprintf(file, "OBJ OpenGL: %s\n", message);
             fclose(file);
+        }
+    }
+
+    static void CheckGLError(const char* stage)
+    {
+        GLenum error = glGetError();
+
+        if (error != GL_NO_ERROR)
+        {
+            char msg[256];
+
+            snprintf(
+                msg,
+                sizeof(msg),
+                "OpenGL error at %s: 0x%X",
+                stage,
+                error
+            );
+
+            LogMessage(msg);
         }
     }
 
@@ -293,7 +292,6 @@ namespace
             std::string type;
             stream >> type;
 
-            // Vertices
             if (type == "v")
             {
                 Vertex3 v{};
@@ -301,8 +299,6 @@ namespace
                 if (stream >> v.x >> v.y >> v.z)
                     source.push_back(v);
             }
-
-            // Faces
             else if (type == "f")
             {
                 std::vector<uint32_t> face;
@@ -419,220 +415,65 @@ namespace
     }
 
     // --------------------------------------------------
-    // Mesh rendering
+    // Diagnostic marker
     // --------------------------------------------------
-static void CheckGLError(const char* stage)
-{
-    GLenum error = glGetError();
 
-    if (error != GL_NO_ERROR)
+    static void RenderDiagnosticMarker()
     {
-        char msg[256];
+        // Save and replace projection matrix.
+        glMatrixMode(GL_PROJECTION);
+        glPushMatrix();
+        glLoadIdentity();
 
-        snprintf(
-            msg,
-            sizeof(msg),
-            "Diagnostic GL error at %s: 0x%X",
-            stage,
-            error
-        );
+        // Save and replace modelview matrix.
+        glMatrixMode(GL_MODELVIEW);
+        glPushMatrix();
+        glLoadIdentity();
 
-        LogMessage(msg);
-    }
-}
-static void TestMatrixState()
-{
-    GLint mode = -1;
-    GLint modelviewDepth = -1;
-    GLint projectionDepth = -1;
-    GLint textureDepth = -1;
+        // Disable states that could hide the marker.
+        glDisable(GL_TEXTURE_2D);
+        glDisable(GL_DEPTH_TEST);
+        glDisable(GL_CULL_FACE);
+        glDisable(GL_BLEND);
+        glDisable(GL_SCISSOR_TEST);
 
-    while (glGetError() != GL_NO_ERROR)
-    {
-    }
+        glDisable(GL_ALPHA_TEST);
+        glDisable(GL_STENCIL_TEST);
 
-    glGetIntegerv(GL_MATRIX_MODE, &mode);
+        // Magenta diagnostic square.
+        glColor4f(1.0f, 0.0f, 1.0f, 1.0f);
 
-    GLenum error = glGetError();
+        glBegin(GL_QUADS);
 
-    char msg[256];
+        glVertex3f(-0.5f, -0.5f, 0.0f);
+        glVertex3f( 0.5f, -0.5f, 0.0f);
+        glVertex3f( 0.5f,  0.5f, 0.0f);
+        glVertex3f(-0.5f,  0.5f, 0.0f);
 
-    snprintf(
-        msg,
-        sizeof(msg),
-        "Matrix mode: 0x%X, error: 0x%X",
-        mode,
-        error
-    );
+        glEnd();
 
-    LogMessage(msg);
+        // Restore modelview matrix.
+        glMatrixMode(GL_MODELVIEW);
+        glPopMatrix();
 
-    glGetIntegerv(
-        GL_MODELVIEW_STACK_DEPTH,
-        &modelviewDepth
-    );
-
-    glGetIntegerv(
-        GL_PROJECTION_STACK_DEPTH,
-        &projectionDepth
-    );
-
-    glGetIntegerv(
-        GL_TEXTURE_STACK_DEPTH,
-        &textureDepth
-    );
-
-    snprintf(
-        msg,
-        sizeof(msg),
-        "Matrix depths: MODELVIEW=%d PROJECTION=%d TEXTURE=%d",
-        modelviewDepth,
-        projectionDepth,
-        textureDepth
-    );
-
-    LogMessage(msg);
-
-    // Test explicitly selecting MODELVIEW.
-    glMatrixMode(GL_MODELVIEW);
-
-    error = glGetError();
-
-    LogMessage(
-        error == GL_NO_ERROR
-            ? "glMatrixMode(GL_MODELVIEW): SUCCESS"
-            : "glMatrixMode(GL_MODELVIEW): FAILED"
-    );
-
-    glGetIntegerv(GL_MATRIX_MODE, &mode);
-
-    snprintf(
-        msg,
-        sizeof(msg),
-        "Matrix mode after selection: 0x%X",
-        mode
-    );
-
-    LogMessage(msg);
-}
-static void RenderDiagnosticQuad()
-{
-    HGLRC context = wglGetCurrentContext();
-
-    if (!context)
-    {
-        LogMessage("No current OpenGL context");
-        return;
+        // Restore projection matrix.
+        glMatrixMode(GL_PROJECTION);
+        glPopMatrix();
     }
 
-    const GLubyte* version = glGetString(GL_VERSION);
-    const GLubyte* renderer = glGetString(GL_RENDERER);
-    const GLubyte* vendor = glGetString(GL_VENDOR);
-    const GLubyte* extensions = glGetString(GL_EXTENSIONS);
-
-    char msg[1024];
-
-    snprintf(
-        msg,
-        sizeof(msg),
-        "GL_VERSION: %s",
-        version
-            ? reinterpret_cast<const char*>(version)
-            : "NULL"
-    );
-
-    LogMessage(msg);
-
-    snprintf(
-        msg,
-        sizeof(msg),
-        "GL_RENDERER: %s",
-        renderer
-            ? reinterpret_cast<const char*>(renderer)
-            : "NULL"
-    );
-
-    LogMessage(msg);
-
-    snprintf(
-        msg,
-        sizeof(msg),
-        "GL_VENDOR: %s",
-        vendor
-            ? reinterpret_cast<const char*>(vendor)
-            : "NULL"
-    );
-
-    LogMessage(msg);
-
-    // Check whether GL_MATRIX_MODE is supported.
-    while (glGetError() != GL_NO_ERROR)
-    {
-    }
-
-    GLint matrixMode = -1;
-
-    glGetIntegerv(GL_MATRIX_MODE, &matrixMode);
-
-    GLenum error = glGetError();
-
-    snprintf(
-        msg,
-        sizeof(msg),
-        "GL_MATRIX_MODE: 0x%X, error: 0x%X",
-        matrixMode,
-        error
-    );
-
-    LogMessage(msg);
-
-    // Check OpenGL context profile (OpenGL 3.2+).
-    GLint major = 0;
-    GLint minor = 0;
-
-    glGetIntegerv(GL_MAJOR_VERSION, &major);
-    glGetIntegerv(GL_MINOR_VERSION, &minor);
-
-    snprintf(
-        msg,
-        sizeof(msg),
-        "OpenGL version numbers: %d.%d",
-        major,
-        minor
-    );
-
-    LogMessage(msg);
-
-    if (major > 3 || (major == 3 && minor >= 2))
-    {
-        GLint profile = 0;
-
-        glGetIntegerv(
-            GL_CONTEXT_PROFILE_MASK,
-            &profile
-        );
-
-        snprintf(
-            msg,
-            sizeof(msg),
-            "GL_CONTEXT_PROFILE_MASK: 0x%X",
-            profile
-        );
-
-        LogMessage(msg);
-
-        if (profile & GL_CONTEXT_CORE_PROFILE_BIT)
-            LogMessage("OpenGL Core Profile detected");
-
-        if (profile & GL_CONTEXT_COMPATIBILITY_PROFILE_BIT)
-            LogMessage("OpenGL Compatibility Profile detected");
-    }
-}
+    // --------------------------------------------------
+    // OBJ rendering
+    // --------------------------------------------------
 
     static void RenderTriangleMesh()
     {
         if (!EnsureContext())
             return;
+
+        // Clear errors from previous game rendering.
+        while (glGetError() != GL_NO_ERROR)
+        {
+        }
 
         if (!g_MeshLoaded)
         {
@@ -655,6 +496,9 @@ static void RenderDiagnosticQuad()
         GLint oldMatrixMode = GL_MODELVIEW;
         GLint oldActiveTexture = GL_TEXTURE0;
 
+        GLint framebuffer = 0;
+        GLint drawBuffer = 0;
+
         glGetIntegerv(GL_VIEWPORT, viewport);
 
         glGetIntegerv(
@@ -662,19 +506,27 @@ static void RenderDiagnosticQuad()
             &oldProgram
         );
 
-glGetIntegerv(
-    GL_MATRIX_MODE,
-    &oldMatrixMode
-);
+        glGetIntegerv(
+            GL_MATRIX_MODE,
+            &oldMatrixMode
+        );
 
-if (oldMatrixMode != GL_MODELVIEW &&
-    oldMatrixMode != GL_PROJECTION &&
-    oldMatrixMode != GL_TEXTURE)
-{
-    LogMessage("Invalid original matrix mode; using GL_MODELVIEW");
+        // Validate original matrix mode.
+        if (oldMatrixMode != GL_MODELVIEW &&
+            oldMatrixMode != GL_PROJECTION &&
+            oldMatrixMode != GL_TEXTURE)
+        {
+            LogMessage("Invalid original matrix mode; using GL_MODELVIEW");
 
-    oldMatrixMode = GL_MODELVIEW;
-}
+            oldMatrixMode = GL_MODELVIEW;
+        }
+
+        // Validate viewport before changing other state.
+        if (viewport[2] <= 0 || viewport[3] <= 0)
+        {
+            LogMessage("Invalid viewport");
+            return;
+        }
 
         if (g_ActiveTexture)
         {
@@ -682,12 +534,29 @@ if (oldMatrixMode != GL_MODELVIEW &&
                 GL_ACTIVE_TEXTURE,
                 &oldActiveTexture
             );
-
-            g_ActiveTexture(GL_TEXTURE0);
         }
 
-        if (viewport[2] <= 0 || viewport[3] <= 0)
-            return;
+        glGetIntegerv(
+            GL_FRAMEBUFFER_BINDING,
+            &framebuffer
+        );
+
+        glGetIntegerv(
+            GL_DRAW_BUFFER,
+            &drawBuffer
+        );
+
+        char framebufferMsg[256];
+
+        snprintf(
+            framebufferMsg,
+            sizeof(framebufferMsg),
+            "Framebuffer: %d, draw buffer: 0x%X",
+            framebuffer,
+            drawBuffer
+        );
+
+        LogMessage(framebufferMsg);
 
         // --------------------------------------------------
         // Context information
@@ -724,6 +593,9 @@ if (oldMatrixMode != GL_MODELVIEW &&
         // --------------------------------------------------
 
         glPushAttrib(GL_ALL_ATTRIB_BITS);
+
+        if (g_ActiveTexture)
+            g_ActiveTexture(GL_TEXTURE0);
 
         glMatrixMode(GL_PROJECTION);
         glPushMatrix();
@@ -768,6 +640,7 @@ if (oldMatrixMode != GL_MODELVIEW &&
             static_cast<float>(viewport[3]);
 
         const double nearPlane = 0.1;
+
         const double halfHeight =
             nearPlane * std::tan(
                 OBJECT_FOV * 3.14159265358979323846 / 360.0
@@ -794,7 +667,11 @@ if (oldMatrixMode != GL_MODELVIEW &&
         glMatrixMode(GL_MODELVIEW);
         glLoadIdentity();
 
-        glTranslatef(0.0f, 0.0f, -OBJECT_DISTANCE);
+        glTranslatef(
+            0.0f,
+            0.0f,
+            -OBJECT_DISTANCE
+        );
 
         glRotatef(
             OBJECT_TILT,
@@ -812,7 +689,7 @@ if (oldMatrixMode != GL_MODELVIEW &&
         );
 
         // --------------------------------------------------
-        // Render OBJ directly to the game framebuffer
+        // Render OBJ
         // --------------------------------------------------
 
         if (!g_RenderLogged)
@@ -859,7 +736,7 @@ if (oldMatrixMode != GL_MODELVIEW &&
             ny /= length;
             nz /= length;
 
-            // Simple directional lighting.
+            // Directional lighting.
             const float lx = -0.35f;
             const float ly = 0.55f;
             const float lz = -0.76f;
@@ -891,32 +768,48 @@ if (oldMatrixMode != GL_MODELVIEW &&
 
         glEnd();
 
+        CheckGLError("after OBJ rendering");
+
+        // --------------------------------------------------
+        // Draw diagnostic marker
+        // --------------------------------------------------
+
+        RenderDiagnosticMarker();
+
+        CheckGLError("after diagnostic marker");
+
         // --------------------------------------------------
         // Restore matrices
         // --------------------------------------------------
 
         glMatrixMode(GL_MODELVIEW);
-glPopMatrix();
+        glPopMatrix();
 
-glMatrixMode(GL_PROJECTION);
-glPopMatrix();
+        glMatrixMode(GL_PROJECTION);
+        glPopMatrix();
 
-glPopAttrib();
+        // Restore OpenGL attributes.
+        glPopAttrib();
 
-g_UseProgram(
-    static_cast<GLuint>(oldProgram)
-);
+        // Restore shader program.
+        g_UseProgram(
+            static_cast<GLuint>(oldProgram)
+        );
 
-if (g_ActiveTexture)
-{
-    g_ActiveTexture(
-        static_cast<GLenum>(oldActiveTexture)
-    );
-}
+        // Restore active texture.
+        if (g_ActiveTexture)
+        {
+            g_ActiveTexture(
+                static_cast<GLenum>(oldActiveTexture)
+            );
+        }
 
-glMatrixMode(
-    static_cast<GLenum>(oldMatrixMode)
-);
+        // Restore original matrix mode.
+        glMatrixMode(
+            static_cast<GLenum>(oldMatrixMode)
+        );
+
+        CheckGLError("after restoring OpenGL state");
     }
 }
 
@@ -944,10 +837,10 @@ HOOK_METHOD_PRIORITY(
         pos
     );
 
-if (_playerHudIndex == 0)
-{
-    RenderTriangleMesh();
-}
+    if (_playerHudIndex == 0)
+    {
+        RenderTriangleMesh();
+    }
 }
 
 // --------------------------------------------------
