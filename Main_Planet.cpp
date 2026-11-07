@@ -162,7 +162,6 @@ namespace
 
     constexpr char DEFAULT_OBJECT[] = "objects/sphere.obj";
 
-    constexpr char LOG_FILE[] = "C:\\IsaacViewPoint.log";
     constexpr char CONFIG_FILE[] = "IsaacViewPoint.ini";
 
     constexpr float OBJECT_DISTANCE = 5.0f;
