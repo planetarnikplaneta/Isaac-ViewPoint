@@ -338,11 +338,38 @@ namespace
         // Embedded resource
         // ----------------------------------------------
 
-        HRSRC resource = FindResourceA(
-            g_Module,
-            assetPath.c_str(),
-            RT_RCDATA
-        );
+static std::string ToUpperResourceName(const std::string& name)
+{
+    std::string result = name;
+
+    for (char& c : result)
+    {
+        if (c >= 'a' && c <= 'z')
+            c = static_cast<char>(c - 'a' + 'A');
+    }
+
+    return result;
+}
+
+static HRSRC FindEmbeddedResource(
+    HMODULE module,
+    const std::string& assetPath
+)
+{
+    const std::string resourceName =
+        ToUpperResourceName(assetPath);
+
+    return FindResourceA(
+        module,
+        resourceName.c_str(),
+        RT_RCDATA
+    );
+}
+
+HRSRC resource = FindEmbeddedResource(
+    g_Module,
+    assetPath
+);
 
         if (!resource)
         {
