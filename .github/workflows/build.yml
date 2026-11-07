@@ -63,6 +63,7 @@ jobs:
             /I REPENTOGON/libs/lua ^
             Main_Planet.cpp ^
             Core\Logger.cpp ^
+            Core\State.cpp ^
             ViewPointResources.res ^
             libzhl.lib ^
             /link /OUT:zhlMain_Planet.dll
