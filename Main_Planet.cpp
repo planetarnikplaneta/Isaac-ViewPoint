@@ -32,6 +32,18 @@
 #define GL_TEXTURE0 0x84C0
 #endif
 
+#ifndef GL_FRAMEBUFFER_BINDING
+#define GL_FRAMEBUFFER_BINDING 0x8CA6
+#endif
+
+#ifndef GL_DRAW_BUFFER
+#define GL_DRAW_BUFFER 0x0C01
+#endif
+
+#ifndef GL_READ_BUFFER
+#define GL_READ_BUFFER 0x0C02
+#endif
+
 using PFNGLUSEPROGRAMPROC = void (APIENTRY *)(GLuint);
 using PFNGLACTIVETEXTUREPROC = void (APIENTRY *)(GLenum);
 
@@ -397,18 +409,54 @@ static void RenderDiagnosticQuad()
         return;
     }
 
-    LogMessage("Diagnostic quad: drawing");
+    static bool diagnosticLogged = false;
 
+    GLint viewport[4] = {};
+    GLint framebuffer = 0;
+    GLint drawBuffer = 0;
+    GLint readBuffer = 0;
     GLint oldProgram = 0;
     GLint oldMatrixMode = GL_MODELVIEW;
 
+    glGetIntegerv(GL_VIEWPORT, viewport);
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &framebuffer);
+    glGetIntegerv(GL_DRAW_BUFFER, &drawBuffer);
+    glGetIntegerv(GL_READ_BUFFER, &readBuffer);
     glGetIntegerv(GL_CURRENT_PROGRAM, &oldProgram);
     glGetIntegerv(GL_MATRIX_MODE, &oldMatrixMode);
 
+    if (!diagnosticLogged)
+    {
+        char msg[512];
+
+        snprintf(
+            msg,
+            sizeof(msg),
+            "Diagnostic state: FBO=%d, DrawBuffer=0x%X, ReadBuffer=0x%X, Viewport=%d,%d %dx%d, Program=%d",
+            framebuffer,
+            drawBuffer,
+            readBuffer,
+            viewport[0],
+            viewport[1],
+            viewport[2],
+            viewport[3],
+            oldProgram
+        );
+
+        LogMessage(msg);
+        diagnosticLogged = true;
+    }
+
+    if (viewport[2] <= 0 || viewport[3] <= 0)
+    {
+        LogMessage("Diagnostic quad: invalid viewport");
+        return;
+    }
+
     glPushAttrib(GL_ALL_ATTRIB_BITS);
 
-if (g_UseProgram)
-    g_UseProgram(0);
+    if (g_UseProgram)
+        g_UseProgram(0);
 
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_TEXTURE_2D);
@@ -418,6 +466,8 @@ if (g_UseProgram)
     glDisable(GL_SCISSOR_TEST);
     glDisable(GL_CULL_FACE);
     glDisable(GL_LIGHTING);
+    glDisable(GL_FOG);
+    glDisable(GL_COLOR_LOGIC_OP);
 
     glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -439,6 +489,22 @@ if (g_UseProgram)
         glVertex2f(-0.5f,  0.5f);
     glEnd();
 
+    GLenum error = glGetError();
+
+    if (error != GL_NO_ERROR)
+    {
+        char msg[128];
+
+        snprintf(
+            msg,
+            sizeof(msg),
+            "Diagnostic quad OpenGL error: 0x%X",
+            error
+        );
+
+        LogMessage(msg);
+    }
+
     glPopMatrix();
 
     glMatrixMode(GL_PROJECTION);
@@ -448,10 +514,9 @@ if (g_UseProgram)
 
     glPopAttrib();
 
-if (g_UseProgram)
-    g_UseProgram(static_cast<GLuint>(oldProgram));
+    if (g_UseProgram)
+        g_UseProgram(static_cast<GLuint>(oldProgram));
 }
-
     static void RenderTriangleMesh()
     {
         if (!EnsureContext())
