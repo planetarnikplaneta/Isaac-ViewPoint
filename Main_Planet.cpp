@@ -883,25 +883,52 @@ HOOK_GLOBAL(OpenGL::wglSwapBuffers, (HDC hdc)->bool, __stdcall)
 
     if (swapCount < 30)
     {
-        GLint framebuffer = -1;
-        GLint viewport[4] = {};
-
-        glGetIntegerv(GL_FRAMEBUFFER_BINDING, &framebuffer);
-        glGetIntegerv(GL_VIEWPORT, viewport);
-
         char buffer[256];
 
-        sprintf_s(
+        snprintf(
             buffer,
-            "OBJ OpenGL: Swap #%u HDC=%p FBO=%d Viewport=%dx%d\n",
+            sizeof(buffer),
+            "Swap #%u HDC=%p",
             swapCount,
-            (void*)hdc,
-            framebuffer,
-            viewport[2],
-            viewport[3]
+            static_cast<void*>(hdc)
         );
 
-        OutputDebugStringA(buffer);
+        LogMessage(buffer);
+
+        HGLRC context = wglGetCurrentContext();
+
+        if (context)
+        {
+            GLint framebuffer = -1;
+            GLint viewport[4] = {};
+
+            glGetIntegerv(
+                GL_FRAMEBUFFER_BINDING,
+                &framebuffer
+            );
+
+            glGetIntegerv(
+                GL_VIEWPORT,
+                viewport
+            );
+
+            snprintf(
+                buffer,
+                sizeof(buffer),
+                "Swap #%u: Context=%p FBO=%d Viewport=%dx%d",
+                swapCount,
+                static_cast<void*>(context),
+                framebuffer,
+                viewport[2],
+                viewport[3]
+            );
+
+            LogMessage(buffer);
+        }
+        else
+        {
+            LogMessage("Swap hook called without current OpenGL context");
+        }
     }
 
     ++swapCount;
@@ -935,5 +962,6 @@ BOOL WINAPI DllMain(
 
 extern "C" __declspec(dllexport) int ModInit()
 {
+    LogMessage("ModInit called");
     return 0;
 }
