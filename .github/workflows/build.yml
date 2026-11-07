@@ -73,6 +73,7 @@ jobs:
             Camera\Camera.cpp ^
             Scene\Scene.cpp ^
             Graphics\Renderer.cpp ^
+            Room\RoomExtractor.cpp ^
             ViewPointResources.res ^
             libzhl.lib ^
             /link /OUT:zhlMain_Planet.dll
