@@ -1,7 +1,7 @@
 #include "Camera.h"
 
-#include "Core/State.h"
-#include "Core/Logger.h"
+#include "../Core/State.h"
+#include "../Core/Logger.h"
 
 #include <algorithm>
 #include <cmath>
