@@ -28,6 +28,20 @@ jobs:
           ref: 1.1.3
           path: REPENTOGON
 
+      - name: Locate RapidXML header
+        shell: pwsh
+        run: |
+          $header = Get-ChildItem -Path REPENTOGON -Recurse -File -Filter rapidxml.hpp | Select-Object -First 1
+
+          if (-not $header) {
+              Write-Error "rapidxml.hpp was not found inside REPENTOGON."
+              exit 1
+          }
+
+          $includeDir = $header.Directory.FullName
+          Write-Host "Found rapidxml.hpp in: $includeDir"
+
+          "RAPIDXML_INCLUDE=$includeDir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       # --------------------------------------------
       # Configure Visual Studio
       # --------------------------------------------
@@ -61,6 +75,7 @@ jobs:
             /I REPENTOGON/include ^
             /I REPENTOGON/libzhl ^
             /I REPENTOGON/libs/lua ^
+            /I "%RAPIDXML_INCLUDE%" ^
             Main_Planet.cpp ^
             Core\Logger.cpp ^
             Core\State.cpp ^
