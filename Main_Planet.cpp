@@ -653,6 +653,9 @@ namespace
                         ResolveRelativeAsset(
                             mtlPath,
                             texture);
+                    LogMessage(
+    ("Resolved diffuse texture: " +
+     material.diffuseTexturePath).c_str());
                 }
             }
         }
@@ -712,10 +715,18 @@ namespace
             return;
         }
 
-        LogMessage(
-            ("Decoded PNG: " +
-             material.diffuseTexturePath)
-                .c_str());
+char message[256];
+
+snprintf(
+    message,
+    sizeof(message),
+    "Decoded PNG: %s (%dx%d)",
+    material.diffuseTexturePath.c_str(),
+    material.width,
+    material.height
+);
+
+LogMessage(message);
     }
 
     // --------------------------------------------------
