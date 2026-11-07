@@ -443,7 +443,15 @@ static PFNGLCHECKFRAMEBUFFERSTATUSPROC g_CheckFramebufferStatus = nullptr;
 
         // Disable states that could hide the marker.
         glDisable(GL_TEXTURE_2D);
-        glDisable(GL_DEPTH_TEST);
+        // Prepare a clean depth buffer for the OBJ model.
+        glDisable(GL_SCISSOR_TEST);
+        glDepthMask(GL_TRUE);
+        glClearDepth(1.0);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        
+        // Enable depth testing so nearer triangles hide farther triangles.
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LEQUAL);
         glDisable(GL_CULL_FACE);
         glDisable(GL_BLEND);
         glDisable(GL_SCISSOR_TEST);
