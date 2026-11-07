@@ -66,6 +66,7 @@ jobs:
             Core\State.cpp ^
             Core\AssetPaths.cpp ^
             Core\Config.cpp ^
+            Resources\ResourceManager.cpp ^
             ViewPointResources.res ^
             libzhl.lib ^
             /link /OUT:zhlMain_Planet.dll
