@@ -2903,7 +2903,7 @@ namespace
             const int mouseDeltaY =
                 mousePosition.y - centerY;
 
-            g_Camera.yaw +=
+            g_Camera.yaw -=
                 static_cast<float>(mouseDeltaX) *
                 g_Camera.mouseSensitivity;
 
