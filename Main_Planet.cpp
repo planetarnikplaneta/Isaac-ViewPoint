@@ -390,82 +390,82 @@ namespace
     // Mesh rendering
     // --------------------------------------------------
 
-    static void RenderTriangleMesh()
+    void RenderTriangleMesh()
 {
-        GLint viewport[4] = { 0, 0, 0, 0 };
-        GLint oldMatrixMode = GL_MODELVIEW;
-        GLint oldProgram = 0;
-    
-        glGetIntegerv(GL_VIEWPORT, viewport);
-        glGetIntegerv(GL_MATRIX_MODE, &oldMatrixMode);
-    
-        if (viewport[2] <= 0 || viewport[3] <= 0)
-            return;
-    
-        if (glUseProgram)
-        {
-            glGetIntegerv(GL_CURRENT_PROGRAM, &oldProgram);
-            glUseProgram(0);
-        }
-    
-        glPushAttrib(GL_ALL_ATTRIB_BITS);
-    
-        glDisable(GL_TEXTURE_2D);
-        glDisable(GL_DEPTH_TEST);
-        glDisable(GL_CULL_FACE);
-        glDisable(GL_BLEND);
-        glDisable(GL_ALPHA_TEST);
-        glDisable(GL_STENCIL_TEST);
-        glDisable(GL_SCISSOR_TEST);
-        glDisable(GL_LIGHTING);
-        glDisable(GL_FOG);
-        glDisable(GL_COLOR_LOGIC_OP);
-    
-        glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-    
-        glMatrixMode(GL_PROJECTION);
-        glPushMatrix();
-        glLoadIdentity();
-    
-        glOrtho(
-            0,
-            viewport[2],
-            0,
-            viewport[3],
-            -1,
-            1
-        );
-    
-        glMatrixMode(GL_MODELVIEW);
-        glPushMatrix();
-        glLoadIdentity();
-    
-        // Draw a large red rectangle in the center of the viewport.
-        glColor4f(1.0f, 0.0f, 0.0f, 1.0f);
-    
-        float centerX = viewport[2] * 0.5f;
-        float centerY = viewport[3] * 0.5f;
-    
-        glBegin(GL_QUADS);
-            glVertex2f(centerX - 100.0f, centerY - 100.0f);
-            glVertex2f(centerX + 100.0f, centerY - 100.0f);
-            glVertex2f(centerX + 100.0f, centerY + 100.0f);
-            glVertex2f(centerX - 100.0f, centerY + 100.0f);
-        glEnd();
-    
-        glMatrixMode(GL_MODELVIEW);
-        glPopMatrix();
-    
-        glMatrixMode(GL_PROJECTION);
-        glPopMatrix();
-    
-        glPopAttrib();
-    
-        if (glUseProgram)
-            glUseProgram(oldProgram);
-    
-        glMatrixMode(oldMatrixMode);
+    GLint viewport[4] = { 0, 0, 0, 0 };
+    GLint oldMatrixMode = GL_MODELVIEW;
+    GLint oldProgram = 0;
+
+    glGetIntegerv(GL_VIEWPORT, viewport);
+    glGetIntegerv(GL_MATRIX_MODE, &oldMatrixMode);
+
+    if (viewport[2] <= 0 || viewport[3] <= 0)
+        return;
+
+    if (glUseProgram)
+    {
+        glGetIntegerv(GL_CURRENT_PROGRAM, &oldProgram);
+        glUseProgram(0);
+    }
+
+    glPushAttrib(GL_ALL_ATTRIB_BITS);
+
+    glDisable(GL_TEXTURE_2D);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
+    glDisable(GL_BLEND);
+    glDisable(GL_ALPHA_TEST);
+    glDisable(GL_STENCIL_TEST);
+    glDisable(GL_SCISSOR_TEST);
+    glDisable(GL_LIGHTING);
+    glDisable(GL_FOG);
+    glDisable(GL_COLOR_LOGIC_OP);
+
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+
+    glOrtho(
+        0,
+        viewport[2],
+        0,
+        viewport[3],
+        -1,
+        1
+    );
+
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+
+    // Draw a large red rectangle in the center of the viewport.
+    glColor4f(1.0f, 0.0f, 0.0f, 1.0f);
+
+    float centerX = viewport[2] * 0.5f;
+    float centerY = viewport[3] * 0.5f;
+
+    glBegin(GL_QUADS);
+        glVertex2f(centerX - 100.0f, centerY - 100.0f);
+        glVertex2f(centerX + 100.0f, centerY - 100.0f);
+        glVertex2f(centerX + 100.0f, centerY + 100.0f);
+        glVertex2f(centerX - 100.0f, centerY + 100.0f);
+    glEnd();
+
+    glMatrixMode(GL_MODELVIEW);
+    glPopMatrix();
+
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+
+    glPopAttrib();
+
+    if (glUseProgram)
+        glUseProgram(oldProgram);
+
+    glMatrixMode(oldMatrixMode);
 }
 
 // --------------------------------------------------
