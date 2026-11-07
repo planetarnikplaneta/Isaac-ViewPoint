@@ -4,13 +4,13 @@
 
 #include "Renderer.h"
 
-#include "Core/Logger.h"
-#include "Core/Types.h"
-#include "Core/State.h"
-#include "Models/Texture.h"
-#include "Models/GpuMesh.h"
-#include "Camera/Camera.h"
-#include "Scene/Scene.h"
+#include "../Core/Logger.h"
+#include "../Core/Types.h"
+#include "../Core/State.h"
+#include "../Models/Texture.h"
+#include "../Models/GpuMesh.h"
+#include "../Camera/Camera.h"
+#include "../Scene/Scene.h"
 
 #include <Windows.h>
 #include <gl/GL.h>
