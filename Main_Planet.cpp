@@ -490,13 +490,16 @@ static void RenderDiagnosticQuad()
     CheckGLError("quad drawing");
 
     glPopMatrix();
+CheckGLError("pop modelview matrix");
 
-    glMatrixMode(GL_PROJECTION);
-    glPopMatrix();
+glMatrixMode(GL_PROJECTION);
+CheckGLError("switch to projection matrix");
 
-    glMatrixMode(oldMatrixMode);
+glPopMatrix();
+CheckGLError("pop projection matrix");
 
-    CheckGLError("matrix restoration");
+glMatrixMode(oldMatrixMode);
+CheckGLError("restore original matrix mode");
 
     glPopAttrib();
 
