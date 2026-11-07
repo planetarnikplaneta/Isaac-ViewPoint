@@ -72,6 +72,7 @@ jobs:
             Models\GpuMesh.cpp ^
             Camera\Camera.cpp ^
             Scene\Scene.cpp ^
+            Graphics\Renderer.cpp ^
             ViewPointResources.res ^
             libzhl.lib ^
             /link /OUT:zhlMain_Planet.dll
