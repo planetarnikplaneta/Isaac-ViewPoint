@@ -13,6 +13,7 @@
 #include "Core/Config.h"
 #include "Resources/ResourceManager.h"
 #include "Graphics/Renderer.h"
+#include "Room/RoomExtractor.h"
 
 using namespace ViewPoint;
 
@@ -31,6 +32,7 @@ HOOK_GLOBAL(
     (HDC hdc)->bool,
     __stdcall)
 {
+    ViewPoint::UpdateRoomExtractor();
     if (wglGetCurrentContext())
     {
         HWND window = WindowFromDC(hdc);
