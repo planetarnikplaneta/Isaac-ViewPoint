@@ -41,6 +41,7 @@
 
 using PFNGLUSEPROGRAMPROC = void (APIENTRY *)(GLuint);
 using PFNGLACTIVETEXTUREPROC = void (APIENTRY *)(GLenum);
+using PFNGLCHECKFRAMEBUFFERSTATUSPROC = GLenum (APIENTRY *)(GLenum);
 
 // --------------------------------------------------
 // Game structures
@@ -112,6 +113,7 @@ namespace
 
     static PFNGLUSEPROGRAMPROC g_UseProgram = nullptr;
     static PFNGLACTIVETEXTUREPROC g_ActiveTexture = nullptr;
+static PFNGLCHECKFRAMEBUFFERSTATUSPROC g_CheckFramebufferStatus = nullptr;
 
     static std::vector<Vertex3> g_Vertices;
     static std::vector<Triangle> g_Triangles;
@@ -184,7 +186,25 @@ namespace
             reinterpret_cast<PFNGLACTIVETEXTUREPROC>(
                 GetGLProc("glActiveTexture")
             );
+g_CheckFramebufferStatus =
+    reinterpret_cast<PFNGLCHECKFRAMEBUFFERSTATUSPROC>(
+        GetGLProc("glCheckFramebufferStatus")
+    );
+        if (g_CheckFramebufferStatus)
+{
+    GLenum status = g_CheckFramebufferStatus(0x8D40);
 
+    char msg[128];
+
+    snprintf(
+        msg,
+        sizeof(msg),
+        "Framebuffer status: 0x%X",
+        status
+    );
+
+    LogMessage(msg);
+}
         if (!g_UseProgram)
         {
             LogMessage("glUseProgram unavailable");
@@ -464,7 +484,40 @@ namespace
     // --------------------------------------------------
     // OBJ rendering
     // --------------------------------------------------
+static void TestFramebufferPixel(const GLint* viewport)
+{
+    GLubyte pixel[4] = {};
 
+    const GLint x = viewport[0] + viewport[2] / 2;
+    const GLint y = viewport[1] + viewport[3] / 2;
+
+    glReadPixels(
+        x,
+        y,
+        1,
+        1,
+        GL_RGBA,
+        GL_UNSIGNED_BYTE,
+        pixel
+    );
+
+    GLenum error = glGetError();
+
+    char msg[256];
+
+    snprintf(
+        msg,
+        sizeof(msg),
+        "Framebuffer center pixel: R=%u G=%u B=%u A=%u; GL error=0x%X",
+        pixel[0],
+        pixel[1],
+        pixel[2],
+        pixel[3],
+        error
+    );
+
+    LogMessage(msg);
+}
     static void RenderTriangleMesh()
     {
         if (!EnsureContext())
@@ -774,9 +827,13 @@ namespace
         // Draw diagnostic marker
         // --------------------------------------------------
 
-        RenderDiagnosticMarker();
+RenderDiagnosticMarker();
 
-        CheckGLError("after diagnostic marker");
+CheckGLError("after diagnostic marker");
+
+TestFramebufferPixel(viewport);
+
+        
 
         // --------------------------------------------------
         // Restore matrices
