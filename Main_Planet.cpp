@@ -149,9 +149,7 @@ namespace
 {
     namespace fs = std::filesystem;
 
-    // ==================================================
     // CONFIGURATION
-    // ==================================================
 
     constexpr char DEFAULT_OBJECT[] = "objects/sphere.obj";
 
@@ -170,9 +168,7 @@ namespace
     constexpr float AMBIENT_LIGHT = 0.40f;
     constexpr float DIFFUSE_LIGHT = 0.60f;
 
-    // ==================================================
     // STRUCTURES
-    // ==================================================
 
     struct Vertex3
     {
@@ -299,9 +295,7 @@ namespace
         ULONGLONG lastUpdateTime = 0;
     };
 
-    // ==================================================
     // GLOBAL STATE
-    // ==================================================
 
     static HMODULE g_Module = nullptr;
 
@@ -358,9 +352,7 @@ namespace
 
     constexpr unsigned int CONFIG_CHECK_INTERVAL = 60;
 
-    // ==================================================
     // LOGGING
-    // ==================================================
 
     static bool ResetLogFile()
     {
@@ -416,9 +408,7 @@ namespace
         LogMessage(message);
     }
 
-    // ==================================================
     // STRING HELPERS
-    // ==================================================
 
     static std::string Trim(const std::string &text)
     {
@@ -533,9 +523,7 @@ namespace
         return result;
     }
 
-    // ==================================================
     // DLL DIRECTORY
-    // ==================================================
 
     static fs::path GetDllDirectory()
     {
@@ -553,9 +541,7 @@ namespace
                    std::string(modulePath, length))
             .parent_path();
     }
-    // ==================================================
     // CONFIGURATION FILE
-    // ==================================================
 
     static fs::path GetConfigurationPath()
     {
@@ -825,9 +811,7 @@ namespace
         UpdateConfigurationTimestamp();
     }
 
-    // ==================================================
     // EMBEDDED RESOURCE LOOKUP
-    // ==================================================
 
     static HRSRC FindEmbeddedResource(
         HMODULE module,
@@ -877,9 +861,7 @@ namespace
         return nullptr;
     }
 
-    // ==================================================
     // ASSET LOADING
-    // ==================================================
 
     static bool ReadAsset(
         const std::string &requestedPath,
@@ -995,9 +977,7 @@ namespace
         return true;
     }
 
-    // ==================================================
     // OBJ INDEX PARSING
-    // ==================================================
 
     static bool ParseObjIndex(
         const std::string &token,
@@ -1056,9 +1036,7 @@ namespace
         return true;
     }
 
-    // ==================================================
     // MATERIAL MANAGEMENT
-    // ==================================================
 
     static int FindOrCreateMaterial(
         const std::string &name,
@@ -1084,9 +1062,7 @@ namespace
         return index;
     }
 
-    // ==================================================
     // MTL TEXTURE PATH PARSING
-    // ==================================================
 
     static std::string GetMapFilename(
         std::istringstream &stream)
@@ -1171,9 +1147,7 @@ namespace
         return tokens[i];
     }
 
-    // ==================================================
     // MTL LOADING
-    // ==================================================
 
     static void LoadMTL(
         Model &model,
@@ -1289,9 +1263,7 @@ namespace
             ("Loaded MTL: " + mtlPath).c_str());
     }
 
-    // ==================================================
     // TEXTURE LOADING
-    // ==================================================
 
     static void LoadMaterialTexture(
         Material &material)
@@ -1371,9 +1343,7 @@ namespace
         LogMessage(message);
     }
 
-    // ==================================================
     // TEXTURE UPLOAD
-    // ==================================================
 
     static bool UploadMaterialTexture(
         Material &material)
@@ -1458,9 +1428,7 @@ namespace
         return true;
     }
 
-    // ==================================================
     // MODEL TEXTURE CLEANUP
-    // ==================================================
 
     static void ReleaseModelTextures(Model &model)
     {
@@ -1481,9 +1449,7 @@ namespace
             }
         }
     }
-    // ==================================================
     // MODEL BOUNDING BOX / NORMALIZATION
-    // ==================================================
 
     static void NormalizeModel(Model &model)
     {
@@ -1521,9 +1487,7 @@ namespace
         }
     }
 
-    // ==================================================
     // OBJ LOADING
-    // ==================================================
 
     static bool LoadOBJ(Model &model)
     {
@@ -1856,9 +1820,7 @@ namespace
     static Vertex3 NormalizeNormal(
         const Vertex3 &normal);
 
-    // ==================================================
     // GPU MESH MANAGEMENT
-    // ==================================================
 
     static void ReleaseModelGpu(Model &model)
     {
@@ -2052,9 +2014,7 @@ namespace
         return true;
     }
 
-    // ==================================================
     // SCENE LOADING
-    // ==================================================
 
     static bool LoadScene(
         const std::vector<ObjectConfig> &configs,
@@ -2131,9 +2091,7 @@ namespace
 
         return true;
     }
-    // ==================================================
     // LIVE CONFIGURATION RELOADING
-    // ==================================================
 
     static void CheckConfigurationReload()
     {
@@ -2208,9 +2166,7 @@ namespace
             g_Models.size());
     }
 
-    // ==================================================
     // NORMAL CALCULATIONS
-    // ==================================================
 
     static Vertex3 CalculateFaceNormal(
         const Vertex3 &a,
@@ -2263,9 +2219,7 @@ namespace
             normal.z / length};
     }
 
-    // ==================================================
     // LIGHTING
-    // ==================================================
 
     static float CalculateBrightness(
         const Vertex3 &normal)
@@ -2286,9 +2240,7 @@ namespace
                           AMBIENT_LIGHT + DIFFUSE_LIGHT * diffuse);
     }
 
-    // ==================================================
     // OPENGL FUNCTION LOADING
-    // ==================================================
 
     static PROC GetGLProc(const char *name)
     {
@@ -2311,9 +2263,7 @@ namespace
         return proc;
     }
 
-    // ==================================================
     // SHADER COMPILATION
-    // ==================================================
 
     static GLuint CompileShader(
         GLenum type,
@@ -2747,9 +2697,7 @@ namespace
         return true;
     }
 
-    // ==================================================
     // TRIANGLE RENDERING
-    // ==================================================
 
     static void RenderTriangle(
         const Model &model,
@@ -2830,9 +2778,7 @@ namespace
                 positions[i]->z);
         }
     }
-    // ==================================================
     // FIRST-PERSON CAMERA
-    // ==================================================
 
     static void ReleaseCameraCursor()
     {
@@ -3057,9 +3003,7 @@ namespace
             verticalInput * movement;
     }
 
-    // ==================================================
     // MODEL RENDERING
-    // ==================================================
 
     static void RenderModel(Model &model)
     {
@@ -3426,9 +3370,7 @@ namespace
             static_cast<GLenum>(oldMatrixMode));
     }
 
-    // ==================================================
     // MAIN RENDERER
-    // ==================================================
 
     static void RenderTriangleMesh(HWND window)
     {
@@ -3478,9 +3420,7 @@ namespace
         }
     }
 
-    // ==================================================
     // RESOURCE DIAGNOSTICS
-    // ==================================================
 
     static BOOL CALLBACK EnumerateResourceNames(
         HMODULE module,
@@ -3557,10 +3497,7 @@ namespace
             0);
     }
 }
-
-// ==================================================
-// REPENTOGON HOOK
-// ==================================================
+// REPENTOGON HOO
 
 HOOK_GLOBAL(
     OpenGL::wglSwapBuffers,
@@ -3576,10 +3513,7 @@ HOOK_GLOBAL(
 
     return super(hdc);
 }
-
-// ==================================================
-// DLL ENTRY POINT
-// ==================================================
+// DLL ENTRY POIN
 
 BOOL WINAPI DllMain(
     HINSTANCE instance,
@@ -3595,10 +3529,7 @@ BOOL WINAPI DllMain(
 
     return TRUE;
 }
-
-// ==================================================
-// MOD INITIALIZATION
-// ==================================================
+// MOD INITIALIZATIO
 
 extern "C" __declspec(dllexport) int ModInit()
 {
