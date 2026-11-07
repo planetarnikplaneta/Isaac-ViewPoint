@@ -69,7 +69,10 @@ public:
     char _padding[8];
     short _playerHudIndex;
 };
-
+namespace OpenGL
+{
+    bool __stdcall wglSwapBuffers(HDC hdc);
+}
 namespace
 {
     // --------------------------------------------------
@@ -874,16 +877,18 @@ TestFramebufferPixel(viewport);
 // REPENTOGON hook
 // --------------------------------------------------
 
-HOOK_GLOBAL(OpenGL::wglSwapBuffers, (HDC hdc)->bool, __stdcall) {
+HOOK_GLOBAL(OpenGL::wglSwapBuffers, (HDC hdc)->bool, __stdcall)
+{
     static unsigned int swapCount = 0;
 
-    GLint framebuffer = -1;
-    GLint viewport[4] = {};
+    if (swapCount < 30)
+    {
+        GLint framebuffer = -1;
+        GLint viewport[4] = {};
 
-    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &framebuffer);
-    glGetIntegerv(GL_VIEWPORT, viewport);
+        glGetIntegerv(GL_FRAMEBUFFER_BINDING, &framebuffer);
+        glGetIntegerv(GL_VIEWPORT, viewport);
 
-    if (swapCount < 30) {
         char buffer[256];
 
         sprintf_s(
