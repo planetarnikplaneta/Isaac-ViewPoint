@@ -944,10 +944,10 @@ HOOK_METHOD_PRIORITY(
         pos
     );
 
-    if (_playerHudIndex == 0)
-    {
-        TestMatrixState();
-    }
+if (_playerHudIndex == 0)
+{
+    RenderTriangleMesh();
+}
 }
 
 // --------------------------------------------------
