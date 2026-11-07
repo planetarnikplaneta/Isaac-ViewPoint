@@ -662,10 +662,19 @@ static void RenderDiagnosticQuad()
             &oldProgram
         );
 
-        glGetIntegerv(
-            GL_MATRIX_MODE,
-            &oldMatrixMode
-        );
+glGetIntegerv(
+    GL_MATRIX_MODE,
+    &oldMatrixMode
+);
+
+if (oldMatrixMode != GL_MODELVIEW &&
+    oldMatrixMode != GL_PROJECTION &&
+    oldMatrixMode != GL_TEXTURE)
+{
+    LogMessage("Invalid original matrix mode; using GL_MODELVIEW");
+
+    oldMatrixMode = GL_MODELVIEW;
+}
 
         if (g_ActiveTexture)
         {
@@ -887,31 +896,27 @@ static void RenderDiagnosticQuad()
         // --------------------------------------------------
 
         glMatrixMode(GL_MODELVIEW);
-        glPopMatrix();
+glPopMatrix();
 
-        glMatrixMode(GL_PROJECTION);
-        glPopMatrix();
+glMatrixMode(GL_PROJECTION);
+glPopMatrix();
 
-        // --------------------------------------------------
-        // Restore OpenGL state
-        // --------------------------------------------------
+glPopAttrib();
 
-        glPopAttrib();
+g_UseProgram(
+    static_cast<GLuint>(oldProgram)
+);
 
-        g_UseProgram(
-            static_cast<GLuint>(oldProgram)
-        );
+if (g_ActiveTexture)
+{
+    g_ActiveTexture(
+        static_cast<GLenum>(oldActiveTexture)
+    );
+}
 
-        if (g_ActiveTexture)
-        {
-            g_ActiveTexture(
-                static_cast<GLenum>(oldActiveTexture)
-            );
-        }
-
-        glMatrixMode(
-            static_cast<GLenum>(oldMatrixMode)
-        );
+glMatrixMode(
+    static_cast<GLenum>(oldMatrixMode)
+);
     }
 }
 
