@@ -2452,28 +2452,33 @@ static GLint g_UniformDiffuse = -1;
     
         static const char* vertexSource = R"(
             #version 120
-    
+        
             uniform vec3 uLightDirection;
             uniform float uAmbient;
             uniform float uDiffuse;
-    
+        
             varying vec2 vTexcoord;
             varying float vBrightness;
-    
+        
             void main()
             {
                 gl_Position = ftransform();
-    
+        
+                // Pass the fixed-function current color to the fragment shader.
+                gl_FrontColor = gl_Color;
+        
+                // Pass texture coordinates from VBO attribute array 0.
                 vTexcoord = gl_MultiTexCoord0.xy;
-    
+        
+                // Transform the normal into eye space.
                 vec3 normal =
                     normalize(gl_NormalMatrix * gl_Normal);
-    
+        
                 float diffuseLight = max(
                     dot(normal, normalize(uLightDirection)),
                     0.0
                 );
-    
+        
                 vBrightness = clamp(
                     uAmbient + uDiffuse * diffuseLight,
                     0.0,
@@ -3276,11 +3281,33 @@ static GLint g_UniformDiffuse = -1;
                 )
             );
         
+            while (glGetError() != GL_NO_ERROR)
+            {
+                // Clear errors from earlier rendering operations.
+            }
+            
             g_DrawArrays(
                 GL_TRIANGLES,
                 0,
                 batch.vertexCount
             );
+            
+            const GLenum drawError = glGetError();
+            
+            if (drawError != GL_NO_ERROR)
+            {
+                char message[256];
+            
+                snprintf(
+                    message,
+                    sizeof(message),
+                    "GPU draw failed for %s: OpenGL error 0x%X",
+                    model.path.c_str(),
+                    drawError
+                );
+            
+                LogMessage(message);
+            }
         }
         
         g_BindBuffer(GL_ARRAY_BUFFER, 0);
