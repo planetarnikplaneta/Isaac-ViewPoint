@@ -28,7 +28,7 @@
 
 namespace ViewPoint
 {
-      static void ReleaseModelGpu(Model &model)
+      void ReleaseModelGpu(Model &model)
     {
         if (wglGetCurrentContext() &&
             g_DeleteBuffers)
@@ -49,7 +49,7 @@ namespace ViewPoint
         model.gpuBuildAttempted = false;
     }
 
-    static bool BuildGpuMesh(Model &model)
+    bool BuildGpuMesh(Model &model)
     {
         if (model.gpuReady)
             return true;
@@ -219,7 +219,7 @@ namespace ViewPoint
 
         return true;
     }
-    static Vertex3 CalculateFaceNormal(
+    Vertex3 CalculateFaceNormal(
         const Vertex3 &a,
         const Vertex3 &b,
         const Vertex3 &c)
@@ -253,7 +253,7 @@ namespace ViewPoint
         return normal;
     }
 
-    static Vertex3 NormalizeNormal(
+    Vertex3 NormalizeNormal(
         const Vertex3 &normal)
     {
         const float length = std::sqrt(
