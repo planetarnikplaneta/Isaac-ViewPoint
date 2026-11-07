@@ -1568,7 +1568,69 @@ BOOL WINAPI DllMain(
 
     return TRUE;
 }
+// some debug
+static BOOL CALLBACK EnumerateResourceNames(
+    HMODULE module,
+    LPCSTR type,
+    LPSTR name,
+    LONG_PTR
+)
+{
+    if (IS_INTRESOURCE(name))
+    {
+        char message[128];
 
+
+snprintf(
+message,
+sizeof(message),
+"Embedded numeric resource ID: %u",
+static_cast<unsigned>(reinterpret_cast<ULONG_PTR>(name))
+);
+
+LogMessage(message);
+}
+else
+{
+LogMessage(
+(std::string("Embedded resource name: ") + name).c_str()
+);
+}
+
+return TRUE;
+}
+
+static void DiagnoseEmbeddedResources()
+{
+LogMessage("Enumerating embedded RCDATA resources...");
+
+if (!g_Module)
+{
+LogMessage("ERROR: g_Module is null");
+return;
+}
+
+if (!EnumResourceNamesA(
+g_Module,
+RT_RCDATA,
+EnumerateResourceNames,
+0))
+{
+char message[128];
+
+snprintf(
+message,
+sizeof(message),
+"EnumResourceNamesA failed: %lu",
+GetLastError()
+);
+
+LogMessage(message);
+return;
+}
+
+LogMessage("Resource enumeration finished.");
+}
 // --------------------------------------------------
 // Mod initialization
 // --------------------------------------------------
@@ -1576,8 +1638,9 @@ BOOL WINAPI DllMain(
 extern "C" __declspec(dllexport) int ModInit()
 {
     LogMessage("Isaac: ViewPoint initialized");
-    LogMessage("Default model: resources_ViewPoint/objects/sphere.obj");
-    LogMessage("External resources override embedded resources");
+    LogMessage(("Default model: " + std::string(DEFAULT_OBJECT)).c_str());
+
+    DiagnoseEmbeddedResources();
 
     return 0;
 }
