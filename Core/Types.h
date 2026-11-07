@@ -1,3 +1,5 @@
+namespace ViewPoint
+{
 struct Vertex3
     {
         float x = 0.0f;
@@ -122,3 +124,4 @@ struct Vertex3
 
         ULONGLONG lastUpdateTime = 0;
     };
+}
