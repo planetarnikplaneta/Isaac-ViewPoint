@@ -36,8 +36,8 @@
 #define GL_TEXTURE0 0x84C0
 #endif
 
-using PFNGLUSEPROGRAMPROC = void (APIENTRY *)(GLuint);
-using PFNGLACTIVETEXTUREPROC = void (APIENTRY *)(GLenum);
+using PFNGLUSEPROGRAMPROC = void(APIENTRY *)(GLuint);
+using PFNGLACTIVETEXTUREPROC = void(APIENTRY *)(GLenum);
 
 namespace OpenGL
 {
@@ -97,15 +97,15 @@ namespace
     {
         std::string name;
 
-        float ambient[3] = { 0.2f, 0.2f, 0.2f };
-        float diffuse[3] = { 1.0f, 1.0f, 1.0f };
-        float specular[3] = { 0.0f, 0.0f, 0.0f };
+        float ambient[3] = {0.2f, 0.2f, 0.2f};
+        float diffuse[3] = {1.0f, 1.0f, 1.0f};
+        float specular[3] = {0.0f, 0.0f, 0.0f};
 
         float shininess = 32.0f;
 
         std::string diffuseTexturePath;
 
-        unsigned char* pixels = nullptr;
+        unsigned char *pixels = nullptr;
 
         int width = 0;
         int height = 0;
@@ -139,9 +139,9 @@ namespace
     // Logging
     // --------------------------------------------------
 
-    static void LogMessage(const char* message)
+    static void LogMessage(const char *message)
     {
-        FILE* file = fopen("C:\\MyNativeMod.log", "a");
+        FILE *file = fopen("C:\\MyNativeMod.log", "a");
 
         if (file)
         {
@@ -154,7 +154,7 @@ namespace
     // String helpers
     // --------------------------------------------------
 
-    static std::string Trim(const std::string& text)
+    static std::string Trim(const std::string &text)
     {
         const size_t first = text.find_first_not_of(" \t\r\n");
 
@@ -197,7 +197,7 @@ namespace
 
         std::string result;
 
-        for (const std::string& p : parts)
+        for (const std::string &p : parts)
         {
             if (!result.empty())
                 result += '/';
@@ -209,8 +209,8 @@ namespace
     }
 
     static std::string ResolveRelativeAsset(
-        const std::string& parent,
-        const std::string& child)
+        const std::string &parent,
+        const std::string &child)
     {
         std::string normalizedChild = child;
 
@@ -218,8 +218,7 @@ namespace
             normalizedChild.begin(),
             normalizedChild.end(),
             '\\',
-            '/'
-        );
+            '/');
 
         if (normalizedChild.empty() ||
             normalizedChild[0] == '/' ||
@@ -250,15 +249,14 @@ namespace
         DWORD length = GetModuleFileNameA(
             g_Module,
             modulePath,
-            MAX_PATH
-        );
+            MAX_PATH);
 
         if (!length || length >= MAX_PATH)
             return fs::current_path();
 
         return fs::path(
-            std::string(modulePath, length)
-        ).parent_path();
+                   std::string(modulePath, length))
+            .parent_path();
     }
 
     // --------------------------------------------------
@@ -270,72 +268,75 @@ namespace
     //
     // If the external file does not exist, checks the
     // embedded Windows resource with the same name.
-static std::string ToUpperResourceName(const std::string& name)
-{
-    std::string result = name;
-
-    for (char& c : result)
+    static std::string ToUpperResourceName(const std::string &name)
     {
-        if (c >= 'a' && c <= 'z')
-            c = static_cast<char>(c - 'a' + 'A');
+        std::string result = name;
+
+        for (char &c : result)
+        {
+            if (c >= 'a' && c <= 'z')
+                c = static_cast<char>(c - 'a' + 'A');
+        }
+
+        return result;
     }
 
-    return result;
-}
-
-static HRSRC FindEmbeddedResource(
+   static HRSRC FindEmbeddedResource(
     HMODULE module,
     const std::string& assetPath)
-{
-    const std::string resourceName =
-        ToUpperResourceName(assetPath);
-
-    char message[512];
-
-    snprintf(
-        message,
-        sizeof(message),
-        "Resource lookup: module=%p, requested=\"%s\", lookup=\"%s\"",
-        static_cast<void*>(module),
-        assetPath.c_str(),
-        resourceName.c_str()
-    );
-
-    LogMessage(message);
-
-    SetLastError(ERROR_SUCCESS);
-
-    HRSRC resource = FindResourceA(
-        module,
-        resourceName.c_str(),
-        RT_RCDATA
-    );
-
-    if (!resource)
     {
-        const DWORD error = GetLastError();
-
+        const std::string resourceName =
+            ToUpperResourceName(assetPath);
+    
+        // First try the normal resource name.
+        HRSRC resource = FindResourceA(
+            module,
+            resourceName.c_str(),
+            RT_RCDATA
+        );
+    
+        if (resource)
+            return resource;
+    
+        // Some generated resources may contain literal quotes.
+        const std::string quotedResourceName =
+            "\"" + resourceName + "\"";
+    
+        resource = FindResourceA(
+            module,
+            quotedResourceName.c_str(),
+            RT_RCDATA
+        );
+    
+        if (resource)
+        {
+            LogMessage(
+                ("Found quoted resource name: " +
+                 quotedResourceName).c_str()
+            );
+    
+            return resource;
+        }
+    
+        char message[512];
+    
         snprintf(
             message,
             sizeof(message),
-            "FindResourceA failed: error=%lu, lookup=\"%s\"",
-            static_cast<unsigned long>(error),
-            resourceName.c_str()
+            "Resource not found: \"%s\" or \"%s\", error=%lu",
+            resourceName.c_str(),
+            quotedResourceName.c_str(),
+            static_cast<unsigned long>(GetLastError())
         );
-
+    
         LogMessage(message);
+    
+        return nullptr;
     }
-    else
-    {
-        LogMessage("FindResourceA succeeded.");
-    }
-
-    return resource;
-}
 
     static bool ReadAsset(
-        const std::string& requestedPath,
-        std::vector<unsigned char>& output)
+        const std::string &requestedPath,
+        std::vector<unsigned char> &output)
     {
         const std::string assetPath =
             NormalizeAssetPath(requestedPath);
@@ -361,8 +362,7 @@ static HRSRC FindEmbeddedResource(
             {
                 std::ifstream file(
                     externalPath,
-                    std::ios::binary
-                );
+                    std::ios::binary);
 
                 if (file)
                 {
@@ -376,13 +376,11 @@ static HRSRC FindEmbeddedResource(
                     file.seekg(0, std::ios::beg);
 
                     output.resize(
-                        static_cast<size_t>(size)
-                    );
+                        static_cast<size_t>(size));
 
                     file.read(
-                        reinterpret_cast<char*>(output.data()),
-                        size
-                    );
+                        reinterpret_cast<char *>(output.data()),
+                        size);
 
                     if (file)
                         return true;
@@ -400,42 +398,36 @@ static HRSRC FindEmbeddedResource(
         // Embedded resource
         // ----------------------------------------------
 
-
-
-HRSRC resource = FindEmbeddedResource(
-    g_Module,
-    assetPath
-);
+        HRSRC resource = FindEmbeddedResource(
+            g_Module,
+            assetPath);
 
         if (!resource)
         {
             LogMessage(
-                ("Embedded asset not found: " + assetPath).c_str()
-            );
+                ("Embedded asset not found: " + assetPath).c_str());
 
             return false;
         }
 
         HGLOBAL loaded = LoadResource(
             g_Module,
-            resource
-        );
+            resource);
 
         if (!loaded)
             return false;
 
         const DWORD size = SizeofResource(
             g_Module,
-            resource
-        );
+            resource);
 
-        const void* data = LockResource(loaded);
+        const void *data = LockResource(loaded);
 
         if (!data || size == 0)
             return false;
 
-        const unsigned char* bytes =
-            static_cast<const unsigned char*>(data);
+        const unsigned char *bytes =
+            static_cast<const unsigned char *>(data);
 
         output.assign(bytes, bytes + size);
 
@@ -447,10 +439,10 @@ HRSRC resource = FindEmbeddedResource(
     // --------------------------------------------------
 
     static bool ParseObjIndex(
-        const std::string& token,
+        const std::string &token,
         int component,
         size_t count,
-        int32_t& output)
+        int32_t &output)
     {
         size_t start = 0;
 
@@ -474,23 +466,21 @@ HRSRC resource = FindEmbeddedResource(
 
         std::string number = token.substr(
             start,
-            end - start
-        );
+            end - start);
 
-        char* parseEnd = nullptr;
+        char *parseEnd = nullptr;
 
         long value = strtol(
             number.c_str(),
             &parseEnd,
-            10
-        );
+            10);
 
         if (!parseEnd || *parseEnd || value == 0)
             return false;
 
         long resolved = value > 0
-            ? value - 1
-            : static_cast<long>(count) + value;
+                            ? value - 1
+                            : static_cast<long>(count) + value;
 
         if (resolved < 0 ||
             static_cast<size_t>(resolved) >= count)
@@ -508,8 +498,8 @@ HRSRC resource = FindEmbeddedResource(
     // --------------------------------------------------
 
     static int FindOrCreateMaterial(
-        const std::string& name,
-        std::map<std::string, int>& lookup)
+        const std::string &name,
+        std::map<std::string, int> &lookup)
     {
         auto found = lookup.find(name);
 
@@ -520,8 +510,7 @@ HRSRC resource = FindEmbeddedResource(
         material.name = name;
 
         const int index = static_cast<int>(
-            g_Materials.size()
-        );
+            g_Materials.size());
 
         g_Materials.push_back(material);
 
@@ -535,24 +524,22 @@ HRSRC resource = FindEmbeddedResource(
     // --------------------------------------------------
 
     static void LoadMTL(
-        const std::string& mtlPath,
-        std::map<std::string, int>& lookup)
+        const std::string &mtlPath,
+        std::map<std::string, int> &lookup)
     {
         std::vector<unsigned char> bytes;
 
         if (!ReadAsset(mtlPath, bytes))
         {
             LogMessage(
-                ("Cannot load MTL: " + mtlPath).c_str()
-            );
+                ("Cannot load MTL: " + mtlPath).c_str());
 
             return;
         }
 
         std::string source(
-            reinterpret_cast<const char*>(bytes.data()),
-            bytes.size()
-        );
+            reinterpret_cast<const char *>(bytes.data()),
+            bytes.size());
 
         std::istringstream input(source);
 
@@ -595,7 +582,7 @@ HRSRC resource = FindEmbeddedResource(
             if (currentMaterial < 0)
                 continue;
 
-            Material& material =
+            Material &material =
                 g_Materials[currentMaterial];
 
             // ------------------------------------------
@@ -665,22 +652,20 @@ HRSRC resource = FindEmbeddedResource(
                     material.diffuseTexturePath =
                         ResolveRelativeAsset(
                             mtlPath,
-                            texture
-                        );
+                            texture);
                 }
             }
         }
 
         LogMessage(
-            ("Loaded MTL: " + mtlPath).c_str()
-        );
+            ("Loaded MTL: " + mtlPath).c_str());
     }
 
     // --------------------------------------------------
     // PNG loading
     // --------------------------------------------------
 
-    static void LoadMaterialTexture(Material& material)
+    static void LoadMaterialTexture(Material &material)
     {
         if (material.textureAttempted)
             return;
@@ -693,13 +678,13 @@ HRSRC resource = FindEmbeddedResource(
         std::vector<unsigned char> bytes;
 
         if (!ReadAsset(
-            material.diffuseTexturePath,
-            bytes))
+                material.diffuseTexturePath,
+                bytes))
         {
             LogMessage(
                 ("Cannot load texture: " +
-                 material.diffuseTexturePath).c_str()
-            );
+                 material.diffuseTexturePath)
+                    .c_str());
 
             return;
         }
@@ -715,30 +700,29 @@ HRSRC resource = FindEmbeddedResource(
             &material.width,
             &material.height,
             nullptr,
-            4
-        );
+            4);
 
         if (!material.pixels)
         {
             LogMessage(
                 ("PNG decoding failed: " +
-                 material.diffuseTexturePath).c_str()
-            );
+                 material.diffuseTexturePath)
+                    .c_str());
 
             return;
         }
 
         LogMessage(
             ("Decoded PNG: " +
-             material.diffuseTexturePath).c_str()
-        );
+             material.diffuseTexturePath)
+                .c_str());
     }
 
     // --------------------------------------------------
     // OpenGL texture upload
     // --------------------------------------------------
 
-    static bool UploadMaterialTexture(Material& material)
+    static bool UploadMaterialTexture(Material &material)
     {
         LoadMaterialTexture(material);
 
@@ -750,45 +734,38 @@ HRSRC resource = FindEmbeddedResource(
 
         glGenTextures(
             1,
-            &material.textureId
-        );
+            &material.textureId);
 
         if (!material.textureId)
             return false;
 
         glBindTexture(
             GL_TEXTURE_2D,
-            material.textureId
-        );
+            material.textureId);
 
         glPixelStorei(
             GL_UNPACK_ALIGNMENT,
-            1
-        );
+            1);
 
         glTexParameteri(
             GL_TEXTURE_2D,
             GL_TEXTURE_MIN_FILTER,
-            GL_LINEAR
-        );
+            GL_LINEAR);
 
         glTexParameteri(
             GL_TEXTURE_2D,
             GL_TEXTURE_MAG_FILTER,
-            GL_LINEAR
-        );
+            GL_LINEAR);
 
         glTexParameteri(
             GL_TEXTURE_2D,
             GL_TEXTURE_WRAP_S,
-            GL_REPEAT
-        );
+            GL_REPEAT);
 
         glTexParameteri(
             GL_TEXTURE_2D,
             GL_TEXTURE_WRAP_T,
-            GL_REPEAT
-        );
+            GL_REPEAT);
 
         glTexImage2D(
             GL_TEXTURE_2D,
@@ -799,8 +776,7 @@ HRSRC resource = FindEmbeddedResource(
             0,
             GL_RGBA,
             GL_UNSIGNED_BYTE,
-            material.pixels
-        );
+            material.pixels);
 
         const GLenum error = glGetError();
 
@@ -812,15 +788,13 @@ HRSRC resource = FindEmbeddedResource(
                 message,
                 sizeof(message),
                 "Texture upload failed: 0x%X",
-                error
-            );
+                error);
 
             LogMessage(message);
 
             glDeleteTextures(
                 1,
-                &material.textureId
-            );
+                &material.textureId);
 
             material.textureId = 0;
 
@@ -844,16 +818,15 @@ HRSRC resource = FindEmbeddedResource(
         {
             LogMessage(
                 ("Cannot load OBJ: " +
-                 std::string(DEFAULT_OBJECT)).c_str()
-            );
+                 std::string(DEFAULT_OBJECT))
+                    .c_str());
 
             return;
         }
 
         std::string source(
-            reinterpret_cast<const char*>(bytes.data()),
-            bytes.size()
-        );
+            reinterpret_cast<const char *>(bytes.data()),
+            bytes.size());
 
         std::istringstream input(source);
 
@@ -950,15 +923,13 @@ HRSRC resource = FindEmbeddedResource(
                     const std::string mtlPath =
                         ResolveRelativeAsset(
                             DEFAULT_OBJECT,
-                            filename
-                        );
+                            filename);
 
                     if (!mtlPath.empty())
                     {
                         LoadMTL(
                             mtlPath,
-                            materialLookup
-                        );
+                            materialLookup);
                     }
                 }
             }
@@ -997,10 +968,10 @@ HRSRC resource = FindEmbeddedResource(
                     ObjCorner corner;
 
                     if (!ParseObjIndex(
-                        token,
-                        0,
-                        g_Vertices.size(),
-                        corner.position))
+                            token,
+                            0,
+                            g_Vertices.size(),
+                            corner.position))
                     {
                         continue;
                     }
@@ -1009,15 +980,13 @@ HRSRC resource = FindEmbeddedResource(
                         token,
                         1,
                         g_Texcoords.size(),
-                        corner.texcoord
-                    );
+                        corner.texcoord);
 
                     ParseObjIndex(
                         token,
                         2,
                         g_Normals.size(),
-                        corner.normal
-                    );
+                        corner.normal);
 
                     face.push_back(corner);
                 }
@@ -1055,7 +1024,7 @@ HRSRC resource = FindEmbeddedResource(
         Vertex3 lo = g_Vertices.front();
         Vertex3 hi = g_Vertices.front();
 
-        for (const Vertex3& v : g_Vertices)
+        for (const Vertex3 &v : g_Vertices)
         {
             lo.x = (std::min)(lo.x, v.x);
             lo.y = (std::min)(lo.y, v.y);
@@ -1070,14 +1039,12 @@ HRSRC resource = FindEmbeddedResource(
         const float cy = (lo.y + hi.y) * 0.5f;
         const float cz = (lo.z + hi.z) * 0.5f;
 
-        const float extent = (std::max)(
-            (std::max)(hi.x - lo.x, hi.y - lo.y),
-            (std::max)(hi.z - lo.z, 0.0001f)
-        );
+        const float extent = (std::max)((std::max)(hi.x - lo.x, hi.y - lo.y),
+                                        (std::max)(hi.z - lo.z, 0.0001f));
 
         const float scale = 2.0f / extent;
 
-        for (Vertex3& v : g_Vertices)
+        for (Vertex3 &v : g_Vertices)
         {
             v.x = (v.x - cx) * scale;
             v.y = (v.y - cy) * scale;
@@ -1096,8 +1063,7 @@ HRSRC resource = FindEmbeddedResource(
             g_Texcoords.size(),
             g_Normals.size(),
             g_Triangles.size(),
-            g_Materials.size()
-        );
+            g_Materials.size());
 
         LogMessage(message);
     }
@@ -1107,9 +1073,9 @@ HRSRC resource = FindEmbeddedResource(
     // --------------------------------------------------
 
     static Vertex3 CalculateFaceNormal(
-        const Vertex3& a,
-        const Vertex3& b,
-        const Vertex3& c)
+        const Vertex3 &a,
+        const Vertex3 &b,
+        const Vertex3 &c)
     {
         const float ux = b.x - a.x;
         const float uy = b.y - a.y;
@@ -1128,11 +1094,10 @@ HRSRC resource = FindEmbeddedResource(
         const float length = std::sqrt(
             normal.x * normal.x +
             normal.y * normal.y +
-            normal.z * normal.z
-        );
+            normal.z * normal.z);
 
         if (length < 1e-8f)
-            return { 0.0f, 0.0f, 1.0f };
+            return {0.0f, 0.0f, 1.0f};
 
         normal.x /= length;
         normal.y /= length;
@@ -1141,56 +1106,49 @@ HRSRC resource = FindEmbeddedResource(
         return normal;
     }
 
-    static Vertex3 NormalizeNormal(const Vertex3& normal)
+    static Vertex3 NormalizeNormal(const Vertex3 &normal)
     {
         const float length = std::sqrt(
             normal.x * normal.x +
             normal.y * normal.y +
-            normal.z * normal.z
-        );
+            normal.z * normal.z);
 
         if (length < 1e-8f)
-            return { 0.0f, 0.0f, 1.0f };
+            return {0.0f, 0.0f, 1.0f};
 
         return {
             normal.x / length,
             normal.y / length,
-            normal.z / length
-        };
+            normal.z / length};
     }
 
     // --------------------------------------------------
     // Lighting
     // --------------------------------------------------
 
-    static float CalculateBrightness(const Vertex3& normal)
+    static float CalculateBrightness(const Vertex3 &normal)
     {
         const float lightLength = std::sqrt(
             LIGHT_X * LIGHT_X +
             LIGHT_Y * LIGHT_Y +
-            LIGHT_Z * LIGHT_Z
-        );
+            LIGHT_Z * LIGHT_Z);
 
-        const float diffuse = (std::max)(
-            0.0f,
-            (
-                normal.x * LIGHT_X +
-                normal.y * LIGHT_Y +
-                normal.z * LIGHT_Z
-            ) / lightLength
-        );
+        const float diffuse = (std::max)(0.0f,
+                                         (
+                                             normal.x * LIGHT_X +
+                                             normal.y * LIGHT_Y +
+                                             normal.z * LIGHT_Z) /
+                                             lightLength);
 
-        return (std::min)(
-            1.0f,
-            AMBIENT_LIGHT + DIFFUSE_LIGHT * diffuse
-        );
+        return (std::min)(1.0f,
+                          AMBIENT_LIGHT + DIFFUSE_LIGHT * diffuse);
     }
 
     // --------------------------------------------------
     // OpenGL function loading
     // --------------------------------------------------
 
-    static PROC GetGLProc(const char* name)
+    static PROC GetGLProc(const char *name)
     {
         PROC proc = wglGetProcAddress(name);
 
@@ -1203,8 +1161,8 @@ HRSRC resource = FindEmbeddedResource(
             HMODULE gl = GetModuleHandleA("opengl32.dll");
 
             proc = gl
-                ? GetProcAddress(gl, name)
-                : nullptr;
+                       ? GetProcAddress(gl, name)
+                       : nullptr;
         }
 
         return proc;
@@ -1225,7 +1183,7 @@ HRSRC resource = FindEmbeddedResource(
             g_ActiveTexture = nullptr;
 
             // Texture IDs belong to their OpenGL context.
-            for (Material& material : g_Materials)
+            for (Material &material : g_Materials)
                 material.textureId = 0;
 
             LogMessage("OpenGL context changed");
@@ -1235,16 +1193,14 @@ HRSRC resource = FindEmbeddedResource(
         {
             g_UseProgram =
                 reinterpret_cast<PFNGLUSEPROGRAMPROC>(
-                    GetGLProc("glUseProgram")
-                );
+                    GetGLProc("glUseProgram"));
         }
 
         if (!g_ActiveTexture)
         {
             g_ActiveTexture =
                 reinterpret_cast<PFNGLACTIVETEXTUREPROC>(
-                    GetGLProc("glActiveTexture")
-                );
+                    GetGLProc("glActiveTexture"));
         }
 
         if (!g_UseProgram)
@@ -1260,39 +1216,36 @@ HRSRC resource = FindEmbeddedResource(
     // Triangle rendering
     // --------------------------------------------------
 
-    static void RenderTriangle(const Triangle& triangle)
+    static void RenderTriangle(const Triangle &triangle)
     {
-        const ObjCorner* corners[3] = {
+        const ObjCorner *corners[3] = {
             &triangle.corners[0],
             &triangle.corners[1],
-            &triangle.corners[2]
-        };
+            &triangle.corners[2]};
 
-        const Vertex3* positions[3] = {
+        const Vertex3 *positions[3] = {
             &g_Vertices[corners[0]->position],
             &g_Vertices[corners[1]->position],
-            &g_Vertices[corners[2]->position]
-        };
+            &g_Vertices[corners[2]->position]};
 
         const Vertex3 faceNormal = CalculateFaceNormal(
             *positions[0],
             *positions[1],
-            *positions[2]
-        );
+            *positions[2]);
 
         const int materialIndex =
             triangle.materialIndex >= 0 &&
-            static_cast<size_t>(triangle.materialIndex) <
-                g_Materials.size()
+                    static_cast<size_t>(triangle.materialIndex) <
+                        g_Materials.size()
                 ? triangle.materialIndex
                 : 0;
 
-        const Material& material =
+        const Material &material =
             g_Materials[materialIndex];
 
         for (int i = 0; i < 3; ++i)
         {
-            const ObjCorner& corner = *corners[i];
+            const ObjCorner &corner = *corners[i];
 
             Vertex3 normal = faceNormal;
 
@@ -1301,8 +1254,7 @@ HRSRC resource = FindEmbeddedResource(
                     g_Normals.size())
             {
                 normal = NormalizeNormal(
-                    g_Normals[corner.normal]
-                );
+                    g_Normals[corner.normal]);
             }
 
             const float brightness =
@@ -1312,20 +1264,18 @@ HRSRC resource = FindEmbeddedResource(
                 material.diffuse[0] * brightness,
                 material.diffuse[1] * brightness,
                 material.diffuse[2] * brightness,
-                1.0f
-            );
+                1.0f);
 
             glNormal3f(
                 normal.x,
                 normal.y,
-                normal.z
-            );
+                normal.z);
 
             if (corner.texcoord >= 0 &&
                 static_cast<size_t>(corner.texcoord) <
                     g_Texcoords.size())
             {
-                const Vertex2& uv =
+                const Vertex2 &uv =
                     g_Texcoords[corner.texcoord];
 
                 glTexCoord2f(uv.u, uv.v);
@@ -1338,8 +1288,7 @@ HRSRC resource = FindEmbeddedResource(
             glVertex3f(
                 positions[i]->x,
                 positions[i]->y,
-                positions[i]->z
-            );
+                positions[i]->z);
         }
     }
 
@@ -1388,8 +1337,7 @@ HRSRC resource = FindEmbeddedResource(
         {
             glGetIntegerv(
                 GL_ACTIVE_TEXTURE,
-                &oldActiveTexture
-            );
+                &oldActiveTexture);
         }
 
         // ----------------------------------------------
@@ -1427,8 +1375,7 @@ HRSRC resource = FindEmbeddedResource(
             GL_TRUE,
             GL_TRUE,
             GL_TRUE,
-            GL_TRUE
-        );
+            GL_TRUE);
 
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LEQUAL);
@@ -1437,8 +1384,7 @@ HRSRC resource = FindEmbeddedResource(
         glEnable(GL_BLEND);
         glBlendFunc(
             GL_SRC_ALPHA,
-            GL_ONE_MINUS_SRC_ALPHA
-        );
+            GL_ONE_MINUS_SRC_ALPHA);
 
         glEnable(GL_ALPHA_TEST);
         glAlphaFunc(GL_GREATER, 0.01f);
@@ -1476,8 +1422,7 @@ HRSRC resource = FindEmbeddedResource(
             -halfHeight,
             halfHeight,
             nearPlane,
-            farPlane
-        );
+            farPlane);
 
         // ----------------------------------------------
         // Model transformation
@@ -1489,23 +1434,20 @@ HRSRC resource = FindEmbeddedResource(
         glTranslatef(
             0.0f,
             0.0f,
-            -OBJECT_DISTANCE
-        );
+            -OBJECT_DISTANCE);
 
         glRotatef(
             OBJECT_TILT,
             1.0f,
             0.0f,
-            0.0f
-        );
+            0.0f);
 
         glRotatef(
             static_cast<float>(GetTickCount64()) *
                 OBJECT_ROTATION_SPEED,
             0.0f,
             1.0f,
-            0.0f
-        );
+            0.0f);
 
         // ----------------------------------------------
         // Render each material separately
@@ -1515,7 +1457,7 @@ HRSRC resource = FindEmbeddedResource(
              materialIndex < g_Materials.size();
              ++materialIndex)
         {
-            Material& material =
+            Material &material =
                 g_Materials[materialIndex];
 
             const bool textured =
@@ -1527,14 +1469,12 @@ HRSRC resource = FindEmbeddedResource(
 
                 glBindTexture(
                     GL_TEXTURE_2D,
-                    material.textureId
-                );
+                    material.textureId);
 
                 glTexEnvi(
                     GL_TEXTURE_ENV,
                     GL_TEXTURE_ENV_MODE,
-                    GL_MODULATE
-                );
+                    GL_MODULATE);
             }
             else
             {
@@ -1543,7 +1483,7 @@ HRSRC resource = FindEmbeddedResource(
 
             glBegin(GL_TRIANGLES);
 
-            for (const Triangle& triangle : g_Triangles)
+            for (const Triangle &triangle : g_Triangles)
             {
                 if (triangle.materialIndex !=
                     static_cast<int>(materialIndex))
@@ -1553,7 +1493,7 @@ HRSRC resource = FindEmbeddedResource(
 
                 bool valid = true;
 
-                for (const ObjCorner& corner : triangle.corners)
+                for (const ObjCorner &corner : triangle.corners)
                 {
                     if (corner.position < 0 ||
                         static_cast<size_t>(corner.position) >=
@@ -1584,19 +1524,16 @@ HRSRC resource = FindEmbeddedResource(
         glPopAttrib();
 
         g_UseProgram(
-            static_cast<GLuint>(oldProgram)
-        );
+            static_cast<GLuint>(oldProgram));
 
         if (g_ActiveTexture)
         {
             g_ActiveTexture(
-                static_cast<GLenum>(oldActiveTexture)
-            );
+                static_cast<GLenum>(oldActiveTexture));
         }
 
         glMatrixMode(
-            static_cast<GLenum>(oldMatrixMode)
-        );
+            static_cast<GLenum>(oldMatrixMode));
     }
 }
 
@@ -1619,8 +1556,7 @@ HOOK_GLOBAL(OpenGL::wglSwapBuffers, (HDC hdc)->bool, __stdcall)
 BOOL WINAPI DllMain(
     HINSTANCE instance,
     DWORD reason,
-    LPVOID
-)
+    LPVOID)
 {
     if (reason == DLL_PROCESS_ATTACH)
     {
@@ -1646,8 +1582,7 @@ static BOOL CALLBACK EnumerateResourceNames(
             message,
             sizeof(message),
             "Embedded numeric resource ID: %u",
-            static_cast<unsigned>(reinterpret_cast<ULONG_PTR>(name))
-        );
+            static_cast<unsigned>(reinterpret_cast<ULONG_PTR>(name)));
 
         LogMessage(message);
         return TRUE;
@@ -1657,9 +1592,8 @@ static BOOL CALLBACK EnumerateResourceNames(
         message,
         sizeof(message),
         "Enumerated resource: module=%p, name=\"%s\"",
-        static_cast<void*>(module),
-        name
-    );
+        static_cast<void *>(module),
+        name);
 
     LogMessage(message);
 
@@ -1668,8 +1602,7 @@ static BOOL CALLBACK EnumerateResourceNames(
     HRSRC resource = FindResourceA(
         module,
         name,
-        type
-    );
+        type);
 
     if (resource)
     {
@@ -1681,8 +1614,7 @@ static BOOL CALLBACK EnumerateResourceNames(
             message,
             sizeof(message),
             "Lookup using enumerated name: FAILED, error=%lu",
-            static_cast<unsigned long>(GetLastError())
-        );
+            static_cast<unsigned long>(GetLastError()));
 
         LogMessage(message);
     }
@@ -1697,8 +1629,7 @@ static void DiagnoseEmbeddedResources()
         message,
         sizeof(message),
         "Resource enumeration module: %p",
-        static_cast<void*>(g_Module)
-    );
+        static_cast<void *>(g_Module));
 
     LogMessage(message);
 
@@ -1706,8 +1637,7 @@ static void DiagnoseEmbeddedResources()
         g_Module,
         RT_RCDATA,
         EnumerateResourceNames,
-        0
-    );
+        0);
 }
 // --------------------------------------------------
 // Mod initialization
