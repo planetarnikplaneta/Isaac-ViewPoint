@@ -77,31 +77,31 @@ using PFNGLUSEPROGRAMPROC = void(APIENTRY *)(GLuint);
 using PFNGLACTIVETEXTUREPROC = void(APIENTRY *)(GLenum);
 
 using PFNGLGENBUFFERSPROC =
-    void(APIENTRY *)(GLsizei, GLuint*);
+    void(APIENTRY *)(GLsizei, GLuint *);
 
 using PFNGLBINDBUFFERPROC =
     void(APIENTRY *)(GLenum, GLuint);
 
 using PFNGLBUFFERDATAPROC =
-    void(APIENTRY *)(GLenum, ptrdiff_t, const void*, GLenum);
+    void(APIENTRY *)(GLenum, ptrdiff_t, const void *, GLenum);
 
 using PFNGLDELETEBUFFERSPROC =
-    void(APIENTRY *)(GLsizei, const GLuint*);
+    void(APIENTRY *)(GLsizei, const GLuint *);
 
 using PFNGLCREATESHADERPROC =
     GLuint(APIENTRY *)(GLenum);
 
 using PFNGLSHADERSOURCEPROC =
-    void(APIENTRY *)(GLuint, GLsizei, const char* const*, const GLint*);
+    void(APIENTRY *)(GLuint, GLsizei, const char *const *, const GLint *);
 
 using PFNGLCOMPILESHADERPROC =
     void(APIENTRY *)(GLuint);
 
 using PFNGLGETSHADERIVPROC =
-    void(APIENTRY *)(GLuint, GLenum, GLint*);
+    void(APIENTRY *)(GLuint, GLenum, GLint *);
 
 using PFNGLGETSHADERINFOLOGPROC =
-    void(APIENTRY *)(GLuint, GLsizei, GLsizei*, char*);
+    void(APIENTRY *)(GLuint, GLsizei, GLsizei *, char *);
 
 using PFNGLDELETESHADERPROC =
     void(APIENTRY *)(GLuint);
@@ -116,16 +116,16 @@ using PFNGLLINKPROGRAMPROC =
     void(APIENTRY *)(GLuint);
 
 using PFNGLGETPROGRAMIVPROC =
-    void(APIENTRY *)(GLuint, GLenum, GLint*);
+    void(APIENTRY *)(GLuint, GLenum, GLint *);
 
 using PFNGLGETPROGRAMINFOLOGPROC =
-    void(APIENTRY *)(GLuint, GLsizei, GLsizei*, char*);
+    void(APIENTRY *)(GLuint, GLsizei, GLsizei *, char *);
 
 using PFNGLDELETEPROGRAMPROC =
     void(APIENTRY *)(GLuint);
 
 using PFNGLGETUNIFORMLOCATIONPROC =
-    GLint(APIENTRY *)(GLuint, const char*);
+    GLint(APIENTRY *)(GLuint, const char *);
 
 using PFNGLUNIFORM1IPROC =
     void(APIENTRY *)(GLint, GLint);
@@ -204,16 +204,13 @@ namespace
         std::string name;
 
         float ambient[3] = {
-            0.2f, 0.2f, 0.2f
-        };
+            0.2f, 0.2f, 0.2f};
 
         float diffuse[3] = {
-            1.0f, 1.0f, 1.0f
-        };
+            1.0f, 1.0f, 1.0f};
 
         float specular[3] = {
-            0.0f, 0.0f, 0.0f
-        };
+            0.0f, 0.0f, 0.0f};
 
         float shininess = 32.0f;
 
@@ -235,7 +232,7 @@ namespace
         Vertex3 normal;
         Vertex2 texcoord;
     };
-    
+
     struct MaterialBatch
     {
         GLuint vertexBuffer = 0;
@@ -247,37 +244,58 @@ namespace
     struct Model
     {
         std::string path;
-    
+
         std::vector<Vertex3> vertices;
         std::vector<Vertex2> texcoords;
         std::vector<Vertex3> normals;
-    
+
         std::vector<Triangle> triangles;
         std::vector<Material> materials;
 
         std::vector<MaterialBatch> gpuBatches;
-        
+
         bool gpuBuildAttempted = false;
         bool gpuReady = false;
 
         // Instance transformation.
         Vertex3 position = {0.0f, 0.0f, 0.0f};
         Vertex3 rotation = {0.0f, 0.0f, 0.0f};
-    
+
         float scale = 1.0f;
-    
+
         bool attempted = false;
         bool loaded = false;
     };
-    
+
     struct ObjectConfig
     {
         std::string path;
-    
+
         Vertex3 position = {0.0f, 0.0f, 0.0f};
         Vertex3 rotation = {0.0f, 0.0f, 0.0f};
-    
+
         float scale = 1.0f;
+    };
+
+    struct Camera
+    {
+        Vertex3 position = {0.0f, 0.0f, 5.0f};
+
+        float yaw = 0.0f;
+        float pitch = 0.0f;
+
+        float fieldOfView = 45.0f;
+        float nearPlane = 0.1f;
+        float farPlane = 1000.0f;
+
+        float movementSpeed = 5.0f;
+        float sprintMultiplier = 3.0f;
+        float mouseSensitivity = 0.15f;
+
+        bool enabled = false;
+        bool previousF1State = false;
+
+        ULONGLONG lastUpdateTime = 0;
     };
 
     // ==================================================
@@ -290,50 +308,53 @@ namespace
 
     static PFNGLUSEPROGRAMPROC g_UseProgram = nullptr;
     static PFNGLACTIVETEXTUREPROC g_ActiveTexture = nullptr;
-static PFNGLGENBUFFERSPROC g_GenBuffers = nullptr;
-static PFNGLBINDBUFFERPROC g_BindBuffer = nullptr;
-static PFNGLBUFFERDATAPROC g_BufferData = nullptr;
-static PFNGLDELETEBUFFERSPROC g_DeleteBuffers = nullptr;
+    static PFNGLGENBUFFERSPROC g_GenBuffers = nullptr;
+    static PFNGLBINDBUFFERPROC g_BindBuffer = nullptr;
+    static PFNGLBUFFERDATAPROC g_BufferData = nullptr;
+    static PFNGLDELETEBUFFERSPROC g_DeleteBuffers = nullptr;
 
-static PFNGLCREATESHADERPROC g_CreateShader = nullptr;
-static PFNGLSHADERSOURCEPROC g_ShaderSource = nullptr;
-static PFNGLCOMPILESHADERPROC g_CompileShader = nullptr;
-static PFNGLGETSHADERIVPROC g_GetShaderiv = nullptr;
-static PFNGLGETSHADERINFOLOGPROC g_GetShaderInfoLog = nullptr;
-static PFNGLDELETESHADERPROC g_DeleteShader = nullptr;
+    static PFNGLCREATESHADERPROC g_CreateShader = nullptr;
+    static PFNGLSHADERSOURCEPROC g_ShaderSource = nullptr;
+    static PFNGLCOMPILESHADERPROC g_CompileShader = nullptr;
+    static PFNGLGETSHADERIVPROC g_GetShaderiv = nullptr;
+    static PFNGLGETSHADERINFOLOGPROC g_GetShaderInfoLog = nullptr;
+    static PFNGLDELETESHADERPROC g_DeleteShader = nullptr;
 
-static PFNGLCREATEPROGRAMPROC g_CreateProgram = nullptr;
-static PFNGLATTACHSHADERPROC g_AttachShader = nullptr;
-static PFNGLLINKPROGRAMPROC g_LinkProgram = nullptr;
-static PFNGLGETPROGRAMIVPROC g_GetProgramiv = nullptr;
-static PFNGLGETPROGRAMINFOLOGPROC g_GetProgramInfoLog = nullptr;
-static PFNGLDELETEPROGRAMPROC g_DeleteProgram = nullptr;
+    static PFNGLCREATEPROGRAMPROC g_CreateProgram = nullptr;
+    static PFNGLATTACHSHADERPROC g_AttachShader = nullptr;
+    static PFNGLLINKPROGRAMPROC g_LinkProgram = nullptr;
+    static PFNGLGETPROGRAMIVPROC g_GetProgramiv = nullptr;
+    static PFNGLGETPROGRAMINFOLOGPROC g_GetProgramInfoLog = nullptr;
+    static PFNGLDELETEPROGRAMPROC g_DeleteProgram = nullptr;
 
-static PFNGLGETUNIFORMLOCATIONPROC g_GetUniformLocation = nullptr;
-static PFNGLUNIFORM1IPROC g_Uniform1i = nullptr;
-static PFNGLUNIFORM1FPROC g_Uniform1f = nullptr;
-static PFNGLUNIFORM3FPROC g_Uniform3f = nullptr;
-static PFNGLDRAWARRAYSPROC g_DrawArrays = nullptr;
+    static PFNGLGETUNIFORMLOCATIONPROC g_GetUniformLocation = nullptr;
+    static PFNGLUNIFORM1IPROC g_Uniform1i = nullptr;
+    static PFNGLUNIFORM1FPROC g_Uniform1f = nullptr;
+    static PFNGLUNIFORM3FPROC g_Uniform3f = nullptr;
+    static PFNGLDRAWARRAYSPROC g_DrawArrays = nullptr;
 
-static GLuint g_ShaderProgram = 0;
+    static GLuint g_ShaderProgram = 0;
 
-static GLint g_UniformTexture = -1;
-static GLint g_UniformUseTexture = -1;
-static GLint g_UniformLightDirection = -1;
-static GLint g_UniformAmbient = -1;
-static GLint g_UniformDiffuse = -1;
+    static GLint g_UniformTexture = -1;
+    static GLint g_UniformUseTexture = -1;
+    static GLint g_UniformLightDirection = -1;
+    static GLint g_UniformAmbient = -1;
+    static GLint g_UniformDiffuse = -1;
 
     static std::vector<Model> g_Models;
-    
+
     static std::vector<ObjectConfig> g_ObjectConfigs;
+    static Camera g_Camera;
+
+    static bool g_CursorCaptured = false;
     static bool g_SceneAttempted = false;
 
     // Configuration hot-reload state.
     static fs::file_time_type g_ConfigLastWriteTime{};
     static bool g_ConfigTimestampValid = false;
-    
+
     static unsigned int g_ConfigCheckCounter = 0;
-    
+
     constexpr unsigned int CONFIG_CHECK_INTERVAL = 60;
 
     // ==================================================
@@ -342,13 +363,12 @@ static GLint g_UniformDiffuse = -1;
 
     static bool ResetLogFile()
     {
-        FILE* file = fopen(LOG_FILE, "w");
+        FILE *file = fopen(LOG_FILE, "w");
 
         if (!file)
         {
             OutputDebugStringA(
-                "Isaac ViewPoint: Cannot reset log file.\n"
-            );
+                "Isaac ViewPoint: Cannot reset log file.\n");
 
             return false;
         }
@@ -359,15 +379,14 @@ static GLint g_UniformDiffuse = -1;
         return true;
     }
 
-    static void LogMessage(const char* message)
+    static void LogMessage(const char *message)
     {
-        FILE* file = fopen(LOG_FILE, "a");
+        FILE *file = fopen(LOG_FILE, "a");
 
         if (!file)
         {
             OutputDebugStringA(
-                "Isaac ViewPoint: Cannot write log.\n"
-            );
+                "Isaac ViewPoint: Cannot write log.\n");
 
             return;
         }
@@ -375,14 +394,13 @@ static GLint g_UniformDiffuse = -1;
         fprintf(
             file,
             "Isaac ViewPoint: %s\n",
-            message
-        );
+            message);
 
         fclose(file);
     }
 
     static void LogNumber(
-        const char* label,
+        const char *label,
         size_t value)
     {
         char message[256];
@@ -392,8 +410,7 @@ static GLint g_UniformDiffuse = -1;
             sizeof(message),
             "%s: %zu",
             label,
-            value
-        );
+            value);
 
         LogMessage(message);
     }
@@ -402,7 +419,7 @@ static GLint g_UniformDiffuse = -1;
     // STRING HELPERS
     // ==================================================
 
-    static std::string Trim(const std::string& text)
+    static std::string Trim(const std::string &text)
     {
         const size_t first =
             text.find_first_not_of(" \t\r\n");
@@ -415,8 +432,7 @@ static GLint g_UniformDiffuse = -1;
 
         return text.substr(
             first,
-            last - first + 1
-        );
+            last - first + 1);
     }
 
     static std::string NormalizeAssetPath(
@@ -426,8 +442,7 @@ static GLint g_UniformDiffuse = -1;
             path.begin(),
             path.end(),
             '\\',
-            '/'
-        );
+            '/');
 
         while (path.rfind("./", 0) == 0)
             path.erase(0, 2);
@@ -457,7 +472,7 @@ static GLint g_UniformDiffuse = -1;
 
         std::string result;
 
-        for (const std::string& p : parts)
+        for (const std::string &p : parts)
         {
             if (!result.empty())
                 result += '/';
@@ -469,8 +484,8 @@ static GLint g_UniformDiffuse = -1;
     }
 
     static std::string ResolveRelativeAsset(
-        const std::string& parent,
-        const std::string& child)
+        const std::string &parent,
+        const std::string &child)
     {
         std::string normalizedChild = child;
 
@@ -478,8 +493,7 @@ static GLint g_UniformDiffuse = -1;
             normalizedChild.begin(),
             normalizedChild.end(),
             '\\',
-            '/'
-        );
+            '/');
 
         if (normalizedChild.empty() ||
             normalizedChild[0] == '/' ||
@@ -498,22 +512,20 @@ static GLint g_UniformDiffuse = -1;
                 : parent.substr(0, slash + 1);
 
         return NormalizeAssetPath(
-            directory + normalizedChild
-        );
+            directory + normalizedChild);
     }
 
     static std::string ToUpperResourceName(
-        const std::string& name)
+        const std::string &name)
     {
         std::string result = name;
 
-        for (char& c : result)
+        for (char &c : result)
         {
             if (c >= 'a' && c <= 'z')
             {
                 c = static_cast<char>(
-                    c - 'a' + 'A'
-                );
+                    c - 'a' + 'A');
             }
         }
 
@@ -531,63 +543,62 @@ static GLint g_UniformDiffuse = -1;
         DWORD length = GetModuleFileNameA(
             g_Module,
             modulePath,
-            MAX_PATH
-        );
+            MAX_PATH);
 
         if (!length || length >= MAX_PATH)
             return fs::current_path();
 
         return fs::path(
-            std::string(modulePath, length)
-        ).parent_path();
+                   std::string(modulePath, length))
+            .parent_path();
     }
     // ==================================================
     // CONFIGURATION FILE
     // ==================================================
-    
+
     static fs::path GetConfigurationPath()
     {
         return GetDllDirectory() / CONFIG_FILE;
     }
-    
+
     static bool ParseVector3Text(
-        const std::string& text,
-        Vertex3& output)
+        const std::string &text,
+        Vertex3 &output)
     {
         std::istringstream stream(text);
-    
+
         std::string x;
         std::string y;
         std::string z;
         std::string extra;
-    
+
         if (!std::getline(stream, x, ',') ||
             !std::getline(stream, y, ',') ||
             !std::getline(stream, z, ','))
         {
             return false;
         }
-    
+
         if (std::getline(stream, extra, ','))
             return false;
-    
+
         try
         {
             size_t usedX = 0;
             size_t usedY = 0;
             size_t usedZ = 0;
-    
+
             output.x = std::stof(Trim(x), &usedX);
             output.y = std::stof(Trim(y), &usedY);
             output.z = std::stof(Trim(z), &usedZ);
-    
+
             if (usedX != Trim(x).size() ||
                 usedY != Trim(y).size() ||
                 usedZ != Trim(z).size())
             {
                 return false;
             }
-    
+
             return std::isfinite(output.x) &&
                    std::isfinite(output.y) &&
                    std::isfinite(output.z);
@@ -597,19 +608,19 @@ static GLint g_UniformDiffuse = -1;
             return false;
         }
     }
-    
+
     static bool ParseObjectConfiguration(
-        const std::string& value,
-        ObjectConfig& output)
+        const std::string &value,
+        ObjectConfig &output)
     {
         std::istringstream stream(value);
-    
+
         std::string path;
         std::string position;
         std::string rotation;
         std::string scale;
         std::string extra;
-    
+
         if (!std::getline(stream, path, '|') ||
             !std::getline(stream, position, '|') ||
             !std::getline(stream, rotation, '|') ||
@@ -617,39 +628,39 @@ static GLint g_UniformDiffuse = -1;
         {
             return false;
         }
-    
+
         if (std::getline(stream, extra, '|'))
             return false;
-    
+
         path = Trim(path);
         position = Trim(position);
         rotation = Trim(rotation);
         scale = Trim(scale);
-    
+
         if (path.size() >= 2 &&
             path.front() == '"' &&
             path.back() == '"')
         {
             path = path.substr(1, path.size() - 2);
         }
-    
+
         output.path = NormalizeAssetPath(path);
-    
+
         if (output.path.empty())
             return false;
-    
+
         if (!ParseVector3Text(position, output.position))
             return false;
-    
+
         if (!ParseVector3Text(rotation, output.rotation))
             return false;
-    
+
         try
         {
             size_t used = 0;
-    
+
             output.scale = std::stof(scale, &used);
-    
+
             if (used != scale.size() ||
                 !std::isfinite(output.scale) ||
                 output.scale <= 0.0f)
@@ -661,30 +672,30 @@ static GLint g_UniformDiffuse = -1;
         {
             return false;
         }
-    
+
         return true;
     }
-    
+
     static bool ReadConfiguration(
-        std::vector<ObjectConfig>& output)
+        std::vector<ObjectConfig> &output)
     {
         output.clear();
-    
+
         const fs::path configPath = GetConfigurationPath();
-    
+
         std::ifstream file(configPath);
-    
+
         if (!file)
             return false;
-    
+
         std::string legacyModel;
-    
+
         std::string line;
-    
+
         while (std::getline(file, line))
         {
             line = Trim(line);
-    
+
             if (line.empty() ||
                 line[0] == '#' ||
                 line[0] == ';' ||
@@ -692,18 +703,18 @@ static GLint g_UniformDiffuse = -1;
             {
                 continue;
             }
-    
+
             const size_t equals = line.find('=');
-    
+
             if (equals == std::string::npos)
                 continue;
-    
+
             const std::string key =
                 Trim(line.substr(0, equals));
-    
+
             const std::string value =
                 Trim(line.substr(equals + 1));
-    
+
             if (key == "Model")
             {
                 legacyModel = value;
@@ -711,109 +722,105 @@ static GLint g_UniformDiffuse = -1;
             else if (key == "Object")
             {
                 ObjectConfig object;
-    
+
                 if (!ParseObjectConfiguration(value, object))
                 {
                     LogMessage(
                         ("Invalid Object configuration: " +
-                         value).c_str()
-                    );
-    
+                         value)
+                            .c_str());
+
                     return false;
                 }
-    
+
                 output.push_back(std::move(object));
             }
         }
-    
+
         // Backwards compatibility with the old Model= format.
         if (output.empty())
         {
             ObjectConfig object;
-    
+
             std::string path =
                 legacyModel.empty()
                     ? DEFAULT_OBJECT
                     : legacyModel;
-            
+
             if (path.size() >= 2 &&
                 path.front() == '"' &&
                 path.back() == '"')
             {
                 path = path.substr(1, path.size() - 2);
             }
-    
+
             object.path = NormalizeAssetPath(path);
-    
+
             if (object.path.empty())
             {
                 LogMessage(
-                    "Invalid Model path in configuration."
-                );
-    
+                    "Invalid Model path in configuration.");
+
                 return false;
             }
-    
+
             output.push_back(std::move(object));
         }
-    
+
         return true;
     }
-    
+
     static void UpdateConfigurationTimestamp()
     {
         std::error_code error;
-    
+
         const fs::file_time_type timestamp =
             fs::last_write_time(
                 GetConfigurationPath(),
-                error
-            );
-    
+                error);
+
         if (error)
         {
             g_ConfigTimestampValid = false;
             return;
         }
-    
+
         g_ConfigLastWriteTime = timestamp;
         g_ConfigTimestampValid = true;
     }
-    
+
     static void LoadConfiguration()
     {
         std::vector<ObjectConfig> configuredObjects;
-    
+
         if (!ReadConfiguration(configuredObjects))
         {
             LogMessage(
-                "Configuration file not found or invalid; using default model."
-            );
-    
+                "Configuration file not found or invalid; using default model.");
+
             configuredObjects.clear();
-    
+
             ObjectConfig defaultObject;
             defaultObject.path = DEFAULT_OBJECT;
-    
+
             configuredObjects.push_back(defaultObject);
         }
-    
+
         g_ObjectConfigs = std::move(configuredObjects);
-    
+
         LogNumber(
             "Configured object count",
-            g_ObjectConfigs.size()
-        );
-    
+            g_ObjectConfigs.size());
+
         for (size_t i = 0; i < g_ObjectConfigs.size(); ++i)
         {
             LogMessage(
                 ("Configured object " +
                  std::to_string(i) + ": " +
-                 g_ObjectConfigs[i].path).c_str()
-            );
+                 g_ObjectConfigs[i].path)
+                    .c_str());
         }
-    
+
         UpdateConfigurationTimestamp();
     }
 
@@ -823,7 +830,7 @@ static GLint g_UniformDiffuse = -1;
 
     static HRSRC FindEmbeddedResource(
         HMODULE module,
-        const std::string& assetPath)
+        const std::string &assetPath)
     {
         const std::string resourceName =
             ToUpperResourceName(assetPath);
@@ -831,8 +838,7 @@ static GLint g_UniformDiffuse = -1;
         HRSRC resource = FindResourceA(
             module,
             resourceName.c_str(),
-            RT_RCDATA
-        );
+            RT_RCDATA);
 
         if (resource)
             return resource;
@@ -845,15 +851,14 @@ static GLint g_UniformDiffuse = -1;
         resource = FindResourceA(
             module,
             quotedName.c_str(),
-            RT_RCDATA
-        );
+            RT_RCDATA);
 
         if (resource)
         {
             LogMessage(
                 ("Found quoted resource name: " +
-                 quotedName).c_str()
-            );
+                 quotedName)
+                    .c_str());
 
             return resource;
         }
@@ -864,8 +869,7 @@ static GLint g_UniformDiffuse = -1;
             message,
             sizeof(message),
             "Resource not found: %s",
-            assetPath.c_str()
-        );
+            assetPath.c_str());
 
         LogMessage(message);
 
@@ -877,8 +881,8 @@ static GLint g_UniformDiffuse = -1;
     // ==================================================
 
     static bool ReadAsset(
-        const std::string& requestedPath,
-        std::vector<unsigned char>& output)
+        const std::string &requestedPath,
+        std::vector<unsigned char> &output)
     {
         const std::string assetPath =
             NormalizeAssetPath(requestedPath);
@@ -904,8 +908,7 @@ static GLint g_UniformDiffuse = -1;
             {
                 std::ifstream file(
                     externalPath,
-                    std::ios::binary
-                );
+                    std::ios::binary);
 
                 if (file)
                 {
@@ -920,22 +923,19 @@ static GLint g_UniformDiffuse = -1;
                     file.seekg(0, std::ios::beg);
 
                     output.resize(
-                        static_cast<size_t>(size)
-                    );
+                        static_cast<size_t>(size));
 
                     file.read(
-                        reinterpret_cast<char*>(
-                            output.data()
-                        ),
-                        size
-                    );
+                        reinterpret_cast<char *>(
+                            output.data()),
+                        size);
 
                     if (file)
                     {
                         LogMessage(
                             ("Loaded external asset: " +
-                             assetPath).c_str()
-                        );
+                             assetPath)
+                                .c_str());
 
                         return true;
                     }
@@ -947,8 +947,7 @@ static GLint g_UniformDiffuse = -1;
         catch (...)
         {
             LogMessage(
-                "External asset access failed."
-            );
+                "External asset access failed.");
         }
 
         // ----------------------------------------------
@@ -957,44 +956,40 @@ static GLint g_UniformDiffuse = -1;
 
         HRSRC resource = FindEmbeddedResource(
             g_Module,
-            assetPath
-        );
+            assetPath);
 
         if (!resource)
         {
             LogMessage(
                 ("Asset not found: " +
-                 assetPath).c_str()
-            );
+                 assetPath)
+                    .c_str());
 
             return false;
         }
 
         HGLOBAL loaded = LoadResource(
             g_Module,
-            resource
-        );
+            resource);
 
         if (!loaded)
             return false;
 
         const DWORD size = SizeofResource(
             g_Module,
-            resource
-        );
+            resource);
 
-        const void* data = LockResource(loaded);
+        const void *data = LockResource(loaded);
 
         if (!data || size == 0)
             return false;
 
-        const unsigned char* bytes =
-            static_cast<const unsigned char*>(data);
+        const unsigned char *bytes =
+            static_cast<const unsigned char *>(data);
 
         output.assign(
             bytes,
-            bytes + size
-        );
+            bytes + size);
 
         return true;
     }
@@ -1004,10 +999,10 @@ static GLint g_UniformDiffuse = -1;
     // ==================================================
 
     static bool ParseObjIndex(
-        const std::string& token,
+        const std::string &token,
         int component,
         size_t count,
-        int32_t& output)
+        int32_t &output)
     {
         size_t start = 0;
 
@@ -1034,13 +1029,12 @@ static GLint g_UniformDiffuse = -1;
         const std::string number =
             token.substr(start, end - start);
 
-        char* parseEnd = nullptr;
+        char *parseEnd = nullptr;
 
         const long value = strtol(
             number.c_str(),
             &parseEnd,
-            10
-        );
+            10);
 
         if (!parseEnd || *parseEnd || value == 0)
             return false;
@@ -1066,9 +1060,9 @@ static GLint g_UniformDiffuse = -1;
     // ==================================================
 
     static int FindOrCreateMaterial(
-        const std::string& name,
-        std::map<std::string, int>& lookup,
-        Model& model)
+        const std::string &name,
+        std::map<std::string, int> &lookup,
+        Model &model)
     {
         auto found = lookup.find(name);
 
@@ -1082,8 +1076,7 @@ static GLint g_UniformDiffuse = -1;
             static_cast<int>(model.materials.size());
 
         model.materials.push_back(
-            std::move(material)
-        );
+            std::move(material));
 
         lookup[name] = index;
 
@@ -1095,7 +1088,7 @@ static GLint g_UniformDiffuse = -1;
     // ==================================================
 
     static std::string GetMapFilename(
-        std::istringstream& stream)
+        std::istringstream &stream)
     {
         std::vector<std::string> tokens;
 
@@ -1112,7 +1105,7 @@ static GLint g_UniformDiffuse = -1;
 
         while (i < tokens.size())
         {
-            const std::string& option = tokens[i];
+            const std::string &option = tokens[i];
 
             if (option.empty() || option[0] != '-')
                 break;
@@ -1182,9 +1175,9 @@ static GLint g_UniformDiffuse = -1;
     // ==================================================
 
     static void LoadMTL(
-        Model& model,
-        const std::string& mtlPath,
-        std::map<std::string, int>& lookup)
+        Model &model,
+        const std::string &mtlPath,
+        std::map<std::string, int> &lookup)
     {
         std::vector<unsigned char> bytes;
 
@@ -1192,16 +1185,15 @@ static GLint g_UniformDiffuse = -1;
         {
             LogMessage(
                 ("Cannot load MTL: " +
-                 mtlPath).c_str()
-            );
+                 mtlPath)
+                    .c_str());
 
             return;
         }
 
         const std::string source(
-            reinterpret_cast<const char*>(bytes.data()),
-            bytes.size()
-        );
+            reinterpret_cast<const char *>(bytes.data()),
+            bytes.size());
 
         std::istringstream input(source);
 
@@ -1234,8 +1226,7 @@ static GLint g_UniformDiffuse = -1;
                         FindOrCreateMaterial(
                             name,
                             lookup,
-                            model
-                        );
+                            model);
                 }
 
                 continue;
@@ -1244,7 +1235,7 @@ static GLint g_UniformDiffuse = -1;
             if (currentMaterial < 0)
                 continue;
 
-            Material& material =
+            Material &material =
                 model.materials[currentMaterial];
 
             if (command == "Ka")
@@ -1282,21 +1273,19 @@ static GLint g_UniformDiffuse = -1;
                     material.diffuseTexturePath =
                         ResolveRelativeAsset(
                             mtlPath,
-                            texture
-                        );
+                            texture);
 
                     LogMessage(
                         ("Material texture: " +
                          material.name + " -> " +
-                         material.diffuseTexturePath).c_str()
-                    );
+                         material.diffuseTexturePath)
+                            .c_str());
                 }
             }
         }
 
         LogMessage(
-            ("Loaded MTL: " + mtlPath).c_str()
-        );
+            ("Loaded MTL: " + mtlPath).c_str());
     }
 
     // ==================================================
@@ -1304,7 +1293,7 @@ static GLint g_UniformDiffuse = -1;
     // ==================================================
 
     static void LoadMaterialTexture(
-        Material& material)
+        Material &material)
     {
         if (material.textureAttempted)
             return;
@@ -1322,8 +1311,8 @@ static GLint g_UniformDiffuse = -1;
         {
             LogMessage(
                 ("Cannot load texture: " +
-                 material.diffuseTexturePath).c_str()
-            );
+                 material.diffuseTexturePath)
+                    .c_str());
 
             return;
         }
@@ -1339,21 +1328,20 @@ static GLint g_UniformDiffuse = -1;
 
         stbi_set_flip_vertically_on_load(1);
 
-        unsigned char* decoded = stbi_load_from_memory(
+        unsigned char *decoded = stbi_load_from_memory(
             bytes.data(),
             static_cast<int>(bytes.size()),
             &material.width,
             &material.height,
             &channels,
-            4
-        );
+            4);
 
         if (!decoded)
         {
             LogMessage(
                 ("PNG decoding failed: " +
-                 material.diffuseTexturePath).c_str()
-            );
+                 material.diffuseTexturePath)
+                    .c_str());
 
             return;
         }
@@ -1364,8 +1352,7 @@ static GLint g_UniformDiffuse = -1;
 
         material.pixels.assign(
             decoded,
-            decoded + pixelSize
-        );
+            decoded + pixelSize);
 
         stbi_image_free(decoded);
 
@@ -1378,8 +1365,7 @@ static GLint g_UniformDiffuse = -1;
             material.diffuseTexturePath.c_str(),
             material.width,
             material.height,
-            channels
-        );
+            channels);
 
         LogMessage(message);
     }
@@ -1389,7 +1375,7 @@ static GLint g_UniformDiffuse = -1;
     // ==================================================
 
     static bool UploadMaterialTexture(
-        Material& material)
+        Material &material)
     {
         LoadMaterialTexture(material);
 
@@ -1401,45 +1387,38 @@ static GLint g_UniformDiffuse = -1;
 
         glGenTextures(
             1,
-            &material.textureId
-        );
+            &material.textureId);
 
         if (!material.textureId)
             return false;
 
         glBindTexture(
             GL_TEXTURE_2D,
-            material.textureId
-        );
+            material.textureId);
 
         glPixelStorei(
             GL_UNPACK_ALIGNMENT,
-            1
-        );
+            1);
 
         glTexParameteri(
             GL_TEXTURE_2D,
             GL_TEXTURE_MIN_FILTER,
-            GL_LINEAR
-        );
+            GL_LINEAR);
 
         glTexParameteri(
             GL_TEXTURE_2D,
             GL_TEXTURE_MAG_FILTER,
-            GL_LINEAR
-        );
+            GL_LINEAR);
 
         glTexParameteri(
             GL_TEXTURE_2D,
             GL_TEXTURE_WRAP_S,
-            GL_REPEAT
-        );
+            GL_REPEAT);
 
         glTexParameteri(
             GL_TEXTURE_2D,
             GL_TEXTURE_WRAP_T,
-            GL_REPEAT
-        );
+            GL_REPEAT);
 
         glTexImage2D(
             GL_TEXTURE_2D,
@@ -1450,8 +1429,7 @@ static GLint g_UniformDiffuse = -1;
             0,
             GL_RGBA,
             GL_UNSIGNED_BYTE,
-            material.pixels.data()
-        );
+            material.pixels.data());
 
         const GLenum error = glGetError();
 
@@ -1463,15 +1441,13 @@ static GLint g_UniformDiffuse = -1;
                 message,
                 sizeof(message),
                 "Texture upload failed: 0x%X",
-                error
-            );
+                error);
 
             LogMessage(message);
 
             glDeleteTextures(
                 1,
-                &material.textureId
-            );
+                &material.textureId);
 
             material.textureId = 0;
 
@@ -1484,23 +1460,22 @@ static GLint g_UniformDiffuse = -1;
     // ==================================================
     // MODEL TEXTURE CLEANUP
     // ==================================================
-    
-    static void ReleaseModelTextures(Model& model)
+
+    static void ReleaseModelTextures(Model &model)
     {
         // OpenGL resources can only be deleted when their
         // owning context is current.
         if (!wglGetCurrentContext())
             return;
-    
-        for (Material& material : model.materials)
+
+        for (Material &material : model.materials)
         {
             if (material.textureId != 0)
             {
                 glDeleteTextures(
                     1,
-                    &material.textureId
-                );
-    
+                    &material.textureId);
+
                 material.textureId = 0;
             }
         }
@@ -1509,7 +1484,7 @@ static GLint g_UniformDiffuse = -1;
     // MODEL BOUNDING BOX / NORMALIZATION
     // ==================================================
 
-    static void NormalizeModel(Model& model)
+    static void NormalizeModel(Model &model)
     {
         if (model.vertices.empty())
             return;
@@ -1517,7 +1492,7 @@ static GLint g_UniformDiffuse = -1;
         Vertex3 lo = model.vertices.front();
         Vertex3 hi = model.vertices.front();
 
-        for (const Vertex3& v : model.vertices)
+        for (const Vertex3 &v : model.vertices)
         {
             lo.x = (std::min)(lo.x, v.x);
             lo.y = (std::min)(lo.y, v.y);
@@ -1532,14 +1507,12 @@ static GLint g_UniformDiffuse = -1;
         const float cy = (lo.y + hi.y) * 0.5f;
         const float cz = (lo.z + hi.z) * 0.5f;
 
-        const float extent = (std::max)(
-            (std::max)(hi.x - lo.x, hi.y - lo.y),
-            (std::max)(hi.z - lo.z, 0.0001f)
-        );
+        const float extent = (std::max)((std::max)(hi.x - lo.x, hi.y - lo.y),
+                                        (std::max)(hi.z - lo.z, 0.0001f));
 
         const float scale = 2.0f / extent;
 
-        for (Vertex3& v : model.vertices)
+        for (Vertex3 &v : model.vertices)
         {
             v.x = (v.x - cx) * scale;
             v.y = (v.y - cy) * scale;
@@ -1551,7 +1524,7 @@ static GLint g_UniformDiffuse = -1;
     // OBJ LOADING
     // ==================================================
 
-    static bool LoadOBJ(Model& model)
+    static bool LoadOBJ(Model &model)
     {
         model.attempted = true;
         model.loaded = false;
@@ -1568,16 +1541,15 @@ static GLint g_UniformDiffuse = -1;
         {
             LogMessage(
                 ("Cannot load OBJ: " +
-                 model.path).c_str()
-            );
+                 model.path)
+                    .c_str());
 
             return false;
         }
 
         const std::string source(
-            reinterpret_cast<const char*>(bytes.data()),
-            bytes.size()
-        );
+            reinterpret_cast<const char *>(bytes.data()),
+            bytes.size());
 
         std::istringstream input(source);
 
@@ -1589,8 +1561,7 @@ static GLint g_UniformDiffuse = -1;
         defaultMaterial.name = "__default";
 
         model.materials.push_back(
-            std::move(defaultMaterial)
-        );
+            std::move(defaultMaterial));
 
         materialLookup["__default"] = 0;
 
@@ -1672,16 +1643,14 @@ static GLint g_UniformDiffuse = -1;
                     const std::string mtlPath =
                         ResolveRelativeAsset(
                             model.path,
-                            filename
-                        );
+                            filename);
 
                     if (!mtlPath.empty())
                     {
                         LoadMTL(
                             model,
                             mtlPath,
-                            materialLookup
-                        );
+                            materialLookup);
                     }
                 }
             }
@@ -1710,8 +1679,8 @@ static GLint g_UniformDiffuse = -1;
 
                     LogMessage(
                         ("Unknown material: " +
-                         name).c_str()
-                    );
+                         name)
+                            .c_str());
                 }
             }
 
@@ -1739,8 +1708,7 @@ static GLint g_UniformDiffuse = -1;
                             corner.position))
                     {
                         LogMessage(
-                            "Invalid OBJ position index."
-                        );
+                            "Invalid OBJ position index.");
 
                         face.clear();
                         break;
@@ -1805,8 +1773,7 @@ static GLint g_UniformDiffuse = -1;
             model.triangles.empty())
         {
             LogMessage(
-                "OBJ contains no usable geometry."
-            );
+                "OBJ contains no usable geometry.");
 
             return false;
         }
@@ -1829,59 +1796,51 @@ static GLint g_UniformDiffuse = -1;
             message,
             sizeof(message),
             "Loaded OBJ: %s",
-            model.path.c_str()
-        );
+            model.path.c_str());
 
         LogMessage(message);
 
         LogNumber(
             "Vertex count",
-            model.vertices.size()
-        );
+            model.vertices.size());
 
         LogNumber(
             "UV count",
-            model.texcoords.size()
-        );
+            model.texcoords.size());
 
         LogNumber(
             "Normal count",
-            model.normals.size()
-        );
+            model.normals.size());
 
         LogNumber(
             "Triangle count",
-            model.triangles.size()
-        );
+            model.triangles.size());
 
         LogNumber(
             "Material count",
-            model.materials.size()
-        );
+            model.materials.size());
 
         LogNumber(
             "Faces without UV coordinates",
-            facesWithoutUV
-        );
+            facesWithoutUV);
 
         LogNumber(
             "Faces without normals",
-            facesWithoutNormals
-        );
+            facesWithoutNormals);
 
-        for (const Material& material : model.materials)
+        for (const Material &material : model.materials)
         {
             LogMessage(
                 ("Material loaded: " +
-                 material.name).c_str()
-            );
+                 material.name)
+                    .c_str());
 
             if (material.diffuseTexturePath.empty())
             {
                 LogMessage(
                     ("Material has no diffuse texture: " +
-                     material.name).c_str()
-                );
+                     material.name)
+                        .c_str());
             }
         }
 
@@ -1889,59 +1848,55 @@ static GLint g_UniformDiffuse = -1;
     }
 
     static Vertex3 CalculateFaceNormal(
-        const Vertex3& a,
-        const Vertex3& b,
-        const Vertex3& c
-    );
-    
+        const Vertex3 &a,
+        const Vertex3 &b,
+        const Vertex3 &c);
+
     static Vertex3 NormalizeNormal(
-        const Vertex3& normal
-    );
+        const Vertex3 &normal);
 
     // ==================================================
     // GPU MESH MANAGEMENT
     // ==================================================
-    
-    static void ReleaseModelGpu(Model& model)
+
+    static void ReleaseModelGpu(Model &model)
     {
         if (wglGetCurrentContext() &&
             g_DeleteBuffers)
         {
-            for (MaterialBatch& batch : model.gpuBatches)
+            for (MaterialBatch &batch : model.gpuBatches)
             {
                 if (batch.vertexBuffer)
                 {
                     g_DeleteBuffers(
                         1,
-                        &batch.vertexBuffer
-                    );
+                        &batch.vertexBuffer);
                 }
             }
         }
-    
+
         model.gpuBatches.clear();
         model.gpuReady = false;
         model.gpuBuildAttempted = false;
     }
-    
-    static bool BuildGpuMesh(Model& model)
+
+    static bool BuildGpuMesh(Model &model)
     {
         if (model.gpuReady)
             return true;
-    
+
         if (model.gpuBuildAttempted)
             return false;
-    
+
         model.gpuBuildAttempted = true;
-    
+
         if (!model.loaded || model.materials.empty())
             return false;
-    
+
         std::vector<std::vector<GpuVertex>> materialVertices(
-            model.materials.size()
-        );
-    
-        for (const Triangle& triangle : model.triangles)
+            model.materials.size());
+
+        for (const Triangle &triangle : model.triangles)
         {
             if (triangle.materialIndex < 0 ||
                 static_cast<size_t>(triangle.materialIndex) >=
@@ -1949,13 +1904,13 @@ static GLint g_UniformDiffuse = -1;
             {
                 continue;
             }
-    
+
             const int materialIndex = triangle.materialIndex;
-    
-            const ObjCorner& a = triangle.corners[0];
-            const ObjCorner& b = triangle.corners[1];
-            const ObjCorner& c = triangle.corners[2];
-    
+
+            const ObjCorner &a = triangle.corners[0];
+            const ObjCorner &b = triangle.corners[1];
+            const ObjCorner &c = triangle.corners[2];
+
             if (a.position < 0 || b.position < 0 || c.position < 0 ||
                 static_cast<size_t>(a.position) >= model.vertices.size() ||
                 static_cast<size_t>(b.position) >= model.vertices.size() ||
@@ -1963,38 +1918,36 @@ static GLint g_UniformDiffuse = -1;
             {
                 continue;
             }
-    
-            const Vertex3& pa = model.vertices[a.position];
-            const Vertex3& pb = model.vertices[b.position];
-            const Vertex3& pc = model.vertices[c.position];
-    
+
+            const Vertex3 &pa = model.vertices[a.position];
+            const Vertex3 &pb = model.vertices[b.position];
+            const Vertex3 &pc = model.vertices[c.position];
+
             const Vertex3 faceNormal =
                 CalculateFaceNormal(pa, pb, pc);
-    
-            const ObjCorner* corners[3] = {
-                &a, &b, &c
-            };
-    
+
+            const ObjCorner *corners[3] = {
+                &a, &b, &c};
+
             for (int i = 0; i < 3; ++i)
             {
-                const ObjCorner& corner = *corners[i];
-    
+                const ObjCorner &corner = *corners[i];
+
                 GpuVertex vertex{};
-    
+
                 vertex.position =
                     model.vertices[corner.position];
-    
+
                 vertex.normal = faceNormal;
-    
+
                 if (corner.normal >= 0 &&
                     static_cast<size_t>(corner.normal) <
                         model.normals.size())
                 {
                     vertex.normal = NormalizeNormal(
-                        model.normals[corner.normal]
-                    );
+                        model.normals[corner.normal]);
                 }
-    
+
                 if (corner.texcoord >= 0 &&
                     static_cast<size_t>(corner.texcoord) <
                         model.texcoords.size())
@@ -2002,270 +1955,256 @@ static GLint g_UniformDiffuse = -1;
                     vertex.texcoord =
                         model.texcoords[corner.texcoord];
                 }
-    
+
                 materialVertices[materialIndex].push_back(vertex);
             }
         }
-    
+
         std::vector<MaterialBatch> newBatches;
-    
+
         newBatches.reserve(materialVertices.size());
-    
+
         for (size_t i = 0; i < materialVertices.size(); ++i)
         {
-            std::vector<GpuVertex>& vertices =
+            std::vector<GpuVertex> &vertices =
                 materialVertices[i];
-    
+
             if (vertices.empty())
                 continue;
-    
+
             if (vertices.size() >
                 static_cast<size_t>(INT_MAX))
             {
                 LogMessage("GPU mesh contains too many vertices.");
                 return false;
             }
-    
+
             MaterialBatch batch;
-    
+
             batch.materialIndex = static_cast<int>(i);
             batch.vertexCount =
                 static_cast<GLsizei>(vertices.size());
-    
+
             g_GenBuffers(
                 1,
-                &batch.vertexBuffer
-            );
-    
+                &batch.vertexBuffer);
+
             if (!batch.vertexBuffer)
             {
                 LogMessage("Failed to create a VBO.");
                 return false;
             }
-    
+
             g_BindBuffer(
                 GL_ARRAY_BUFFER,
-                batch.vertexBuffer
-            );
-    
+                batch.vertexBuffer);
+
             g_BufferData(
                 GL_ARRAY_BUFFER,
                 static_cast<ptrdiff_t>(
-                    vertices.size() * sizeof(GpuVertex)
-                ),
+                    vertices.size() * sizeof(GpuVertex)),
                 vertices.data(),
-                GL_STATIC_DRAW
-            );
-    
+                GL_STATIC_DRAW);
+
             const GLenum error = glGetError();
-    
+
             if (error != GL_NO_ERROR)
             {
                 char message[128];
-    
+
                 snprintf(
                     message,
                     sizeof(message),
                     "VBO upload failed: 0x%X",
-                    error
-                );
-    
+                    error);
+
                 LogMessage(message);
-    
+
                 g_DeleteBuffers(
                     1,
-                    &batch.vertexBuffer
-                );
-    
+                    &batch.vertexBuffer);
+
                 return false;
             }
-    
+
             newBatches.push_back(batch);
         }
-    
+
         g_BindBuffer(GL_ARRAY_BUFFER, 0);
-    
+
         if (newBatches.empty())
         {
             LogMessage("GPU mesh contains no drawable batches.");
             return false;
         }
-    
+
         model.gpuBatches = std::move(newBatches);
         model.gpuReady = true;
-    
+
         LogMessage(
-            ("GPU mesh created: " + model.path).c_str()
-        );
-    
+            ("GPU mesh created: " + model.path).c_str());
+
         LogNumber(
             "GPU material batches",
-            model.gpuBatches.size()
-        );
-    
+            model.gpuBatches.size());
+
         return true;
     }
-            
+
     // ==================================================
     // SCENE LOADING
     // ==================================================
-    
+
     static bool LoadScene(
-        const std::vector<ObjectConfig>& configs,
-        std::vector<Model>& output)
+        const std::vector<ObjectConfig> &configs,
+        std::vector<Model> &output)
     {
         output.clear();
-    
+
         if (configs.empty())
         {
             LogMessage("Scene contains no objects.");
             return false;
         }
-    
+
         std::vector<Model> newModels;
-    
+
         newModels.reserve(configs.size());
-    
+
         for (size_t i = 0; i < configs.size(); ++i)
         {
-            const ObjectConfig& config = configs[i];
-    
+            const ObjectConfig &config = configs[i];
+
             Model model;
-    
+
             model.path = config.path;
             model.position = config.position;
             model.rotation = config.rotation;
             model.scale = config.scale;
-    
+
             LogMessage(
                 ("Loading scene object " +
                  std::to_string(i) + ": " +
-                 model.path).c_str()
-            );
-    
+                 model.path)
+                    .c_str());
+
             if (!LoadOBJ(model))
             {
                 LogMessage(
                     ("Scene loading failed at object " +
                      std::to_string(i) + ": " +
-                     model.path).c_str()
-                );
-    
+                     model.path)
+                        .c_str());
+
                 return false;
             }
-    
+
             newModels.push_back(std::move(model));
         }
-    
+
         output = std::move(newModels);
-    
+
         LogNumber(
             "Successfully loaded scene objects",
-            output.size()
-        );
-    
+            output.size());
+
         return true;
     }
-    
+
     static bool LoadConfiguredScene()
     {
         std::vector<Model> newModels;
-    
+
         if (!LoadScene(g_ObjectConfigs, newModels))
             return false;
-    
+
         // Only replace the active scene after every object
         // has loaded successfully.
-        for (Model& model : g_Models)
+        for (Model &model : g_Models)
         {
             ReleaseModelTextures(model);
             ReleaseModelGpu(model);
         }
-    
+
         g_Models = std::move(newModels);
-    
+
         return true;
     }
     // ==================================================
     // LIVE CONFIGURATION RELOADING
     // ==================================================
-    
+
     static void CheckConfigurationReload()
     {
         ++g_ConfigCheckCounter;
-    
+
         if (g_ConfigCheckCounter < CONFIG_CHECK_INTERVAL)
             return;
-    
+
         g_ConfigCheckCounter = 0;
-    
+
         std::error_code error;
-    
+
         const fs::file_time_type currentTimestamp =
             fs::last_write_time(
                 GetConfigurationPath(),
-                error
-            );
-    
+                error);
+
         if (error)
             return;
-    
+
         if (g_ConfigTimestampValid &&
             currentTimestamp == g_ConfigLastWriteTime)
         {
             return;
         }
-        
+
         g_ConfigLastWriteTime = currentTimestamp;
         g_ConfigTimestampValid = true;
-    
+
         std::vector<ObjectConfig> newConfigs;
-    
+
         if (!ReadConfiguration(newConfigs))
         {
             LogMessage(
-                "Configuration reload failed; keeping previous scene."
-            );
-    
+                "Configuration reload failed; keeping previous scene.");
+
             return;
         }
-    
+
         // Load the complete new scene before touching the old one.
         std::vector<Model> newModels;
-    
+
         if (!LoadScene(newConfigs, newModels))
         {
             LogMessage(
-                "Scene reload failed; keeping previous scene."
-            );
-    
+                "Scene reload failed; keeping previous scene.");
+
             // Remember this timestamp so a failed configuration
             // is not repeatedly loaded every 60 frames.
             g_ConfigLastWriteTime = currentTimestamp;
-    
+
             return;
         }
-    
+
         // Release old GPU textures while the OpenGL context is current.
-        for (Model& model : g_Models)
+        for (Model &model : g_Models)
         {
             ReleaseModelTextures(model);
             ReleaseModelGpu(model);
         }
-    
+
         g_Models = std::move(newModels);
         g_ObjectConfigs = std::move(newConfigs);
-    
+
         g_ConfigLastWriteTime = currentTimestamp;
-    
+
         LogMessage(
-            "Scene successfully reloaded."
-        );
-    
+            "Scene successfully reloaded.");
+
         LogNumber(
             "Active scene objects",
-            g_Models.size()
-        );
+            g_Models.size());
     }
 
     // ==================================================
@@ -2273,9 +2212,9 @@ static GLint g_UniformDiffuse = -1;
     // ==================================================
 
     static Vertex3 CalculateFaceNormal(
-        const Vertex3& a,
-        const Vertex3& b,
-        const Vertex3& c)
+        const Vertex3 &a,
+        const Vertex3 &b,
+        const Vertex3 &c)
     {
         const float ux = b.x - a.x;
         const float uy = b.y - a.y;
@@ -2294,8 +2233,7 @@ static GLint g_UniformDiffuse = -1;
         const float length = std::sqrt(
             normal.x * normal.x +
             normal.y * normal.y +
-            normal.z * normal.z
-        );
+            normal.z * normal.z);
 
         if (length < 1e-8f)
             return {0.0f, 0.0f, 1.0f};
@@ -2308,13 +2246,12 @@ static GLint g_UniformDiffuse = -1;
     }
 
     static Vertex3 NormalizeNormal(
-        const Vertex3& normal)
+        const Vertex3 &normal)
     {
         const float length = std::sqrt(
             normal.x * normal.x +
             normal.y * normal.y +
-            normal.z * normal.z
-        );
+            normal.z * normal.z);
 
         if (length < 1e-8f)
             return {0.0f, 0.0f, 1.0f};
@@ -2322,8 +2259,7 @@ static GLint g_UniformDiffuse = -1;
         return {
             normal.x / length,
             normal.y / length,
-            normal.z / length
-        };
+            normal.z / length};
     }
 
     // ==================================================
@@ -2331,34 +2267,29 @@ static GLint g_UniformDiffuse = -1;
     // ==================================================
 
     static float CalculateBrightness(
-        const Vertex3& normal)
+        const Vertex3 &normal)
     {
         const float lightLength = std::sqrt(
             LIGHT_X * LIGHT_X +
             LIGHT_Y * LIGHT_Y +
-            LIGHT_Z * LIGHT_Z
-        );
+            LIGHT_Z * LIGHT_Z);
 
-        const float diffuse = (std::max)(
-            0.0f,
-            (
-                normal.x * LIGHT_X +
-                normal.y * LIGHT_Y +
-                normal.z * LIGHT_Z
-            ) / lightLength
-        );
+        const float diffuse = (std::max)(0.0f,
+                                         (
+                                             normal.x * LIGHT_X +
+                                             normal.y * LIGHT_Y +
+                                             normal.z * LIGHT_Z) /
+                                             lightLength);
 
-        return (std::min)(
-            1.0f,
-            AMBIENT_LIGHT + DIFFUSE_LIGHT * diffuse
-        );
+        return (std::min)(1.0f,
+                          AMBIENT_LIGHT + DIFFUSE_LIGHT * diffuse);
     }
 
     // ==================================================
     // OPENGL FUNCTION LOADING
     // ==================================================
 
-    static PROC GetGLProc(const char* name)
+    static PROC GetGLProc(const char *name)
     {
         PROC proc = wglGetProcAddress(name);
 
@@ -2372,8 +2303,8 @@ static GLint g_UniformDiffuse = -1;
                 GetModuleHandleA("opengl32.dll");
 
             proc = gl
-                ? GetProcAddress(gl, name)
-                : nullptr;
+                       ? GetProcAddress(gl, name)
+                       : nullptr;
         }
 
         return proc;
@@ -2382,75 +2313,70 @@ static GLint g_UniformDiffuse = -1;
     // ==================================================
     // SHADER COMPILATION
     // ==================================================
-    
+
     static GLuint CompileShader(
         GLenum type,
-        const char* source)
+        const char *source)
     {
         GLuint shader = g_CreateShader(type);
-    
+
         if (!shader)
         {
             LogMessage("glCreateShader failed.");
             return 0;
         }
-    
+
         g_ShaderSource(
             shader,
             1,
             &source,
-            nullptr
-        );
-    
+            nullptr);
+
         g_CompileShader(shader);
-    
+
         GLint success = GL_FALSE;
-    
+
         g_GetShaderiv(
             shader,
             GL_COMPILE_STATUS,
-            &success
-        );
-    
+            &success);
+
         if (success != GL_TRUE)
         {
             GLint length = 0;
-    
+
             g_GetShaderiv(
                 shader,
                 GL_INFO_LOG_LENGTH,
-                &length
-            );
-    
+                &length);
+
             std::vector<char> log(
                 static_cast<size_t>((std::max)(length, 1)),
-                '\0'
-            );
-    
+                '\0');
+
             g_GetShaderInfoLog(
                 shader,
                 static_cast<GLsizei>(log.size()),
                 nullptr,
-                log.data()
-            );
-    
+                log.data());
+
             LogMessage("Shader compilation failed.");
             LogMessage(log.data());
-    
+
             g_DeleteShader(shader);
-    
+
             return 0;
         }
-    
+
         return shader;
     }
-    
+
     static bool CreateShaderProgram()
     {
         if (g_ShaderProgram)
             return true;
-    
-        static const char* vertexSource = R"(
+
+        static const char *vertexSource = R"(
             #version 120
         
             uniform vec3 uLightDirection;
@@ -2486,8 +2412,8 @@ static GLint g_UniformDiffuse = -1;
                 );
             }
         )";
-    
-        static const char* fragmentSource = R"(
+
+        static const char *fragmentSource = R"(
             #version 120
     
             uniform sampler2D uTexture;
@@ -2514,306 +2440,277 @@ static GLint g_UniformDiffuse = -1;
                 );
             }
         )";
-    
+
         GLuint vertexShader = CompileShader(
             GL_VERTEX_SHADER,
-            vertexSource
-        );
-    
+            vertexSource);
+
         if (!vertexShader)
             return false;
-    
+
         GLuint fragmentShader = CompileShader(
             GL_FRAGMENT_SHADER,
-            fragmentSource
-        );
-    
+            fragmentSource);
+
         if (!fragmentShader)
         {
             g_DeleteShader(vertexShader);
             return false;
         }
-    
+
         GLuint program = g_CreateProgram();
-    
+
         if (!program)
         {
             g_DeleteShader(vertexShader);
             g_DeleteShader(fragmentShader);
-    
+
             LogMessage("glCreateProgram failed.");
-    
+
             return false;
         }
-    
+
         g_AttachShader(program, vertexShader);
         g_AttachShader(program, fragmentShader);
-    
+
         g_LinkProgram(program);
-    
+
         g_DeleteShader(vertexShader);
         g_DeleteShader(fragmentShader);
-    
+
         GLint success = GL_FALSE;
-    
+
         g_GetProgramiv(
             program,
             GL_LINK_STATUS,
-            &success
-        );
-    
+            &success);
+
         if (success != GL_TRUE)
         {
             GLint length = 0;
-    
+
             g_GetProgramiv(
                 program,
                 GL_INFO_LOG_LENGTH,
-                &length
-            );
-    
+                &length);
+
             std::vector<char> log(
                 static_cast<size_t>((std::max)(length, 1)),
-                '\0'
-            );
-    
+                '\0');
+
             g_GetProgramInfoLog(
                 program,
                 static_cast<GLsizei>(log.size()),
                 nullptr,
-                log.data()
-            );
-    
+                log.data());
+
             LogMessage("Shader program linking failed.");
             LogMessage(log.data());
-    
+
             g_DeleteProgram(program);
-    
+
             return false;
         }
-    
+
         g_ShaderProgram = program;
-    
+
         g_UniformTexture =
             g_GetUniformLocation(program, "uTexture");
-    
+
         g_UniformUseTexture =
             g_GetUniformLocation(program, "uUseTexture");
-    
+
         g_UniformLightDirection =
             g_GetUniformLocation(program, "uLightDirection");
-    
+
         g_UniformAmbient =
             g_GetUniformLocation(program, "uAmbient");
-    
+
         g_UniformDiffuse =
             g_GetUniformLocation(program, "uDiffuse");
-    
+
         LogMessage("GPU shader program successfully created.");
-    
+
         return true;
     }
 
     static bool EnsureContext()
     {
         HGLRC context = wglGetCurrentContext();
-    
+
         if (!context)
             return false;
-    
+
         if (context != g_ResourceContext)
         {
             g_ResourceContext = context;
-    
+
             g_UseProgram = nullptr;
             g_ActiveTexture = nullptr;
-    
+
             g_GenBuffers = nullptr;
             g_BindBuffer = nullptr;
             g_BufferData = nullptr;
             g_DeleteBuffers = nullptr;
-    
+
             g_CreateShader = nullptr;
             g_ShaderSource = nullptr;
             g_CompileShader = nullptr;
             g_GetShaderiv = nullptr;
             g_GetShaderInfoLog = nullptr;
             g_DeleteShader = nullptr;
-    
+
             g_CreateProgram = nullptr;
             g_AttachShader = nullptr;
             g_LinkProgram = nullptr;
             g_GetProgramiv = nullptr;
             g_GetProgramInfoLog = nullptr;
             g_DeleteProgram = nullptr;
-    
+
             g_GetUniformLocation = nullptr;
             g_Uniform1i = nullptr;
             g_Uniform1f = nullptr;
             g_Uniform3f = nullptr;
             g_DrawArrays = nullptr;
-    
+
             g_ShaderProgram = 0;
-    
-            for (Model& model : g_Models)
+
+            for (Model &model : g_Models)
             {
-                for (Material& material : model.materials)
+                for (Material &material : model.materials)
                     material.textureId = 0;
-    
-                for (MaterialBatch& batch : model.gpuBatches)
+
+                for (MaterialBatch &batch : model.gpuBatches)
                     batch.vertexBuffer = 0;
-    
+
                 model.gpuReady = false;
                 model.gpuBuildAttempted = false;
             }
-    
+
             LogMessage("OpenGL context changed.");
         }
 
-    #define LOAD_GL_FUNCTION(variable, type, name) \
-        if (!(variable)) \
-            (variable) = reinterpret_cast<type>(GetGLProc(name))
-    
+#define LOAD_GL_FUNCTION(variable, type, name) \
+    if (!(variable))                           \
+    (variable) = reinterpret_cast<type>(GetGLProc(name))
+
         LOAD_GL_FUNCTION(
             g_UseProgram,
             PFNGLUSEPROGRAMPROC,
-            "glUseProgram"
-        );
-    
+            "glUseProgram");
+
         LOAD_GL_FUNCTION(
             g_ActiveTexture,
             PFNGLACTIVETEXTUREPROC,
-            "glActiveTexture"
-        );
-    
+            "glActiveTexture");
+
         LOAD_GL_FUNCTION(
             g_GenBuffers,
             PFNGLGENBUFFERSPROC,
-            "glGenBuffers"
-        );
-    
+            "glGenBuffers");
+
         LOAD_GL_FUNCTION(
             g_BindBuffer,
             PFNGLBINDBUFFERPROC,
-            "glBindBuffer"
-        );
-    
+            "glBindBuffer");
+
         LOAD_GL_FUNCTION(
             g_BufferData,
             PFNGLBUFFERDATAPROC,
-            "glBufferData"
-        );
-    
+            "glBufferData");
+
         LOAD_GL_FUNCTION(
             g_DeleteBuffers,
             PFNGLDELETEBUFFERSPROC,
-            "glDeleteBuffers"
-        );
-    
+            "glDeleteBuffers");
+
         LOAD_GL_FUNCTION(
             g_CreateShader,
             PFNGLCREATESHADERPROC,
-            "glCreateShader"
-        );
-    
+            "glCreateShader");
+
         LOAD_GL_FUNCTION(
             g_ShaderSource,
             PFNGLSHADERSOURCEPROC,
-            "glShaderSource"
-        );
-    
+            "glShaderSource");
+
         LOAD_GL_FUNCTION(
             g_CompileShader,
             PFNGLCOMPILESHADERPROC,
-            "glCompileShader"
-        );
-    
+            "glCompileShader");
+
         LOAD_GL_FUNCTION(
             g_GetShaderiv,
             PFNGLGETSHADERIVPROC,
-            "glGetShaderiv"
-        );
-    
+            "glGetShaderiv");
+
         LOAD_GL_FUNCTION(
             g_GetShaderInfoLog,
             PFNGLGETSHADERINFOLOGPROC,
-            "glGetShaderInfoLog"
-        );
-    
+            "glGetShaderInfoLog");
+
         LOAD_GL_FUNCTION(
             g_DeleteShader,
             PFNGLDELETESHADERPROC,
-            "glDeleteShader"
-        );
-    
+            "glDeleteShader");
+
         LOAD_GL_FUNCTION(
             g_CreateProgram,
             PFNGLCREATEPROGRAMPROC,
-            "glCreateProgram"
-        );
-    
+            "glCreateProgram");
+
         LOAD_GL_FUNCTION(
             g_AttachShader,
             PFNGLATTACHSHADERPROC,
-            "glAttachShader"
-        );
-    
+            "glAttachShader");
+
         LOAD_GL_FUNCTION(
             g_LinkProgram,
             PFNGLLINKPROGRAMPROC,
-            "glLinkProgram"
-        );
-    
+            "glLinkProgram");
+
         LOAD_GL_FUNCTION(
             g_GetProgramiv,
             PFNGLGETPROGRAMIVPROC,
-            "glGetProgramiv"
-        );
-    
+            "glGetProgramiv");
+
         LOAD_GL_FUNCTION(
             g_GetProgramInfoLog,
             PFNGLGETPROGRAMINFOLOGPROC,
-            "glGetProgramInfoLog"
-        );
-    
+            "glGetProgramInfoLog");
+
         LOAD_GL_FUNCTION(
             g_DeleteProgram,
             PFNGLDELETEPROGRAMPROC,
-            "glDeleteProgram"
-        );
-    
+            "glDeleteProgram");
+
         LOAD_GL_FUNCTION(
             g_GetUniformLocation,
             PFNGLGETUNIFORMLOCATIONPROC,
-            "glGetUniformLocation"
-        );
-    
+            "glGetUniformLocation");
+
         LOAD_GL_FUNCTION(
             g_Uniform1i,
             PFNGLUNIFORM1IPROC,
-            "glUniform1i"
-        );
-    
+            "glUniform1i");
+
         LOAD_GL_FUNCTION(
             g_Uniform1f,
             PFNGLUNIFORM1FPROC,
-            "glUniform1f"
-        );
-    
+            "glUniform1f");
+
         LOAD_GL_FUNCTION(
             g_Uniform3f,
             PFNGLUNIFORM3FPROC,
-            "glUniform3f"
-        );
-    
+            "glUniform3f");
+
         LOAD_GL_FUNCTION(
             g_DrawArrays,
             PFNGLDRAWARRAYSPROC,
-            "glDrawArrays"
-        );
-    
-    #undef LOAD_GL_FUNCTION
-    
+            "glDrawArrays");
+
+#undef LOAD_GL_FUNCTION
+
         if (!g_UseProgram ||
             !g_GenBuffers ||
             !g_BindBuffer ||
@@ -2838,15 +2735,14 @@ static GLint g_UniformDiffuse = -1;
             !g_DrawArrays)
         {
             LogMessage(
-                "Required VBO or shader OpenGL functions are unavailable."
-            );
-    
+                "Required VBO or shader OpenGL functions are unavailable.");
+
             return false;
         }
-    
+
         if (!CreateShaderProgram())
             return false;
-    
+
         return true;
     }
 
@@ -2855,42 +2751,38 @@ static GLint g_UniformDiffuse = -1;
     // ==================================================
 
     static void RenderTriangle(
-        const Model& model,
-        const Triangle& triangle)
+        const Model &model,
+        const Triangle &triangle)
     {
-        const ObjCorner* corners[3] = {
+        const ObjCorner *corners[3] = {
             &triangle.corners[0],
             &triangle.corners[1],
-            &triangle.corners[2]
-        };
+            &triangle.corners[2]};
 
-        const Vertex3* positions[3] = {
+        const Vertex3 *positions[3] = {
             &model.vertices[corners[0]->position],
             &model.vertices[corners[1]->position],
-            &model.vertices[corners[2]->position]
-        };
+            &model.vertices[corners[2]->position]};
 
         const Vertex3 faceNormal =
             CalculateFaceNormal(
                 *positions[0],
                 *positions[1],
-                *positions[2]
-            );
+                *positions[2]);
 
         const int materialIndex =
             triangle.materialIndex >= 0 &&
-            static_cast<size_t>(
-                triangle.materialIndex
-            ) < model.materials.size()
+                    static_cast<size_t>(
+                        triangle.materialIndex) < model.materials.size()
                 ? triangle.materialIndex
                 : 0;
 
-        const Material& material =
+        const Material &material =
             model.materials[materialIndex];
 
         for (int i = 0; i < 3; ++i)
         {
-            const ObjCorner& corner =
+            const ObjCorner &corner =
                 *corners[i];
 
             Vertex3 normal = faceNormal;
@@ -2900,8 +2792,7 @@ static GLint g_UniformDiffuse = -1;
                     model.normals.size())
             {
                 normal = NormalizeNormal(
-                    model.normals[corner.normal]
-                );
+                    model.normals[corner.normal]);
             }
 
             const float brightness =
@@ -2911,20 +2802,18 @@ static GLint g_UniformDiffuse = -1;
                 material.diffuse[0] * brightness,
                 material.diffuse[1] * brightness,
                 material.diffuse[2] * brightness,
-                1.0f
-            );
+                1.0f);
 
             glNormal3f(
                 normal.x,
                 normal.y,
-                normal.z
-            );
+                normal.z);
 
             if (corner.texcoord >= 0 &&
                 static_cast<size_t>(corner.texcoord) <
                     model.texcoords.size())
             {
-                const Vertex2& uv =
+                const Vertex2 &uv =
                     model.texcoords[corner.texcoord];
 
                 glTexCoord2f(uv.u, uv.v);
@@ -2937,16 +2826,241 @@ static GLint g_UniformDiffuse = -1;
             glVertex3f(
                 positions[i]->x,
                 positions[i]->y,
-                positions[i]->z
-            );
+                positions[i]->z);
         }
+    }
+    // ==================================================
+    // FIRST-PERSON CAMERA
+    // ==================================================
+
+    static void ReleaseCameraCursor()
+    {
+        ClipCursor(nullptr);
+        g_CursorCaptured = false;
+    }
+
+    static void UpdateCamera(HWND window)
+    {
+        const ULONGLONG currentTime = GetTickCount64();
+
+        float deltaTime = 0.0f;
+
+        if (g_Camera.lastUpdateTime != 0)
+        {
+            deltaTime = static_cast<float>(
+                            currentTime - g_Camera.lastUpdateTime) /
+                        1000.0f;
+        }
+
+        g_Camera.lastUpdateTime = currentTime;
+
+        // Prevent large movement after pauses or window stalls.
+        deltaTime = (std::min)(deltaTime, 0.05f);
+
+        // ----------------------------------------------
+        // F1 camera toggle
+        // ----------------------------------------------
+
+        const bool f1Down =
+            (GetAsyncKeyState(VK_F1) & 0x8000) != 0;
+
+        if (f1Down && !g_Camera.previousF1State)
+        {
+            g_Camera.enabled = !g_Camera.enabled;
+
+            if (!g_Camera.enabled)
+            {
+                ReleaseCameraCursor();
+                LogMessage("First-person camera disabled.");
+            }
+            else
+            {
+                g_CursorCaptured = false;
+                LogMessage("First-person camera enabled.");
+            }
+        }
+
+        g_Camera.previousF1State = f1Down;
+
+        if (!g_Camera.enabled || !window)
+        {
+            if (g_CursorCaptured)
+                ReleaseCameraCursor();
+
+            return;
+        }
+
+        // ----------------------------------------------
+        // Window and cursor coordinates
+        // ----------------------------------------------
+
+        RECT clientRect{};
+
+        if (!GetClientRect(window, &clientRect))
+            return;
+
+        const int clientWidth =
+            clientRect.right - clientRect.left;
+
+        const int clientHeight =
+            clientRect.bottom - clientRect.top;
+
+        if (clientWidth <= 0 || clientHeight <= 0)
+            return;
+
+        POINT topLeft = {
+            clientRect.left,
+            clientRect.top};
+
+        POINT bottomRight = {
+            clientRect.right,
+            clientRect.bottom};
+
+        if (!ClientToScreen(window, &topLeft) ||
+            !ClientToScreen(window, &bottomRight))
+        {
+            return;
+        }
+
+        RECT screenRect = {
+            topLeft.x,
+            topLeft.y,
+            bottomRight.x,
+            bottomRight.y};
+
+        const int centerX =
+            (topLeft.x + bottomRight.x) / 2;
+
+        const int centerY =
+            (topLeft.y + bottomRight.y) / 2;
+
+        // ----------------------------------------------
+        // Mouse capture
+        // ----------------------------------------------
+
+        if (!g_CursorCaptured)
+        {
+            ClipCursor(&screenRect);
+            SetCursorPos(centerX, centerY);
+
+            g_CursorCaptured = true;
+        }
+
+        POINT mousePosition{};
+
+        if (GetCursorPos(&mousePosition))
+        {
+            const int mouseDeltaX =
+                mousePosition.x - centerX;
+
+            const int mouseDeltaY =
+                mousePosition.y - centerY;
+
+            g_Camera.yaw +=
+                static_cast<float>(mouseDeltaX) *
+                g_Camera.mouseSensitivity;
+
+            g_Camera.pitch -=
+                static_cast<float>(mouseDeltaY) *
+                g_Camera.mouseSensitivity;
+
+            // Prevent the camera from flipping upside down.
+            g_Camera.pitch = (std::max)(-89.0f,
+                                        (std::min)(89.0f, g_Camera.pitch));
+        }
+
+        SetCursorPos(centerX, centerY);
+
+        // ----------------------------------------------
+        // Movement input
+        // ----------------------------------------------
+
+        const auto KeyDown = [](int key) -> bool
+        {
+            return (GetAsyncKeyState(key) & 0x8000) != 0;
+        };
+
+        float forwardInput = 0.0f;
+        float rightInput = 0.0f;
+        float verticalInput = 0.0f;
+
+        if (KeyDown('W'))
+            forwardInput += 1.0f;
+
+        if (KeyDown('S'))
+            forwardInput -= 1.0f;
+
+        if (KeyDown('D'))
+            rightInput += 1.0f;
+
+        if (KeyDown('A'))
+            rightInput -= 1.0f;
+
+        if (KeyDown(VK_SPACE))
+            verticalInput += 1.0f;
+
+        if (KeyDown(VK_CONTROL))
+            verticalInput -= 1.0f;
+
+        // Normalize horizontal movement so diagonal movement
+        // is not faster than straight movement.
+        const float movementLength = std::sqrt(
+            forwardInput * forwardInput +
+            rightInput * rightInput);
+
+        if (movementLength > 1.0f)
+        {
+            forwardInput /= movementLength;
+            rightInput /= movementLength;
+        }
+
+        // ----------------------------------------------
+        // Calculate camera direction
+        // ----------------------------------------------
+
+        const float yawRadians =
+            g_Camera.yaw *
+            3.14159265358979323846f / 180.0f;
+
+        const float forwardX = -std::sin(yawRadians);
+        const float forwardZ = -std::cos(yawRadians);
+
+        const float rightX = std::cos(yawRadians);
+        const float rightZ = -std::sin(yawRadians);
+
+        // ----------------------------------------------
+        // Movement speed
+        // ----------------------------------------------
+
+        float speed = g_Camera.movementSpeed;
+
+        if (KeyDown(VK_SHIFT))
+        {
+            speed *= g_Camera.sprintMultiplier;
+        }
+
+        const float movement =
+            speed * deltaTime;
+
+        g_Camera.position.x +=
+            (forwardX * forwardInput +
+             rightX * rightInput) *
+            movement;
+
+        g_Camera.position.z +=
+            (forwardZ * forwardInput +
+             rightZ * rightInput) *
+            movement;
+
+        g_Camera.position.y +=
+            verticalInput * movement;
     }
 
     // ==================================================
     // MODEL RENDERING
     // ==================================================
 
-    static void RenderModel(Model& model)
+    static void RenderModel(Model &model)
     {
         if (!model.loaded)
             return;
@@ -2960,8 +3074,7 @@ static GLint g_UniformDiffuse = -1;
 
         glGetIntegerv(
             GL_VIEWPORT,
-            viewport
-        );
+            viewport);
 
         if (viewport[2] <= 0 ||
             viewport[3] <= 0)
@@ -2971,18 +3084,15 @@ static GLint g_UniformDiffuse = -1;
 
         glGetIntegerv(
             GL_CURRENT_PROGRAM,
-            &oldProgram
-        );
+            &oldProgram);
 
         glGetIntegerv(
             GL_MATRIX_MODE,
-            &oldMatrixMode
-        );
+            &oldMatrixMode);
 
         glGetIntegerv(
             GL_DEPTH_BITS,
-            &depthBits
-        );
+            &depthBits);
 
         if (depthBits <= 0)
             return;
@@ -2998,8 +3108,7 @@ static GLint g_UniformDiffuse = -1;
         {
             glGetIntegerv(
                 GL_ACTIVE_TEXTURE,
-                &oldActiveTexture
-            );
+                &oldActiveTexture);
         }
 
         // ----------------------------------------------
@@ -3031,15 +3140,13 @@ static GLint g_UniformDiffuse = -1;
 
         glPolygonMode(
             GL_FRONT_AND_BACK,
-            GL_FILL
-        );
+            GL_FILL);
 
         glColorMask(
             GL_TRUE,
             GL_TRUE,
             GL_TRUE,
-            GL_TRUE
-        );
+            GL_TRUE);
 
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LEQUAL);
@@ -3049,8 +3156,7 @@ static GLint g_UniformDiffuse = -1;
 
         glBlendFunc(
             GL_SRC_ALPHA,
-            GL_ONE_MINUS_SRC_ALPHA
-        );
+            GL_ONE_MINUS_SRC_ALPHA);
 
         glEnable(GL_ALPHA_TEST);
         glAlphaFunc(GL_GREATER, 0.01f);
@@ -3063,11 +3169,11 @@ static GLint g_UniformDiffuse = -1;
             static_cast<double>(viewport[2]) /
             static_cast<double>(viewport[3]);
 
-        const double nearPlane = 0.1;
-        const double farPlane = 100.0;
+        const double nearPlane = g_Camera.nearPlane;
+        const double farPlane = g_Camera.farPlane;
 
         const double halfFov =
-            OBJECT_FOV *
+            g_Camera.fieldOfView *
             3.14159265358979323846 / 360.0;
 
         const double halfHeight =
@@ -3085,241 +3191,215 @@ static GLint g_UniformDiffuse = -1;
             -halfHeight,
             halfHeight,
             nearPlane,
-            farPlane
-        );
+            farPlane);
 
         // ----------------------------------------------
-        // Model transformation
+        // First-person camera transformation
         // ----------------------------------------------
 
         glMatrixMode(GL_MODELVIEW);
         glLoadIdentity();
-        
-        // Shared scene distance.
+
+        // Apply inverse camera rotation.
+        glRotatef(
+            -g_Camera.pitch,
+            1.0f,
+            0.0f,
+            0.0f);
+
+        glRotatef(
+            -g_Camera.yaw,
+            0.0f,
+            1.0f,
+            0.0f);
+
+        // Apply inverse camera position.
         glTranslatef(
-            0.0f,
-            0.0f,
-            -OBJECT_DISTANCE
-        );
-        
-        // Shared viewing tilt.
-        glRotatef(
-            OBJECT_TILT,
-            1.0f,
-            0.0f,
-            0.0f
-        );
-        
-        // Shared scene rotation.
-        glRotatef(
-            static_cast<float>(GetTickCount64()) *
-                OBJECT_ROTATION_SPEED,
-            0.0f,
-            1.0f,
-            0.0f
-        );
-        
-        // Individual object position.
+            -g_Camera.position.x,
+            -g_Camera.position.y,
+            -g_Camera.position.z);
+
+        // ----------------------------------------------
+        // Individual object transformation
+        // ----------------------------------------------
+
         glTranslatef(
             model.position.x,
             model.position.y,
-            model.position.z
-        );
-        
-        // Individual object rotation.
+            model.position.z);
+
         glRotatef(
             model.rotation.x,
             1.0f,
             0.0f,
-            0.0f
-        );
-        
+            0.0f);
+
         glRotatef(
             model.rotation.y,
             0.0f,
             1.0f,
-            0.0f
-        );
-        
+            0.0f);
+
         glRotatef(
             model.rotation.z,
             0.0f,
             0.0f,
-            1.0f
-        );
-        
-        // Individual object scale.
+            1.0f);
+
         glScalef(
             model.scale,
             model.scale,
-            model.scale
-        );
+            model.scale);
 
         // ----------------------------------------------
         // GPU mesh rendering
         // ----------------------------------------------
-        
+
         if (!BuildGpuMesh(model))
         {
             glMatrixMode(GL_MODELVIEW);
             glPopMatrix();
-        
+
             glMatrixMode(GL_PROJECTION);
             glPopMatrix();
-        
+
             glPopAttrib();
-        
+
             g_UseProgram(
-                static_cast<GLuint>(oldProgram)
-            );
-        
+                static_cast<GLuint>(oldProgram));
+
             if (g_ActiveTexture)
             {
                 g_ActiveTexture(
-                    static_cast<GLenum>(oldActiveTexture)
-                );
+                    static_cast<GLenum>(oldActiveTexture));
             }
-        
+
             glMatrixMode(
-                static_cast<GLenum>(oldMatrixMode)
-            );
-        
+                static_cast<GLenum>(oldMatrixMode));
+
             return;
         }
-        
+
         glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT);
-        
+
         g_UseProgram(g_ShaderProgram);
-        
+
         g_Uniform1i(g_UniformTexture, 0);
         g_Uniform3f(
             g_UniformLightDirection,
             LIGHT_X,
             LIGHT_Y,
-            LIGHT_Z
-        );
-        
+            LIGHT_Z);
+
         g_Uniform1f(g_UniformAmbient, AMBIENT_LIGHT);
         g_Uniform1f(g_UniformDiffuse, DIFFUSE_LIGHT);
-        
+
         if (g_ActiveTexture)
             g_ActiveTexture(GL_TEXTURE0);
-        
+
         glEnableClientState(GL_VERTEX_ARRAY);
         glEnableClientState(GL_NORMAL_ARRAY);
         glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-        
-        for (MaterialBatch& batch : model.gpuBatches)
+
+        for (MaterialBatch &batch : model.gpuBatches)
         {
             if (!batch.vertexBuffer ||
                 batch.vertexCount <= 0)
             {
                 continue;
             }
-        
+
             if (batch.materialIndex < 0 ||
                 static_cast<size_t>(batch.materialIndex) >=
                     model.materials.size())
             {
                 continue;
             }
-        
-            Material& material =
+
+            Material &material =
                 model.materials[batch.materialIndex];
-        
+
             const bool textured =
                 UploadMaterialTexture(material);
-        
+
             glColor4f(
                 material.diffuse[0],
                 material.diffuse[1],
                 material.diffuse[2],
-                1.0f
-            );
-        
+                1.0f);
+
             g_Uniform1i(
                 g_UniformUseTexture,
-                textured ? 1 : 0
-            );
-        
+                textured ? 1 : 0);
+
             if (textured)
             {
                 glBindTexture(
                     GL_TEXTURE_2D,
-                    material.textureId
-                );
+                    material.textureId);
             }
-        
+
             g_BindBuffer(
                 GL_ARRAY_BUFFER,
-                batch.vertexBuffer
-            );
-        
+                batch.vertexBuffer);
+
             glVertexPointer(
                 3,
                 GL_FLOAT,
                 sizeof(GpuVertex),
-                reinterpret_cast<const void*>(
-                    offsetof(GpuVertex, position)
-                )
-            );
-        
+                reinterpret_cast<const void *>(
+                    offsetof(GpuVertex, position)));
+
             glNormalPointer(
                 GL_FLOAT,
                 sizeof(GpuVertex),
-                reinterpret_cast<const void*>(
-                    offsetof(GpuVertex, normal)
-                )
-            );
-        
+                reinterpret_cast<const void *>(
+                    offsetof(GpuVertex, normal)));
+
             glTexCoordPointer(
                 2,
                 GL_FLOAT,
                 sizeof(GpuVertex),
-                reinterpret_cast<const void*>(
-                    offsetof(GpuVertex, texcoord)
-                )
-            );
-        
+                reinterpret_cast<const void *>(
+                    offsetof(GpuVertex, texcoord)));
+
             while (glGetError() != GL_NO_ERROR)
             {
                 // Clear errors from earlier rendering operations.
             }
-            
+
             g_DrawArrays(
                 GL_TRIANGLES,
                 0,
-                batch.vertexCount
-            );
-            
+                batch.vertexCount);
+
             const GLenum drawError = glGetError();
-            
+
             if (drawError != GL_NO_ERROR)
             {
                 char message[256];
-            
+
                 snprintf(
                     message,
                     sizeof(message),
                     "GPU draw failed for %s: OpenGL error 0x%X",
                     model.path.c_str(),
-                    drawError
-                );
-            
+                    drawError);
+
                 LogMessage(message);
             }
         }
-        
+
         g_BindBuffer(GL_ARRAY_BUFFER, 0);
-        
+
         glDisableClientState(GL_VERTEX_ARRAY);
         glDisableClientState(GL_NORMAL_ARRAY);
         glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-        
+
         glPopClientAttrib();
-        
+
         g_UseProgram(0);
-                
+
         // ----------------------------------------------
         // Restore state
         // ----------------------------------------------
@@ -3333,65 +3413,62 @@ static GLint g_UniformDiffuse = -1;
         glPopAttrib();
 
         g_UseProgram(
-            static_cast<GLuint>(oldProgram)
-        );
+            static_cast<GLuint>(oldProgram));
 
         if (g_ActiveTexture)
         {
             g_ActiveTexture(
-                static_cast<GLenum>(oldActiveTexture)
-            );
+                static_cast<GLenum>(oldActiveTexture));
         }
 
         glMatrixMode(
-            static_cast<GLenum>(oldMatrixMode)
-        );
+            static_cast<GLenum>(oldMatrixMode));
     }
 
     // ==================================================
     // MAIN RENDERER
     // ==================================================
-    
-    static void RenderTriangleMesh()
+
+    static void RenderTriangleMesh(HWND window)
     {
         if (!EnsureContext())
             return;
-    
+
+        UpdateCamera(window);
+
         // Detect configuration changes.
         CheckConfigurationReload();
-    
+
         // Initial scene loading.
         if (!g_SceneAttempted)
         {
             g_SceneAttempted = true;
-    
+
             if (!LoadConfiguredScene())
             {
                 LogMessage(
-                    "Initial scene loading failed."
-                );
+                    "Initial scene loading failed.");
             }
         }
-    
+
         if (g_Models.empty())
             return;
-    
+
         // Clear the depth buffer once for the whole scene.
         // Preserve the game's depth/scissor state.
         glPushAttrib(
             GL_DEPTH_BUFFER_BIT |
-            GL_SCISSOR_BIT
-        );
-    
+            GL_SCISSOR_BIT);
+
         glDisable(GL_SCISSOR_TEST);
         glDepthMask(GL_TRUE);
         glClearDepth(1.0);
         glClear(GL_DEPTH_BUFFER_BIT);
-    
+
         glPopAttrib();
-    
+
         // Render every model using the same depth buffer.
-        for (Model& model : g_Models)
+        for (Model &model : g_Models)
         {
             if (model.loaded)
             {
@@ -3419,9 +3496,7 @@ static GLint g_UniformDiffuse = -1;
                 sizeof(message),
                 "Embedded numeric resource ID: %u",
                 static_cast<unsigned>(
-                    reinterpret_cast<ULONG_PTR>(name)
-                )
-            );
+                    reinterpret_cast<ULONG_PTR>(name)));
 
             LogMessage(message);
             return TRUE;
@@ -3431,8 +3506,7 @@ static GLint g_UniformDiffuse = -1;
             message,
             sizeof(message),
             "Enumerated resource: %s",
-            name
-        );
+            name);
 
         LogMessage(message);
 
@@ -3441,14 +3515,12 @@ static GLint g_UniformDiffuse = -1;
         HRSRC resource = FindResourceA(
             module,
             name,
-            type
-        );
+            type);
 
         if (resource)
         {
             LogMessage(
-                "Lookup using enumerated name: SUCCESS"
-            );
+                "Lookup using enumerated name: SUCCESS");
         }
         else
         {
@@ -3457,9 +3529,7 @@ static GLint g_UniformDiffuse = -1;
                 sizeof(message),
                 "Resource lookup failed: %lu",
                 static_cast<unsigned long>(
-                    GetLastError()
-                )
-            );
+                    GetLastError()));
 
             LogMessage(message);
         }
@@ -3475,8 +3545,7 @@ static GLint g_UniformDiffuse = -1;
             message,
             sizeof(message),
             "Resource enumeration module: %p",
-            static_cast<void*>(g_Module)
-        );
+            static_cast<void *>(g_Module));
 
         LogMessage(message);
 
@@ -3484,8 +3553,7 @@ static GLint g_UniformDiffuse = -1;
             g_Module,
             RT_RCDATA,
             EnumerateResourceNames,
-            0
-        );
+            0);
     }
 }
 
@@ -3496,11 +3564,14 @@ static GLint g_UniformDiffuse = -1;
 HOOK_GLOBAL(
     OpenGL::wglSwapBuffers,
     (HDC hdc)->bool,
-    __stdcall
-)
+    __stdcall)
 {
     if (wglGetCurrentContext())
-        RenderTriangleMesh();
+    {
+        HWND window = WindowFromDC(hdc);
+
+        RenderTriangleMesh(window);
+    }
 
     return super(hdc);
 }
@@ -3528,27 +3599,24 @@ BOOL WINAPI DllMain(
 // MOD INITIALIZATION
 // ==================================================
 
-extern "C" __declspec(dllexport)
-int ModInit()
+extern "C" __declspec(dllexport) int ModInit()
 {
     // Reset the log before writing initialization data.
     ResetLogFile();
 
     LogMessage(
-        "Isaac: ViewPoint initialized."
-    );
+        "Isaac: ViewPoint initialized.");
 
     LoadConfiguration();
 
     LogMessage(
         ("Default model: " +
-         std::string(DEFAULT_OBJECT)).c_str()
-    );
-    
+         std::string(DEFAULT_OBJECT))
+            .c_str());
+
     LogNumber(
         "Configured scene objects",
-        g_ObjectConfigs.size()
-    );
+        g_ObjectConfigs.size());
 
     DiagnoseEmbeddedResources();
 
