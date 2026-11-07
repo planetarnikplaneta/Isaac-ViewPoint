@@ -401,62 +401,49 @@ namespace
     // --------------------------------------------------
     // Mesh rendering
     // --------------------------------------------------
-static void RenderDiagnosticQuad()
+static void CheckGLError(const char* stage)
 {
-    if (!EnsureContext())
+    GLenum error = glGetError();
+
+    if (error != GL_NO_ERROR)
     {
-        LogMessage("Diagnostic quad: EnsureContext failed");
-        return;
-    }
-
-    static bool diagnosticLogged = false;
-
-    GLint viewport[4] = {};
-    GLint framebuffer = 0;
-    GLint drawBuffer = 0;
-    GLint readBuffer = 0;
-    GLint oldProgram = 0;
-    GLint oldMatrixMode = GL_MODELVIEW;
-
-    glGetIntegerv(GL_VIEWPORT, viewport);
-    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &framebuffer);
-    glGetIntegerv(GL_DRAW_BUFFER, &drawBuffer);
-    glGetIntegerv(GL_READ_BUFFER, &readBuffer);
-    glGetIntegerv(GL_CURRENT_PROGRAM, &oldProgram);
-    glGetIntegerv(GL_MATRIX_MODE, &oldMatrixMode);
-
-    if (!diagnosticLogged)
-    {
-        char msg[512];
+        char msg[256];
 
         snprintf(
             msg,
             sizeof(msg),
-            "Diagnostic state: FBO=%d, DrawBuffer=0x%X, ReadBuffer=0x%X, Viewport=%d,%d %dx%d, Program=%d",
-            framebuffer,
-            drawBuffer,
-            readBuffer,
-            viewport[0],
-            viewport[1],
-            viewport[2],
-            viewport[3],
-            oldProgram
+            "Diagnostic GL error at %s: 0x%X",
+            stage,
+            error
         );
 
         LogMessage(msg);
-        diagnosticLogged = true;
+    }
+}
+
+static void RenderDiagnosticQuad()
+{
+    if (!EnsureContext())
+        return;
+
+    // Clear errors left by the game before our test.
+    while (glGetError() != GL_NO_ERROR)
+    {
     }
 
-    if (viewport[2] <= 0 || viewport[3] <= 0)
-    {
-        LogMessage("Diagnostic quad: invalid viewport");
-        return;
-    }
+    GLint oldProgram = 0;
+    GLint oldMatrixMode = GL_MODELVIEW;
+
+    glGetIntegerv(GL_CURRENT_PROGRAM, &oldProgram);
+    glGetIntegerv(GL_MATRIX_MODE, &oldMatrixMode);
 
     glPushAttrib(GL_ALL_ATTRIB_BITS);
+    CheckGLError("glPushAttrib");
 
     if (g_UseProgram)
         g_UseProgram(0);
+
+    CheckGLError("glUseProgram");
 
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_TEXTURE_2D);
@@ -467,43 +454,40 @@ static void RenderDiagnosticQuad()
     glDisable(GL_CULL_FACE);
     glDisable(GL_LIGHTING);
     glDisable(GL_FOG);
-    glDisable(GL_COLOR_LOGIC_OP);
+
+    CheckGLError("glDisable states");
 
     glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
+    CheckGLError("color mask and polygon mode");
+
     glMatrixMode(GL_PROJECTION);
+    CheckGLError("projection matrix mode");
+
     glPushMatrix();
     glLoadIdentity();
+
+    CheckGLError("projection matrix setup");
 
     glMatrixMode(GL_MODELVIEW);
     glPushMatrix();
     glLoadIdentity();
 
+    CheckGLError("modelview matrix setup");
+
     glColor4f(1.0f, 0.0f, 0.0f, 1.0f);
 
     glBegin(GL_QUADS);
+
         glVertex2f(-0.5f, -0.5f);
         glVertex2f( 0.5f, -0.5f);
         glVertex2f( 0.5f,  0.5f);
         glVertex2f(-0.5f,  0.5f);
+
     glEnd();
 
-    GLenum error = glGetError();
-
-    if (error != GL_NO_ERROR)
-    {
-        char msg[128];
-
-        snprintf(
-            msg,
-            sizeof(msg),
-            "Diagnostic quad OpenGL error: 0x%X",
-            error
-        );
-
-        LogMessage(msg);
-    }
+    CheckGLError("quad drawing");
 
     glPopMatrix();
 
@@ -512,11 +496,16 @@ static void RenderDiagnosticQuad()
 
     glMatrixMode(oldMatrixMode);
 
+    CheckGLError("matrix restoration");
+
     glPopAttrib();
 
     if (g_UseProgram)
         g_UseProgram(static_cast<GLuint>(oldProgram));
+
+    CheckGLError("OpenGL state restoration");
 }
+
     static void RenderTriangleMesh()
     {
         if (!EnsureContext())
