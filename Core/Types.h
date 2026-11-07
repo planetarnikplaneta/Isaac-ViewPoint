@@ -13,7 +13,7 @@
 
 namespace ViewPoint
 {
-struct Vertex3
+    struct Vertex3
     {
         float x = 0.0f;
         float y = 0.0f;
