@@ -23,7 +23,6 @@
 #include "libzhl.h"
 #include "HookSystem.h"
 
-
 #include "Core/Logger.h"
 #include "Core/Types.h"
 #include "Core/State.h"
@@ -31,7 +30,6 @@
 #include "Core/Config.h"
 
 using namespace ViewPoint;
-
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -184,7 +182,7 @@ namespace
         try
         {
             const fs::path externalPath =
-                GetDllDirectory() /
+                GetConfigurationPath().parent_path() /
                 "resources_ViewPoint" /
                 fs::path(assetPath);
 
