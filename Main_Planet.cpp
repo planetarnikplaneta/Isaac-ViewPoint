@@ -440,7 +440,81 @@ static void CheckGLError(const char* stage)
         LogMessage(msg);
     }
 }
+static void TestMatrixState()
+{
+    GLint mode = -1;
+    GLint modelviewDepth = -1;
+    GLint projectionDepth = -1;
+    GLint textureDepth = -1;
 
+    while (glGetError() != GL_NO_ERROR)
+    {
+    }
+
+    glGetIntegerv(GL_MATRIX_MODE, &mode);
+
+    GLenum error = glGetError();
+
+    char msg[256];
+
+    snprintf(
+        msg,
+        sizeof(msg),
+        "Matrix mode: 0x%X, error: 0x%X",
+        mode,
+        error
+    );
+
+    LogMessage(msg);
+
+    glGetIntegerv(
+        GL_MODELVIEW_STACK_DEPTH,
+        &modelviewDepth
+    );
+
+    glGetIntegerv(
+        GL_PROJECTION_STACK_DEPTH,
+        &projectionDepth
+    );
+
+    glGetIntegerv(
+        GL_TEXTURE_STACK_DEPTH,
+        &textureDepth
+    );
+
+    snprintf(
+        msg,
+        sizeof(msg),
+        "Matrix depths: MODELVIEW=%d PROJECTION=%d TEXTURE=%d",
+        modelviewDepth,
+        projectionDepth,
+        textureDepth
+    );
+
+    LogMessage(msg);
+
+    // Test explicitly selecting MODELVIEW.
+    glMatrixMode(GL_MODELVIEW);
+
+    error = glGetError();
+
+    LogMessage(
+        error == GL_NO_ERROR
+            ? "glMatrixMode(GL_MODELVIEW): SUCCESS"
+            : "glMatrixMode(GL_MODELVIEW): FAILED"
+    );
+
+    glGetIntegerv(GL_MATRIX_MODE, &mode);
+
+    snprintf(
+        msg,
+        sizeof(msg),
+        "Matrix mode after selection: 0x%X",
+        mode
+    );
+
+    LogMessage(msg);
+}
 static void RenderDiagnosticQuad()
 {
     HGLRC context = wglGetCurrentContext();
@@ -867,7 +941,7 @@ HOOK_METHOD_PRIORITY(
 
     if (_playerHudIndex == 0)
     {
-        RenderDiagnosticQuad();
+        TestMatrixState();
     }
 }
 
