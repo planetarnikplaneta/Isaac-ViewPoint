@@ -16,6 +16,7 @@
 #include <string>
 #include <vector>
 #include <utility>
+#include <cstddef>
 
 #include "libzhl.h"
 #include "HookSystem.h"
@@ -36,9 +37,107 @@
 #ifndef GL_TEXTURE0
 #define GL_TEXTURE0 0x84C0
 #endif
+#ifndef GL_ARRAY_BUFFER
+#define GL_ARRAY_BUFFER 0x8892
+#endif
+
+#ifndef GL_STATIC_DRAW
+#define GL_STATIC_DRAW 0x88E4
+#endif
+
+#ifndef GL_VERTEX_SHADER
+#define GL_VERTEX_SHADER 0x8B31
+#endif
+
+#ifndef GL_FRAGMENT_SHADER
+#define GL_FRAGMENT_SHADER 0x8B30
+#endif
+
+#ifndef GL_COMPILE_STATUS
+#define GL_COMPILE_STATUS 0x8B81
+#endif
+
+#ifndef GL_LINK_STATUS
+#define GL_LINK_STATUS 0x8B82
+#endif
+
+#ifndef GL_INFO_LOG_LENGTH
+#define GL_INFO_LOG_LENGTH 0x8B84
+#endif
+
+#ifndef GL_FLOAT
+#define GL_FLOAT 0x1406
+#endif
+
+#ifndef GL_TRIANGLES
+#define GL_TRIANGLES 0x0004
+#endif
 
 using PFNGLUSEPROGRAMPROC = void(APIENTRY *)(GLuint);
 using PFNGLACTIVETEXTUREPROC = void(APIENTRY *)(GLenum);
+
+using PFNGLGENBUFFERSPROC =
+    void(APIENTRY *)(GLsizei, GLuint*);
+
+using PFNGLBINDBUFFERPROC =
+    void(APIENTRY *)(GLenum, GLuint);
+
+using PFNGLBUFFERDATAPROC =
+    void(APIENTRY *)(GLenum, ptrdiff_t, const void*, GLenum);
+
+using PFNGLDELETEBUFFERSPROC =
+    void(APIENTRY *)(GLsizei, const GLuint*);
+
+using PFNGLCREATESHADERPROC =
+    GLuint(APIENTRY *)(GLenum);
+
+using PFNGLSHADERSOURCEPROC =
+    void(APIENTRY *)(GLuint, GLsizei, const char* const*, const GLint*);
+
+using PFNGLCOMPILESHADERPROC =
+    void(APIENTRY *)(GLuint);
+
+using PFNGLGETSHADERIVPROC =
+    void(APIENTRY *)(GLuint, GLenum, GLint*);
+
+using PFNGLGETSHADERINFOLOGPROC =
+    void(APIENTRY *)(GLuint, GLsizei, GLsizei*, char*);
+
+using PFNGLDELETESHADERPROC =
+    void(APIENTRY *)(GLuint);
+
+using PFNGLCREATEPROGRAMPROC =
+    GLuint(APIENTRY *)();
+
+using PFNGLATTACHSHADERPROC =
+    void(APIENTRY *)(GLuint, GLuint);
+
+using PFNGLLINKPROGRAMPROC =
+    void(APIENTRY *)(GLuint);
+
+using PFNGLGETPROGRAMIVPROC =
+    void(APIENTRY *)(GLuint, GLenum, GLint*);
+
+using PFNGLGETPROGRAMINFOLOGPROC =
+    void(APIENTRY *)(GLuint, GLsizei, GLsizei*, char*);
+
+using PFNGLDELETEPROGRAMPROC =
+    void(APIENTRY *)(GLuint);
+
+using PFNGLGETUNIFORMLOCATIONPROC =
+    GLint(APIENTRY *)(GLuint, const char*);
+
+using PFNGLUNIFORM1IPROC =
+    void(APIENTRY *)(GLint, GLint);
+
+using PFNGLUNIFORM1FPROC =
+    void(APIENTRY *)(GLint, GLfloat);
+
+using PFNGLUNIFORM3FPROC =
+    void(APIENTRY *)(GLint, GLfloat, GLfloat, GLfloat);
+
+using PFNGLDRAWARRAYSPROC =
+    void(APIENTRY *)(GLenum, GLint, GLsizei);
 
 namespace OpenGL
 {
@@ -130,6 +229,20 @@ namespace
         bool textureAttempted = false;
     };
 
+    struct GpuVertex
+    {
+        Vertex3 position;
+        Vertex3 normal;
+        Vertex2 texcoord;
+    };
+    
+    struct MaterialBatch
+    {
+        GLuint vertexBuffer = 0;
+        GLsizei vertexCount = 0;
+        int materialIndex = 0;
+    };
+
     // Every model owns its own geometry and materials.
     struct Model
     {
@@ -141,7 +254,12 @@ namespace
     
         std::vector<Triangle> triangles;
         std::vector<Material> materials;
-    
+
+        std::vector<MaterialBatch> gpuBatches;
+        
+        bool gpuBuildAttempted = false;
+        bool gpuReady = false;
+
         // Instance transformation.
         Vertex3 position = {0.0f, 0.0f, 0.0f};
         Vertex3 rotation = {0.0f, 0.0f, 0.0f};
@@ -172,6 +290,38 @@ namespace
 
     static PFNGLUSEPROGRAMPROC g_UseProgram = nullptr;
     static PFNGLACTIVETEXTUREPROC g_ActiveTexture = nullptr;
+static PFNGLGENBUFFERSPROC g_GenBuffers = nullptr;
+static PFNGLBINDBUFFERPROC g_BindBuffer = nullptr;
+static PFNGLBUFFERDATAPROC g_BufferData = nullptr;
+static PFNGLDELETEBUFFERSPROC g_DeleteBuffers = nullptr;
+
+static PFNGLCREATESHADERPROC g_CreateShader = nullptr;
+static PFNGLSHADERSOURCEPROC g_ShaderSource = nullptr;
+static PFNGLCOMPILESHADERPROC g_CompileShader = nullptr;
+static PFNGLGETSHADERIVPROC g_GetShaderiv = nullptr;
+static PFNGLGETSHADERINFOLOGPROC g_GetShaderInfoLog = nullptr;
+static PFNGLDELETESHADERPROC g_DeleteShader = nullptr;
+
+static PFNGLCREATEPROGRAMPROC g_CreateProgram = nullptr;
+static PFNGLATTACHSHADERPROC g_AttachShader = nullptr;
+static PFNGLLINKPROGRAMPROC g_LinkProgram = nullptr;
+static PFNGLGETPROGRAMIVPROC g_GetProgramiv = nullptr;
+static PFNGLGETPROGRAMINFOLOGPROC g_GetProgramInfoLog = nullptr;
+static PFNGLDELETEPROGRAMPROC g_DeleteProgram = nullptr;
+
+static PFNGLGETUNIFORMLOCATIONPROC g_GetUniformLocation = nullptr;
+static PFNGLUNIFORM1IPROC g_Uniform1i = nullptr;
+static PFNGLUNIFORM1FPROC g_Uniform1f = nullptr;
+static PFNGLUNIFORM3FPROC g_Uniform3f = nullptr;
+static PFNGLDRAWARRAYSPROC g_DrawArrays = nullptr;
+
+static GLuint g_ShaderProgram = 0;
+
+static GLint g_UniformTexture = -1;
+static GLint g_UniformUseTexture = -1;
+static GLint g_UniformLightDirection = -1;
+static GLint g_UniformAmbient = -1;
+static GLint g_UniformDiffuse = -1;
 
     static std::vector<Model> g_Models;
     
@@ -1738,6 +1888,224 @@ namespace
         return true;
     }
 
+    static Vertex3 CalculateFaceNormal(
+        const Vertex3& a,
+        const Vertex3& b,
+        const Vertex3& c
+    );
+    
+    static Vertex3 NormalizeNormal(
+        const Vertex3& normal
+    );
+
+    // ==================================================
+    // GPU MESH MANAGEMENT
+    // ==================================================
+    
+    static void ReleaseModelGpu(Model& model)
+    {
+        if (wglGetCurrentContext() &&
+            g_DeleteBuffers)
+        {
+            for (MaterialBatch& batch : model.gpuBatches)
+            {
+                if (batch.vertexBuffer)
+                {
+                    g_DeleteBuffers(
+                        1,
+                        &batch.vertexBuffer
+                    );
+                }
+            }
+        }
+    
+        model.gpuBatches.clear();
+        model.gpuReady = false;
+        model.gpuBuildAttempted = false;
+    }
+    
+    static bool BuildGpuMesh(Model& model)
+    {
+        if (model.gpuReady)
+            return true;
+    
+        if (model.gpuBuildAttempted)
+            return false;
+    
+        model.gpuBuildAttempted = true;
+    
+        if (!model.loaded || model.materials.empty())
+            return false;
+    
+        std::vector<std::vector<GpuVertex>> materialVertices(
+            model.materials.size()
+        );
+    
+        for (const Triangle& triangle : model.triangles)
+        {
+            if (triangle.materialIndex < 0 ||
+                static_cast<size_t>(triangle.materialIndex) >=
+                    model.materials.size())
+            {
+                continue;
+            }
+    
+            const int materialIndex = triangle.materialIndex;
+    
+            const ObjCorner& a = triangle.corners[0];
+            const ObjCorner& b = triangle.corners[1];
+            const ObjCorner& c = triangle.corners[2];
+    
+            if (a.position < 0 || b.position < 0 || c.position < 0 ||
+                static_cast<size_t>(a.position) >= model.vertices.size() ||
+                static_cast<size_t>(b.position) >= model.vertices.size() ||
+                static_cast<size_t>(c.position) >= model.vertices.size())
+            {
+                continue;
+            }
+    
+            const Vertex3& pa = model.vertices[a.position];
+            const Vertex3& pb = model.vertices[b.position];
+            const Vertex3& pc = model.vertices[c.position];
+    
+            const Vertex3 faceNormal =
+                CalculateFaceNormal(pa, pb, pc);
+    
+            const ObjCorner* corners[3] = {
+                &a, &b, &c
+            };
+    
+            for (int i = 0; i < 3; ++i)
+            {
+                const ObjCorner& corner = *corners[i];
+    
+                GpuVertex vertex{};
+    
+                vertex.position =
+                    model.vertices[corner.position];
+    
+                vertex.normal = faceNormal;
+    
+                if (corner.normal >= 0 &&
+                    static_cast<size_t>(corner.normal) <
+                        model.normals.size())
+                {
+                    vertex.normal = NormalizeNormal(
+                        model.normals[corner.normal]
+                    );
+                }
+    
+                if (corner.texcoord >= 0 &&
+                    static_cast<size_t>(corner.texcoord) <
+                        model.texcoords.size())
+                {
+                    vertex.texcoord =
+                        model.texcoords[corner.texcoord];
+                }
+    
+                materialVertices[materialIndex].push_back(vertex);
+            }
+        }
+    
+        std::vector<MaterialBatch> newBatches;
+    
+        newBatches.reserve(materialVertices.size());
+    
+        for (size_t i = 0; i < materialVertices.size(); ++i)
+        {
+            std::vector<GpuVertex>& vertices =
+                materialVertices[i];
+    
+            if (vertices.empty())
+                continue;
+    
+            if (vertices.size() >
+                static_cast<size_t>(INT_MAX))
+            {
+                LogMessage("GPU mesh contains too many vertices.");
+                return false;
+            }
+    
+            MaterialBatch batch;
+    
+            batch.materialIndex = static_cast<int>(i);
+            batch.vertexCount =
+                static_cast<GLsizei>(vertices.size());
+    
+            g_GenBuffers(
+                1,
+                &batch.vertexBuffer
+            );
+    
+            if (!batch.vertexBuffer)
+            {
+                LogMessage("Failed to create a VBO.");
+                return false;
+            }
+    
+            g_BindBuffer(
+                GL_ARRAY_BUFFER,
+                batch.vertexBuffer
+            );
+    
+            g_BufferData(
+                GL_ARRAY_BUFFER,
+                static_cast<ptrdiff_t>(
+                    vertices.size() * sizeof(GpuVertex)
+                ),
+                vertices.data(),
+                GL_STATIC_DRAW
+            );
+    
+            const GLenum error = glGetError();
+    
+            if (error != GL_NO_ERROR)
+            {
+                char message[128];
+    
+                snprintf(
+                    message,
+                    sizeof(message),
+                    "VBO upload failed: 0x%X",
+                    error
+                );
+    
+                LogMessage(message);
+    
+                g_DeleteBuffers(
+                    1,
+                    &batch.vertexBuffer
+                );
+    
+                return false;
+            }
+    
+            newBatches.push_back(batch);
+        }
+    
+        g_BindBuffer(GL_ARRAY_BUFFER, 0);
+    
+        if (newBatches.empty())
+        {
+            LogMessage("GPU mesh contains no drawable batches.");
+            return false;
+        }
+    
+        model.gpuBatches = std::move(newBatches);
+        model.gpuReady = true;
+    
+        LogMessage(
+            ("GPU mesh created: " + model.path).c_str()
+        );
+    
+        LogNumber(
+            "GPU material batches",
+            model.gpuBatches.size()
+        );
+    
+        return true;
+    }
+            
     // ==================================================
     // SCENE LOADING
     // ==================================================
@@ -1809,7 +2177,10 @@ namespace
         // Only replace the active scene after every object
         // has loaded successfully.
         for (Model& model : g_Models)
+        {
             ReleaseModelTextures(model);
+            ReleaseModelGpu(model);
+        }
     
         g_Models = std::move(newModels);
     
@@ -1877,7 +2248,10 @@ namespace
     
         // Release old GPU textures while the OpenGL context is current.
         for (Model& model : g_Models)
+        {
             ReleaseModelTextures(model);
+            ReleaseModelGpu(model);
+        }
     
         g_Models = std::move(newModels);
         g_ObjectConfigs = std::move(newConfigs);
@@ -2005,53 +2379,469 @@ namespace
         return proc;
     }
 
+    // ==================================================
+    // SHADER COMPILATION
+    // ==================================================
+    
+    static GLuint CompileShader(
+        GLenum type,
+        const char* source)
+    {
+        GLuint shader = g_CreateShader(type);
+    
+        if (!shader)
+        {
+            LogMessage("glCreateShader failed.");
+            return 0;
+        }
+    
+        g_ShaderSource(
+            shader,
+            1,
+            &source,
+            nullptr
+        );
+    
+        g_CompileShader(shader);
+    
+        GLint success = GL_FALSE;
+    
+        g_GetShaderiv(
+            shader,
+            GL_COMPILE_STATUS,
+            &success
+        );
+    
+        if (success != GL_TRUE)
+        {
+            GLint length = 0;
+    
+            g_GetShaderiv(
+                shader,
+                GL_INFO_LOG_LENGTH,
+                &length
+            );
+    
+            std::vector<char> log(
+                static_cast<size_t>((std::max)(length, 1)),
+                '\0'
+            );
+    
+            g_GetShaderInfoLog(
+                shader,
+                static_cast<GLsizei>(log.size()),
+                nullptr,
+                log.data()
+            );
+    
+            LogMessage("Shader compilation failed.");
+            LogMessage(log.data());
+    
+            g_DeleteShader(shader);
+    
+            return 0;
+        }
+    
+        return shader;
+    }
+    
+    static bool CreateShaderProgram()
+    {
+        if (g_ShaderProgram)
+            return true;
+    
+        static const char* vertexSource = R"(
+            #version 120
+    
+            uniform vec3 uLightDirection;
+            uniform float uAmbient;
+            uniform float uDiffuse;
+    
+            varying vec2 vTexcoord;
+            varying float vBrightness;
+    
+            void main()
+            {
+                gl_Position = ftransform();
+    
+                vTexcoord = gl_MultiTexCoord0.xy;
+    
+                vec3 normal =
+                    normalize(gl_NormalMatrix * gl_Normal);
+    
+                float diffuseLight = max(
+                    dot(normal, normalize(uLightDirection)),
+                    0.0
+                );
+    
+                vBrightness = clamp(
+                    uAmbient + uDiffuse * diffuseLight,
+                    0.0,
+                    1.0
+                );
+            }
+        )";
+    
+        static const char* fragmentSource = R"(
+            #version 120
+    
+            uniform sampler2D uTexture;
+            uniform int uUseTexture;
+    
+            varying vec2 vTexcoord;
+            varying float vBrightness;
+    
+            void main()
+            {
+                vec4 color = gl_Color;
+    
+                if (uUseTexture != 0)
+                {
+                    color *= texture2D(
+                        uTexture,
+                        vTexcoord
+                    );
+                }
+    
+                gl_FragColor = vec4(
+                    color.rgb * vBrightness,
+                    color.a
+                );
+            }
+        )";
+    
+        GLuint vertexShader = CompileShader(
+            GL_VERTEX_SHADER,
+            vertexSource
+        );
+    
+        if (!vertexShader)
+            return false;
+    
+        GLuint fragmentShader = CompileShader(
+            GL_FRAGMENT_SHADER,
+            fragmentSource
+        );
+    
+        if (!fragmentShader)
+        {
+            g_DeleteShader(vertexShader);
+            return false;
+        }
+    
+        GLuint program = g_CreateProgram();
+    
+        if (!program)
+        {
+            g_DeleteShader(vertexShader);
+            g_DeleteShader(fragmentShader);
+    
+            LogMessage("glCreateProgram failed.");
+    
+            return false;
+        }
+    
+        g_AttachShader(program, vertexShader);
+        g_AttachShader(program, fragmentShader);
+    
+        g_LinkProgram(program);
+    
+        g_DeleteShader(vertexShader);
+        g_DeleteShader(fragmentShader);
+    
+        GLint success = GL_FALSE;
+    
+        g_GetProgramiv(
+            program,
+            GL_LINK_STATUS,
+            &success
+        );
+    
+        if (success != GL_TRUE)
+        {
+            GLint length = 0;
+    
+            g_GetProgramiv(
+                program,
+                GL_INFO_LOG_LENGTH,
+                &length
+            );
+    
+            std::vector<char> log(
+                static_cast<size_t>((std::max)(length, 1)),
+                '\0'
+            );
+    
+            g_GetProgramInfoLog(
+                program,
+                static_cast<GLsizei>(log.size()),
+                nullptr,
+                log.data()
+            );
+    
+            LogMessage("Shader program linking failed.");
+            LogMessage(log.data());
+    
+            g_DeleteProgram(program);
+    
+            return false;
+        }
+    
+        g_ShaderProgram = program;
+    
+        g_UniformTexture =
+            g_GetUniformLocation(program, "uTexture");
+    
+        g_UniformUseTexture =
+            g_GetUniformLocation(program, "uUseTexture");
+    
+        g_UniformLightDirection =
+            g_GetUniformLocation(program, "uLightDirection");
+    
+        g_UniformAmbient =
+            g_GetUniformLocation(program, "uAmbient");
+    
+        g_UniformDiffuse =
+            g_GetUniformLocation(program, "uDiffuse");
+    
+        LogMessage("GPU shader program successfully created.");
+    
+        return true;
+    }
+
     static bool EnsureContext()
     {
         HGLRC context = wglGetCurrentContext();
-
+    
         if (!context)
             return false;
-
+    
         if (context != g_ResourceContext)
         {
             g_ResourceContext = context;
-
+    
             g_UseProgram = nullptr;
             g_ActiveTexture = nullptr;
-
-        for (Model& model : g_Models)
-        {
-            for (Material& material : model.materials)
+    
+            g_GenBuffers = nullptr;
+            g_BindBuffer = nullptr;
+            g_BufferData = nullptr;
+            g_DeleteBuffers = nullptr;
+    
+            g_CreateShader = nullptr;
+            g_ShaderSource = nullptr;
+            g_CompileShader = nullptr;
+            g_GetShaderiv = nullptr;
+            g_GetShaderInfoLog = nullptr;
+            g_DeleteShader = nullptr;
+    
+            g_CreateProgram = nullptr;
+            g_AttachShader = nullptr;
+            g_LinkProgram = nullptr;
+            g_GetProgramiv = nullptr;
+            g_GetProgramInfoLog = nullptr;
+            g_DeleteProgram = nullptr;
+    
+            g_GetUniformLocation = nullptr;
+            g_Uniform1i = nullptr;
+            g_Uniform1f = nullptr;
+            g_Uniform3f = nullptr;
+            g_DrawArrays = nullptr;
+    
+            g_ShaderProgram = 0;
+    
+            for (Model& model : g_Models)
             {
-                material.textureId = 0;
+                for (Material& material : model.materials)
+                    material.textureId = 0;
+    
+                for (MaterialBatch& batch : model.gpuBatches)
+                    batch.vertexBuffer = 0;
+    
+                model.gpuReady = false;
+                model.gpuBuildAttempted = false;
             }
-        }
-
+    
             LogMessage("OpenGL context changed.");
         }
 
-        if (!g_UseProgram)
+    #define LOAD_GL_FUNCTION(variable, type, name) \
+        if (!(variable)) \
+            (variable) = reinterpret_cast<type>(GetGLProc(name))
+    
+        LOAD_GL_FUNCTION(
+            g_UseProgram,
+            PFNGLUSEPROGRAMPROC,
+            "glUseProgram"
+        );
+    
+        LOAD_GL_FUNCTION(
+            g_ActiveTexture,
+            PFNGLACTIVETEXTUREPROC,
+            "glActiveTexture"
+        );
+    
+        LOAD_GL_FUNCTION(
+            g_GenBuffers,
+            PFNGLGENBUFFERSPROC,
+            "glGenBuffers"
+        );
+    
+        LOAD_GL_FUNCTION(
+            g_BindBuffer,
+            PFNGLBINDBUFFERPROC,
+            "glBindBuffer"
+        );
+    
+        LOAD_GL_FUNCTION(
+            g_BufferData,
+            PFNGLBUFFERDATAPROC,
+            "glBufferData"
+        );
+    
+        LOAD_GL_FUNCTION(
+            g_DeleteBuffers,
+            PFNGLDELETEBUFFERSPROC,
+            "glDeleteBuffers"
+        );
+    
+        LOAD_GL_FUNCTION(
+            g_CreateShader,
+            PFNGLCREATESHADERPROC,
+            "glCreateShader"
+        );
+    
+        LOAD_GL_FUNCTION(
+            g_ShaderSource,
+            PFNGLSHADERSOURCEPROC,
+            "glShaderSource"
+        );
+    
+        LOAD_GL_FUNCTION(
+            g_CompileShader,
+            PFNGLCOMPILESHADERPROC,
+            "glCompileShader"
+        );
+    
+        LOAD_GL_FUNCTION(
+            g_GetShaderiv,
+            PFNGLGETSHADERIVPROC,
+            "glGetShaderiv"
+        );
+    
+        LOAD_GL_FUNCTION(
+            g_GetShaderInfoLog,
+            PFNGLGETSHADERINFOLOGPROC,
+            "glGetShaderInfoLog"
+        );
+    
+        LOAD_GL_FUNCTION(
+            g_DeleteShader,
+            PFNGLDELETESHADERPROC,
+            "glDeleteShader"
+        );
+    
+        LOAD_GL_FUNCTION(
+            g_CreateProgram,
+            PFNGLCREATEPROGRAMPROC,
+            "glCreateProgram"
+        );
+    
+        LOAD_GL_FUNCTION(
+            g_AttachShader,
+            PFNGLATTACHSHADERPROC,
+            "glAttachShader"
+        );
+    
+        LOAD_GL_FUNCTION(
+            g_LinkProgram,
+            PFNGLLINKPROGRAMPROC,
+            "glLinkProgram"
+        );
+    
+        LOAD_GL_FUNCTION(
+            g_GetProgramiv,
+            PFNGLGETPROGRAMIVPROC,
+            "glGetProgramiv"
+        );
+    
+        LOAD_GL_FUNCTION(
+            g_GetProgramInfoLog,
+            PFNGLGETPROGRAMINFOLOGPROC,
+            "glGetProgramInfoLog"
+        );
+    
+        LOAD_GL_FUNCTION(
+            g_DeleteProgram,
+            PFNGLDELETEPROGRAMPROC,
+            "glDeleteProgram"
+        );
+    
+        LOAD_GL_FUNCTION(
+            g_GetUniformLocation,
+            PFNGLGETUNIFORMLOCATIONPROC,
+            "glGetUniformLocation"
+        );
+    
+        LOAD_GL_FUNCTION(
+            g_Uniform1i,
+            PFNGLUNIFORM1IPROC,
+            "glUniform1i"
+        );
+    
+        LOAD_GL_FUNCTION(
+            g_Uniform1f,
+            PFNGLUNIFORM1FPROC,
+            "glUniform1f"
+        );
+    
+        LOAD_GL_FUNCTION(
+            g_Uniform3f,
+            PFNGLUNIFORM3FPROC,
+            "glUniform3f"
+        );
+    
+        LOAD_GL_FUNCTION(
+            g_DrawArrays,
+            PFNGLDRAWARRAYSPROC,
+            "glDrawArrays"
+        );
+    
+    #undef LOAD_GL_FUNCTION
+    
+        if (!g_UseProgram ||
+            !g_GenBuffers ||
+            !g_BindBuffer ||
+            !g_BufferData ||
+            !g_DeleteBuffers ||
+            !g_CreateShader ||
+            !g_ShaderSource ||
+            !g_CompileShader ||
+            !g_GetShaderiv ||
+            !g_GetShaderInfoLog ||
+            !g_DeleteShader ||
+            !g_CreateProgram ||
+            !g_AttachShader ||
+            !g_LinkProgram ||
+            !g_GetProgramiv ||
+            !g_GetProgramInfoLog ||
+            !g_DeleteProgram ||
+            !g_GetUniformLocation ||
+            !g_Uniform1i ||
+            !g_Uniform1f ||
+            !g_Uniform3f ||
+            !g_DrawArrays)
         {
-            g_UseProgram =
-                reinterpret_cast<PFNGLUSEPROGRAMPROC>(
-                    GetGLProc("glUseProgram")
-                );
-        }
-
-        if (!g_ActiveTexture)
-        {
-            g_ActiveTexture =
-                reinterpret_cast<PFNGLACTIVETEXTUREPROC>(
-                    GetGLProc("glActiveTexture")
-                );
-        }
-
-        if (!g_UseProgram)
-        {
-            LogMessage("glUseProgram unavailable.");
+            LogMessage(
+                "Required VBO or shader OpenGL functions are unavailable."
+            );
+    
             return false;
         }
-
+    
+        if (!CreateShaderProgram())
+            return false;
+    
         return true;
     }
 
@@ -2226,8 +3016,6 @@ namespace
         // Rendering configuration
         // ----------------------------------------------
 
-        g_UseProgram(0);
-
         glDisable(GL_CULL_FACE);
         glDisable(GL_STENCIL_TEST);
         glDisable(GL_SCISSOR_TEST);
@@ -2363,77 +3151,148 @@ namespace
         );
 
         // ----------------------------------------------
-        // Render materials
+        // GPU mesh rendering
         // ----------------------------------------------
-
-        for (size_t materialIndex = 0;
-             materialIndex < model.materials.size();
-             ++materialIndex)
+        
+        if (!BuildGpuMesh(model))
         {
+            glMatrixMode(GL_MODELVIEW);
+            glPopMatrix();
+        
+            glMatrixMode(GL_PROJECTION);
+            glPopMatrix();
+        
+            glPopAttrib();
+        
+            g_UseProgram(
+                static_cast<GLuint>(oldProgram)
+            );
+        
+            if (g_ActiveTexture)
+            {
+                g_ActiveTexture(
+                    static_cast<GLenum>(oldActiveTexture)
+                );
+            }
+        
+            glMatrixMode(
+                static_cast<GLenum>(oldMatrixMode)
+            );
+        
+            return;
+        }
+        
+        glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT);
+        
+        g_UseProgram(g_ShaderProgram);
+        
+        g_Uniform1i(g_UniformTexture, 0);
+        g_Uniform3f(
+            g_UniformLightDirection,
+            LIGHT_X,
+            LIGHT_Y,
+            LIGHT_Z
+        );
+        
+        g_Uniform1f(g_UniformAmbient, AMBIENT_LIGHT);
+        g_Uniform1f(g_UniformDiffuse, DIFFUSE_LIGHT);
+        
+        if (g_ActiveTexture)
+            g_ActiveTexture(GL_TEXTURE0);
+        
+        glEnableClientState(GL_VERTEX_ARRAY);
+        glEnableClientState(GL_NORMAL_ARRAY);
+        glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+        
+        for (MaterialBatch& batch : model.gpuBatches)
+        {
+            if (!batch.vertexBuffer ||
+                batch.vertexCount <= 0)
+            {
+                continue;
+            }
+        
+            if (batch.materialIndex < 0 ||
+                static_cast<size_t>(batch.materialIndex) >=
+                    model.materials.size())
+            {
+                continue;
+            }
+        
             Material& material =
-                model.materials[materialIndex];
-
+                model.materials[batch.materialIndex];
+        
             const bool textured =
                 UploadMaterialTexture(material);
-
+        
+            glColor4f(
+                material.diffuse[0],
+                material.diffuse[1],
+                material.diffuse[2],
+                1.0f
+            );
+        
+            g_Uniform1i(
+                g_UniformUseTexture,
+                textured ? 1 : 0
+            );
+        
             if (textured)
             {
-                glEnable(GL_TEXTURE_2D);
-
                 glBindTexture(
                     GL_TEXTURE_2D,
                     material.textureId
                 );
-
-                glTexEnvi(
-                    GL_TEXTURE_ENV,
-                    GL_TEXTURE_ENV_MODE,
-                    GL_MODULATE
-                );
             }
-            else
-            {
-                glDisable(GL_TEXTURE_2D);
-            }
-
-            glBegin(GL_TRIANGLES);
-
-            for (const Triangle& triangle :
-                 model.triangles)
-            {
-                if (triangle.materialIndex !=
-                    static_cast<int>(materialIndex))
-                {
-                    continue;
-                }
-
-                bool valid = true;
-
-                for (const ObjCorner& corner :
-                     triangle.corners)
-                {
-                    if (corner.position < 0 ||
-                        static_cast<size_t>(
-                            corner.position
-                        ) >= model.vertices.size())
-                    {
-                        valid = false;
-                        break;
-                    }
-                }
-
-                if (valid)
-                {
-                    RenderTriangle(
-                        model,
-                        triangle
-                    );
-                }
-            }
-
-            glEnd();
+        
+            g_BindBuffer(
+                GL_ARRAY_BUFFER,
+                batch.vertexBuffer
+            );
+        
+            glVertexPointer(
+                3,
+                GL_FLOAT,
+                sizeof(GpuVertex),
+                reinterpret_cast<const void*>(
+                    offsetof(GpuVertex, position)
+                )
+            );
+        
+            glNormalPointer(
+                GL_FLOAT,
+                sizeof(GpuVertex),
+                reinterpret_cast<const void*>(
+                    offsetof(GpuVertex, normal)
+                )
+            );
+        
+            glTexCoordPointer(
+                2,
+                GL_FLOAT,
+                sizeof(GpuVertex),
+                reinterpret_cast<const void*>(
+                    offsetof(GpuVertex, texcoord)
+                )
+            );
+        
+            g_DrawArrays(
+                GL_TRIANGLES,
+                0,
+                batch.vertexCount
+            );
         }
-
+        
+        g_BindBuffer(GL_ARRAY_BUFFER, 0);
+        
+        glDisableClientState(GL_VERTEX_ARRAY);
+        glDisableClientState(GL_NORMAL_ARRAY);
+        glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+        
+        glPopClientAttrib();
+        
+        g_UseProgram(0);
+                
         // ----------------------------------------------
         // Restore state
         // ----------------------------------------------
