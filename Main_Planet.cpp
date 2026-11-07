@@ -31,48 +31,14 @@
 #define GL_TEXTURE0 0x84C0
 #endif
 
-#ifndef GL_FRAMEBUFFER_BINDING
-#define GL_FRAMEBUFFER_BINDING 0x8CA6
-#endif
-
-#ifndef GL_DRAW_BUFFER
-#define GL_DRAW_BUFFER 0x0C01
-#endif
-
 using PFNGLUSEPROGRAMPROC = void (APIENTRY *)(GLuint);
 using PFNGLACTIVETEXTUREPROC = void (APIENTRY *)(GLenum);
-using PFNGLCHECKFRAMEBUFFERSTATUSPROC = GLenum (APIENTRY *)(GLenum);
 
-// --------------------------------------------------
-// Game structures
-// --------------------------------------------------
-
-struct Vector
-{
-    float x;
-    float y;
-};
-
-struct ANM2;
-
-class PlayerHUD
-{
-public:
-    void RenderHearts(
-        Vector* unk,
-        ANM2* sprite,
-        int playerHudLayout,
-        float scale,
-        Vector pos
-    );
-
-    char _padding[8];
-    short _playerHudIndex;
-};
 namespace OpenGL
 {
     bool __stdcall wglSwapBuffers(HDC hdc);
 }
+
 namespace
 {
     // --------------------------------------------------
@@ -109,14 +75,12 @@ namespace
     static HMODULE g_Module = nullptr;
 
     static bool g_MeshLoaded = false;
-    static bool g_ContextLogged = false;
-    static bool g_RenderLogged = false;
+    static bool g_DepthWarningLogged = false;
 
     static HGLRC g_ResourceContext = nullptr;
 
     static PFNGLUSEPROGRAMPROC g_UseProgram = nullptr;
     static PFNGLACTIVETEXTUREPROC g_ActiveTexture = nullptr;
-static PFNGLCHECKFRAMEBUFFERSTATUSPROC g_CheckFramebufferStatus = nullptr;
 
     static std::vector<Vertex3> g_Vertices;
     static std::vector<Triangle> g_Triangles;
@@ -133,26 +97,6 @@ static PFNGLCHECKFRAMEBUFFERSTATUSPROC g_CheckFramebufferStatus = nullptr;
         {
             fprintf(file, "OBJ OpenGL: %s\n", message);
             fclose(file);
-        }
-    }
-
-    static void CheckGLError(const char* stage)
-    {
-        GLenum error = glGetError();
-
-        if (error != GL_NO_ERROR)
-        {
-            char msg[256];
-
-            snprintf(
-                msg,
-                sizeof(msg),
-                "OpenGL error at %s: 0x%X",
-                stage,
-                error
-            );
-
-            LogMessage(msg);
         }
     }
 
@@ -179,30 +123,25 @@ static PFNGLCHECKFRAMEBUFFERSTATUSPROC g_CheckFramebufferStatus = nullptr;
     }
 
     static bool LoadGLFunctions()
-{
-    g_UseProgram =
-        reinterpret_cast<PFNGLUSEPROGRAMPROC>(
-            GetGLProc("glUseProgram")
-        );
-
-    g_ActiveTexture =
-        reinterpret_cast<PFNGLACTIVETEXTUREPROC>(
-            GetGLProc("glActiveTexture")
-        );
-
-    g_CheckFramebufferStatus =
-        reinterpret_cast<PFNGLCHECKFRAMEBUFFERSTATUSPROC>(
-            GetGLProc("glCheckFramebufferStatus")
-        );
-
-    if (!g_UseProgram)
     {
-        LogMessage("glUseProgram unavailable");
-        return false;
-    }
+        g_UseProgram =
+            reinterpret_cast<PFNGLUSEPROGRAMPROC>(
+                GetGLProc("glUseProgram")
+            );
 
-    return true;
-}
+        g_ActiveTexture =
+            reinterpret_cast<PFNGLACTIVETEXTUREPROC>(
+                GetGLProc("glActiveTexture")
+            );
+
+        if (!g_UseProgram)
+        {
+            LogMessage("glUseProgram unavailable");
+            return false;
+        }
+
+        return true;
+    }
 
     // --------------------------------------------------
     // OBJ path
@@ -402,378 +341,312 @@ static PFNGLCHECKFRAMEBUFFERSTATUSPROC g_CheckFramebufferStatus = nullptr;
     // Context initialization
     // --------------------------------------------------
 
-   static bool EnsureContext()
-{
-    HGLRC context = wglGetCurrentContext();
-
-    if (!context)
-        return false;
-
-    if (context != g_ResourceContext)
+    static bool EnsureContext()
     {
-        g_ResourceContext = context;
+        HGLRC context = wglGetCurrentContext();
 
-        g_UseProgram = nullptr;
-        g_ActiveTexture = nullptr;
-        g_CheckFramebufferStatus = nullptr;
+        if (!context)
+            return false;
 
-        g_ContextLogged = false;
+        if (context != g_ResourceContext)
+        {
+            g_ResourceContext = context;
 
-        LogMessage("OpenGL context changed");
-    }
+            g_UseProgram = nullptr;
+            g_ActiveTexture = nullptr;
 
-    return LoadGLFunctions();
-}
+            g_DepthWarningLogged = false;
 
-    // --------------------------------------------------
-    // Diagnostic marker
-    // --------------------------------------------------
+            LogMessage("OpenGL context changed");
+        }
 
-    static void RenderDiagnosticMarker()
-    {
-        // Save and replace projection matrix.
-        glMatrixMode(GL_PROJECTION);
-        glPushMatrix();
-        glLoadIdentity();
-
-        // Save and replace modelview matrix.
-        glMatrixMode(GL_MODELVIEW);
-        glPushMatrix();
-        glLoadIdentity();
-
-        // Disable states that could hide the marker.
-        glDisable(GL_TEXTURE_2D);
-        // Prepare a clean depth buffer for the OBJ model.
-        glDisable(GL_SCISSOR_TEST);
-        glDepthMask(GL_TRUE);
-        glClearDepth(1.0);
-        glClear(GL_DEPTH_BUFFER_BIT);
-        
-        // Enable depth testing so nearer triangles hide farther triangles.
-        glEnable(GL_DEPTH_TEST);
-        glDepthFunc(GL_LEQUAL);
-        glDisable(GL_CULL_FACE);
-        glDisable(GL_BLEND);
-        glDisable(GL_SCISSOR_TEST);
-
-        glDisable(GL_ALPHA_TEST);
-        glDisable(GL_STENCIL_TEST);
-
-        // Magenta diagnostic square.
-        glColor4f(1.0f, 0.0f, 1.0f, 1.0f);
-
-        glBegin(GL_QUADS);
-
-        glVertex3f(-0.5f, -0.5f, 0.0f);
-        glVertex3f( 0.5f, -0.5f, 0.0f);
-        glVertex3f( 0.5f,  0.5f, 0.0f);
-        glVertex3f(-0.5f,  0.5f, 0.0f);
-
-        glEnd();
-
-        // Restore modelview matrix.
-        glMatrixMode(GL_MODELVIEW);
-        glPopMatrix();
-
-        // Restore projection matrix.
-        glMatrixMode(GL_PROJECTION);
-        glPopMatrix();
+        return LoadGLFunctions();
     }
 
     // --------------------------------------------------
     // OBJ rendering
     // --------------------------------------------------
-static void TestFramebufferPixel(const GLint* viewport)
-{
-    GLubyte pixel[4] = {};
 
-    const GLint x = viewport[0] + viewport[2] / 2;
-    const GLint y = viewport[1] + viewport[3] / 2;
-
-    glReadPixels(
-        x,
-        y,
-        1,
-        1,
-        GL_RGBA,
-        GL_UNSIGNED_BYTE,
-        pixel
-    );
-
-    GLenum error = glGetError();
-
-    char msg[256];
-
-    snprintf(
-        msg,
-        sizeof(msg),
-        "Framebuffer center pixel: R=%u G=%u B=%u A=%u; GL error=0x%X",
-        pixel[0],
-        pixel[1],
-        pixel[2],
-        pixel[3],
-        error
-    );
-
-    LogMessage(msg);
-}
-static void RenderTriangleMesh()
-{
-    if (!EnsureContext())
-        return;
-
-    if (!g_MeshLoaded)
+    static void RenderTriangleMesh()
     {
-        LoadOBJ();
+        if (!EnsureContext())
+            return;
 
         if (!g_MeshLoaded)
-            return;
-    }
-
-    if (g_Vertices.empty() || g_Triangles.empty())
-        return;
-
-    // --------------------------------------------------
-    // Save OpenGL state
-    // --------------------------------------------------
-
-    GLint viewport[4] = {};
-
-    GLint oldProgram = 0;
-    GLint oldMatrixMode = GL_MODELVIEW;
-    GLint oldActiveTexture = GL_TEXTURE0;
-
-    glGetIntegerv(GL_VIEWPORT, viewport);
-
-    if (viewport[2] <= 0 || viewport[3] <= 0)
-        return;
-
-    glGetIntegerv(GL_CURRENT_PROGRAM, &oldProgram);
-    glGetIntegerv(GL_MATRIX_MODE, &oldMatrixMode);
-
-    if (oldMatrixMode != GL_MODELVIEW &&
-        oldMatrixMode != GL_PROJECTION &&
-        oldMatrixMode != GL_TEXTURE)
-    {
-        oldMatrixMode = GL_MODELVIEW;
-    }
-
-    if (g_ActiveTexture)
-    {
-        glGetIntegerv(
-            GL_ACTIVE_TEXTURE,
-            &oldActiveTexture
-        );
-    }
-
-    // Save fixed-function attributes.
-    glPushAttrib(GL_ALL_ATTRIB_BITS);
-
-    // Use texture unit zero.
-    if (g_ActiveTexture)
-        g_ActiveTexture(GL_TEXTURE0);
-
-    // Save projection matrix.
-    glMatrixMode(GL_PROJECTION);
-    glPushMatrix();
-
-    // Save modelview matrix.
-    glMatrixMode(GL_MODELVIEW);
-    glPushMatrix();
-
-    // --------------------------------------------------
-    // Configure rendering state
-    // --------------------------------------------------
-
-    g_UseProgram(0);
-
-    glDisable(GL_TEXTURE_2D);
-    glDisable(GL_DEPTH_TEST);
-    glDisable(GL_CULL_FACE);
-    glDisable(GL_BLEND);
-
-    glDisable(GL_ALPHA_TEST);
-    glDisable(GL_STENCIL_TEST);
-    glDisable(GL_SCISSOR_TEST);
-
-    glDisable(GL_LIGHTING);
-    glDisable(GL_FOG);
-    glDisable(GL_COLOR_LOGIC_OP);
-    glDisable(GL_POLYGON_OFFSET_FILL);
-
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-
-    glColorMask(
-        GL_TRUE,
-        GL_TRUE,
-        GL_TRUE,
-        GL_TRUE
-    );
-
-    // --------------------------------------------------
-    // Perspective projection
-    // --------------------------------------------------
-
-    const double aspect =
-        static_cast<double>(viewport[2]) /
-        static_cast<double>(viewport[3]);
-
-    const double nearPlane = 0.1;
-    const double farPlane = 100.0;
-
-    const double halfFov =
-        OBJECT_FOV * 3.14159265358979323846 / 360.0;
-
-    const double halfHeight =
-        nearPlane * std::tan(halfFov);
-
-    const double halfWidth =
-        halfHeight * aspect;
-
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-
-    glFrustum(
-        -halfWidth,
-        halfWidth,
-        -halfHeight,
-        halfHeight,
-        nearPlane,
-        farPlane
-    );
-
-    // --------------------------------------------------
-    // Model transformation
-    // --------------------------------------------------
-
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-
-    glTranslatef(
-        0.0f,
-        0.0f,
-        -OBJECT_DISTANCE
-    );
-
-    glRotatef(
-        OBJECT_TILT,
-        1.0f,
-        0.0f,
-        0.0f
-    );
-
-    glRotatef(
-        static_cast<float>(GetTickCount64()) *
-            OBJECT_ROTATION_SPEED,
-        0.0f,
-        1.0f,
-        0.0f
-    );
-
-    // --------------------------------------------------
-    // Render OBJ
-    // --------------------------------------------------
-
-    glBegin(GL_TRIANGLES);
-
-    for (const Triangle& t : g_Triangles)
-    {
-        if (t.a >= g_Vertices.size() ||
-            t.b >= g_Vertices.size() ||
-            t.c >= g_Vertices.size())
         {
-            continue;
+            LoadOBJ();
+
+            if (!g_MeshLoaded)
+                return;
         }
 
-        const Vertex3& a = g_Vertices[t.a];
-        const Vertex3& b = g_Vertices[t.b];
-        const Vertex3& c = g_Vertices[t.c];
+        if (g_Vertices.empty() || g_Triangles.empty())
+            return;
 
-        // Calculate face normal.
-        const float ux = b.x - a.x;
-        const float uy = b.y - a.y;
-        const float uz = b.z - a.z;
+        // --------------------------------------------------
+        // Save OpenGL state
+        // --------------------------------------------------
 
-        const float vx = c.x - a.x;
-        const float vy = c.y - a.y;
-        const float vz = c.z - a.z;
+        GLint viewport[4] = {};
 
-        float nx = uy * vz - uz * vy;
-        float ny = uz * vx - ux * vz;
-        float nz = ux * vy - uy * vx;
+        GLint oldProgram = 0;
+        GLint oldMatrixMode = GL_MODELVIEW;
+        GLint oldActiveTexture = GL_TEXTURE0;
+        GLint depthBits = 0;
 
-        const float length =
-            std::sqrt(nx * nx + ny * ny + nz * nz);
+        glGetIntegerv(GL_VIEWPORT, viewport);
+        glGetIntegerv(GL_CURRENT_PROGRAM, &oldProgram);
+        glGetIntegerv(GL_MATRIX_MODE, &oldMatrixMode);
+        glGetIntegerv(GL_DEPTH_BITS, &depthBits);
 
-        if (length < 1e-8f)
-            continue;
+        if (viewport[2] <= 0 || viewport[3] <= 0)
+            return;
 
-        nx /= length;
-        ny /= length;
-        nz /= length;
+        if (depthBits <= 0)
+        {
+            if (!g_DepthWarningLogged)
+            {
+                LogMessage("Framebuffer has no depth buffer; mesh rendering skipped");
+                g_DepthWarningLogged = true;
+            }
 
-        // Directional lighting.
-        const float lx = -0.35f;
-        const float ly = 0.55f;
-        const float lz = -0.76f;
+            return;
+        }
 
-        const float lightLength =
-            std::sqrt(lx * lx + ly * ly + lz * lz);
+        if (oldMatrixMode != GL_MODELVIEW &&
+            oldMatrixMode != GL_PROJECTION &&
+            oldMatrixMode != GL_TEXTURE)
+        {
+            oldMatrixMode = GL_MODELVIEW;
+        }
 
-        const float diffuse = std::max(
+        if (g_ActiveTexture)
+        {
+            glGetIntegerv(
+                GL_ACTIVE_TEXTURE,
+                &oldActiveTexture
+            );
+        }
+
+        // Save fixed-function attributes.
+        glPushAttrib(GL_ALL_ATTRIB_BITS);
+
+        // Use texture unit zero.
+        if (g_ActiveTexture)
+            g_ActiveTexture(GL_TEXTURE0);
+
+        // Save projection matrix.
+        glMatrixMode(GL_PROJECTION);
+        glPushMatrix();
+
+        // Save modelview matrix.
+        glMatrixMode(GL_MODELVIEW);
+        glPushMatrix();
+
+        // --------------------------------------------------
+        // Configure rendering state
+        // --------------------------------------------------
+
+        g_UseProgram(0);
+
+        glDisable(GL_TEXTURE_2D);
+        glDisable(GL_CULL_FACE);
+        glDisable(GL_BLEND);
+
+        glDisable(GL_ALPHA_TEST);
+        glDisable(GL_STENCIL_TEST);
+        glDisable(GL_SCISSOR_TEST);
+
+        glDisable(GL_LIGHTING);
+        glDisable(GL_FOG);
+        glDisable(GL_COLOR_LOGIC_OP);
+        glDisable(GL_POLYGON_OFFSET_FILL);
+
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+        glColorMask(
+            GL_TRUE,
+            GL_TRUE,
+            GL_TRUE,
+            GL_TRUE
+        );
+
+        // --------------------------------------------------
+        // Depth buffer
+        // --------------------------------------------------
+
+        // Clear only depth, preserving the game's color image.
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LEQUAL);
+        glDepthMask(GL_TRUE);
+        glClearDepth(1.0);
+
+        glClear(GL_DEPTH_BUFFER_BIT);
+
+        // --------------------------------------------------
+        // Perspective projection
+        // --------------------------------------------------
+
+        const double aspect =
+            static_cast<double>(viewport[2]) /
+            static_cast<double>(viewport[3]);
+
+        const double nearPlane = 0.1;
+        const double farPlane = 100.0;
+
+        const double halfFov =
+            OBJECT_FOV * 3.14159265358979323846 / 360.0;
+
+        const double halfHeight =
+            nearPlane * std::tan(halfFov);
+
+        const double halfWidth =
+            halfHeight * aspect;
+
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+
+        glFrustum(
+            -halfWidth,
+            halfWidth,
+            -halfHeight,
+            halfHeight,
+            nearPlane,
+            farPlane
+        );
+
+        // --------------------------------------------------
+        // Model transformation
+        // --------------------------------------------------
+
+        glMatrixMode(GL_MODELVIEW);
+        glLoadIdentity();
+
+        glTranslatef(
             0.0f,
-            (nx * lx + ny * ly + nz * lz) / lightLength
+            0.0f,
+            -OBJECT_DISTANCE
         );
 
-        const float brightness =
-            0.25f + 0.75f * diffuse;
-
-        glColor4f(
-            OBJECT_COLOR_R * brightness,
-            OBJECT_COLOR_G * brightness,
-            OBJECT_COLOR_B * brightness,
-            1.0f
+        glRotatef(
+            OBJECT_TILT,
+            1.0f,
+            0.0f,
+            0.0f
         );
 
-        glNormal3f(nx, ny, nz);
+        glRotatef(
+            static_cast<float>(GetTickCount64()) *
+                OBJECT_ROTATION_SPEED,
+            0.0f,
+            1.0f,
+            0.0f
+        );
 
-        glVertex3f(a.x, a.y, a.z);
-        glVertex3f(b.x, b.y, b.z);
-        glVertex3f(c.x, c.y, c.z);
+        // --------------------------------------------------
+        // Render OBJ
+        // --------------------------------------------------
+
+        glBegin(GL_TRIANGLES);
+
+        for (const Triangle& t : g_Triangles)
+        {
+            if (t.a >= g_Vertices.size() ||
+                t.b >= g_Vertices.size() ||
+                t.c >= g_Vertices.size())
+            {
+                continue;
+            }
+
+            const Vertex3& a = g_Vertices[t.a];
+            const Vertex3& b = g_Vertices[t.b];
+            const Vertex3& c = g_Vertices[t.c];
+
+            // Calculate face normal.
+            const float ux = b.x - a.x;
+            const float uy = b.y - a.y;
+            const float uz = b.z - a.z;
+
+            const float vx = c.x - a.x;
+            const float vy = c.y - a.y;
+            const float vz = c.z - a.z;
+
+            float nx = uy * vz - uz * vy;
+            float ny = uz * vx - ux * vz;
+            float nz = ux * vy - uy * vx;
+
+            const float length =
+                std::sqrt(nx * nx + ny * ny + nz * nz);
+
+            if (length < 1e-8f)
+                continue;
+
+            nx /= length;
+            ny /= length;
+            nz /= length;
+
+            // Directional lighting.
+            const float lx = -0.35f;
+            const float ly = 0.55f;
+            const float lz = -0.76f;
+
+            const float lightLength =
+                std::sqrt(lx * lx + ly * ly + lz * lz);
+
+            const float diffuse = std::max(
+                0.0f,
+                (nx * lx + ny * ly + nz * lz) / lightLength
+            );
+
+            const float brightness =
+                0.25f + 0.75f * diffuse;
+
+            glColor4f(
+                OBJECT_COLOR_R * brightness,
+                OBJECT_COLOR_G * brightness,
+                OBJECT_COLOR_B * brightness,
+                1.0f
+            );
+
+            glNormal3f(nx, ny, nz);
+
+            glVertex3f(a.x, a.y, a.z);
+            glVertex3f(b.x, b.y, b.z);
+            glVertex3f(c.x, c.y, c.z);
+        }
+
+        glEnd();
+
+        // --------------------------------------------------
+        // Restore OpenGL state
+        // --------------------------------------------------
+
+        glMatrixMode(GL_MODELVIEW);
+        glPopMatrix();
+
+        glMatrixMode(GL_PROJECTION);
+        glPopMatrix();
+
+        glPopAttrib();
+
+        // Restore shader program.
+        g_UseProgram(
+            static_cast<GLuint>(oldProgram)
+        );
+
+        // Restore active texture.
+        if (g_ActiveTexture)
+        {
+            g_ActiveTexture(
+                static_cast<GLenum>(oldActiveTexture)
+            );
+        }
+
+        // Restore original matrix mode.
+        glMatrixMode(
+            static_cast<GLenum>(oldMatrixMode)
+        );
     }
-
-    glEnd();
-
-    // --------------------------------------------------
-    // Restore OpenGL state
-    // --------------------------------------------------
-
-    glMatrixMode(GL_MODELVIEW);
-    glPopMatrix();
-
-    glMatrixMode(GL_PROJECTION);
-    glPopMatrix();
-
-    glPopAttrib();
-
-    // Restore shader program.
-    g_UseProgram(
-        static_cast<GLuint>(oldProgram)
-    );
-
-    // Restore active texture.
-    if (g_ActiveTexture)
-    {
-        g_ActiveTexture(
-            static_cast<GLenum>(oldActiveTexture)
-        );
-    }
-
-    // Restore original matrix mode.
-    glMatrixMode(
-        static_cast<GLenum>(oldMatrixMode)
-    );
-}
 }
 
 // --------------------------------------------------
