@@ -874,30 +874,34 @@ TestFramebufferPixel(viewport);
 // REPENTOGON hook
 // --------------------------------------------------
 
-HOOK_METHOD_PRIORITY(
-    PlayerHUD,
-    RenderHearts,
-    100,
-    (Vector* unk,
-     ANM2* sprite,
-     int playerHudLayout,
-     float scale,
-     Vector pos)
-        -> void
-)
-{
-    super(
-        unk,
-        sprite,
-        playerHudLayout,
-        scale,
-        pos
-    );
+HOOK_GLOBAL(OpenGL::wglSwapBuffers, (HDC hdc)->bool, __stdcall) {
+    static unsigned int swapCount = 0;
 
-    if (_playerHudIndex == 0)
-    {
-        RenderTriangleMesh();
+    GLint framebuffer = -1;
+    GLint viewport[4] = {};
+
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &framebuffer);
+    glGetIntegerv(GL_VIEWPORT, viewport);
+
+    if (swapCount < 30) {
+        char buffer[256];
+
+        sprintf_s(
+            buffer,
+            "OBJ OpenGL: Swap #%u HDC=%p FBO=%d Viewport=%dx%d\n",
+            swapCount,
+            (void*)hdc,
+            framebuffer,
+            viewport[2],
+            viewport[3]
+        );
+
+        OutputDebugStringA(buffer);
     }
+
+    ++swapCount;
+
+    return super(hdc);
 }
 
 // --------------------------------------------------
