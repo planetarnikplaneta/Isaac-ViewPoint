@@ -1,4 +1,3 @@
-
 #define NOMINMAX
 
 #include <Windows.h>
@@ -9,10 +8,12 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <climits>
+#include <filesystem>
 #include <fstream>
+#include <map>
 #include <sstream>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include "libzhl.h"
@@ -35,14 +36,6 @@
 #define GL_TEXTURE0 0x84C0
 #endif
 
-#ifndef GL_TEXTURE_BINDING_2D
-#define GL_TEXTURE_BINDING_2D 0x8069
-#endif
-
-#ifndef GL_CLAMP_TO_EDGE
-#define GL_CLAMP_TO_EDGE 0x812F
-#endif
-
 using PFNGLUSEPROGRAMPROC = void (APIENTRY *)(GLuint);
 using PFNGLACTIVETEXTUREPROC = void (APIENTRY *)(GLenum);
 
@@ -53,28 +46,28 @@ namespace OpenGL
 
 namespace
 {
+    namespace fs = std::filesystem;
+
     // --------------------------------------------------
     // Configuration
     // --------------------------------------------------
+
+    constexpr char DEFAULT_OBJECT[] = "objects/sphere.obj";
 
     constexpr float OBJECT_DISTANCE = 5.0f;
     constexpr float OBJECT_ROTATION_SPEED = 0.012f;
     constexpr float OBJECT_TILT = -12.0f;
     constexpr float OBJECT_FOV = 45.0f;
 
-    constexpr float OBJECT_COLOR_R = 1.0f;
-    constexpr float OBJECT_COLOR_G = 1.0f;
-    constexpr float OBJECT_COLOR_B = 1.0f;
-
-    constexpr float AMBIENT_LIGHT = 0.40f;
-    constexpr float DIFFUSE_LIGHT = 0.60f;
-
     constexpr float LIGHT_X = -0.35f;
     constexpr float LIGHT_Y = 0.55f;
     constexpr float LIGHT_Z = -0.76f;
 
+    constexpr float AMBIENT_LIGHT = 0.40f;
+    constexpr float DIFFUSE_LIGHT = 0.60f;
+
     // --------------------------------------------------
-    // OBJ structures
+    // Structures
     // --------------------------------------------------
 
     struct Vertex3
@@ -89,14 +82,37 @@ namespace
 
     struct ObjCorner
     {
-        uint32_t position;
-        int32_t texcoord;
-        int32_t normal;
+        int32_t position = -1;
+        int32_t texcoord = -1;
+        int32_t normal = -1;
     };
 
     struct Triangle
     {
         ObjCorner corners[3];
+        int materialIndex = 0;
+    };
+
+    struct Material
+    {
+        std::string name;
+
+        float ambient[3] = { 0.2f, 0.2f, 0.2f };
+        float diffuse[3] = { 1.0f, 1.0f, 1.0f };
+        float specular[3] = { 0.0f, 0.0f, 0.0f };
+
+        float shininess = 32.0f;
+
+        std::string diffuseTexturePath;
+
+        unsigned char* pixels = nullptr;
+
+        int width = 0;
+        int height = 0;
+
+        GLuint textureId = 0;
+
+        bool textureAttempted = false;
     };
 
     // --------------------------------------------------
@@ -104,28 +120,20 @@ namespace
     // --------------------------------------------------
 
     static HMODULE g_Module = nullptr;
-
-    static bool g_MeshAttempted = false;
-    static bool g_MeshLoaded = false;
-
-    static bool g_TextureAttempted = false;
-    static bool g_TextureLoaded = false;
-
     static HGLRC g_ResourceContext = nullptr;
 
     static PFNGLUSEPROGRAMPROC g_UseProgram = nullptr;
     static PFNGLACTIVETEXTUREPROC g_ActiveTexture = nullptr;
 
-    static GLuint g_TextureId = 0;
-
-    static int g_TextureWidth = 0;
-    static int g_TextureHeight = 0;
-    static unsigned char* g_TexturePixels = nullptr;
+    static bool g_MeshAttempted = false;
+    static bool g_MeshLoaded = false;
 
     static std::vector<Vertex3> g_Vertices;
     static std::vector<Vertex2> g_Texcoords;
     static std::vector<Vertex3> g_Normals;
+
     static std::vector<Triangle> g_Triangles;
+    static std::vector<Material> g_Materials;
 
     // --------------------------------------------------
     // Logging
@@ -137,96 +145,249 @@ namespace
 
         if (file)
         {
-            fprintf(file, "OBJ OpenGL: %s\n", message);
+            fprintf(file, "Isaac ViewPoint: %s\n", message);
             fclose(file);
         }
     }
 
     // --------------------------------------------------
-    // OpenGL function loading
+    // String helpers
     // --------------------------------------------------
 
-    static PROC GetGLProc(const char* name)
+    static std::string Trim(const std::string& text)
     {
-        PROC p = wglGetProcAddress(name);
+        const size_t first = text.find_first_not_of(" \t\r\n");
 
-        if (!p ||
-            p == reinterpret_cast<PROC>(1) ||
-            p == reinterpret_cast<PROC>(2) ||
-            p == reinterpret_cast<PROC>(3) ||
-            p == reinterpret_cast<PROC>(-1))
-        {
-            static HMODULE gl = GetModuleHandleA("opengl32.dll");
+        if (first == std::string::npos)
+            return {};
 
-            p = gl ? GetProcAddress(gl, name) : nullptr;
-        }
+        const size_t last = text.find_last_not_of(" \t\r\n");
 
-        return p;
+        return text.substr(first, last - first + 1);
     }
 
-    static bool LoadGLFunctions()
+    static std::string NormalizeAssetPath(std::string path)
     {
-        g_UseProgram =
-            reinterpret_cast<PFNGLUSEPROGRAMPROC>(
-                GetGLProc("glUseProgram")
-            );
+        std::replace(path.begin(), path.end(), '\\', '/');
 
-        g_ActiveTexture =
-            reinterpret_cast<PFNGLACTIVETEXTUREPROC>(
-                GetGLProc("glActiveTexture")
-            );
+        while (path.rfind("./", 0) == 0)
+            path.erase(0, 2);
 
-        if (!g_UseProgram)
+        if (path.empty() ||
+            path[0] == '/' ||
+            (path.size() > 1 && path[1] == ':'))
         {
-            LogMessage("glUseProgram unavailable");
-            return false;
+            return {};
         }
 
-        return true;
+        std::stringstream stream(path);
+        std::string part;
+        std::vector<std::string> parts;
+
+        while (std::getline(stream, part, '/'))
+        {
+            if (part.empty() || part == ".")
+                continue;
+
+            if (part == "..")
+                return {};
+
+            parts.push_back(part);
+        }
+
+        std::string result;
+
+        for (const std::string& p : parts)
+        {
+            if (!result.empty())
+                result += '/';
+
+            result += p;
+        }
+
+        return result;
+    }
+
+    static std::string ResolveRelativeAsset(
+        const std::string& parent,
+        const std::string& child)
+    {
+        std::string normalizedChild = child;
+
+        std::replace(
+            normalizedChild.begin(),
+            normalizedChild.end(),
+            '\\',
+            '/'
+        );
+
+        if (normalizedChild.empty() ||
+            normalizedChild[0] == '/' ||
+            (normalizedChild.size() > 1 &&
+             normalizedChild[1] == ':'))
+        {
+            return {};
+        }
+
+        const size_t slash = parent.find_last_of('/');
+
+        const std::string directory =
+            slash == std::string::npos
+                ? ""
+                : parent.substr(0, slash + 1);
+
+        return NormalizeAssetPath(directory + normalizedChild);
     }
 
     // --------------------------------------------------
-    // File paths
+    // DLL directory
     // --------------------------------------------------
 
-    static std::string GetFilePath(const char* filename)
+    static fs::path GetDllDirectory()
     {
         char modulePath[MAX_PATH] = {};
 
-        DWORD len = GetModuleFileNameA(
+        DWORD length = GetModuleFileNameA(
             g_Module,
             modulePath,
             MAX_PATH
         );
 
-        if (!len || len >= MAX_PATH)
-            return filename;
+        if (!length || length >= MAX_PATH)
+            return fs::current_path();
 
-        std::string path(modulePath, len);
+        return fs::path(
+            std::string(modulePath, length)
+        ).parent_path();
+    }
 
-        size_t slash = path.find_last_of("\\/");
+    // --------------------------------------------------
+    // Asset loading
+    // --------------------------------------------------
 
-        if (slash != std::string::npos)
-            path.resize(slash + 1);
+    // First checks:
+    // <DLL directory>/resources_ViewPoint/<asset path>
+    //
+    // If the external file does not exist, checks the
+    // embedded Windows resource with the same name.
 
-        return path + filename;
+    static bool ReadAsset(
+        const std::string& requestedPath,
+        std::vector<unsigned char>& output)
+    {
+        const std::string assetPath =
+            NormalizeAssetPath(requestedPath);
+
+        if (assetPath.empty())
+            return false;
+
+        output.clear();
+
+        // ----------------------------------------------
+        // External resource
+        // ----------------------------------------------
+
+        try
+        {
+            const fs::path externalPath =
+                GetDllDirectory() /
+                "resources_ViewPoint" /
+                fs::path(assetPath);
+
+            if (fs::exists(externalPath) &&
+                fs::is_regular_file(externalPath))
+            {
+                std::ifstream file(
+                    externalPath,
+                    std::ios::binary
+                );
+
+                if (file)
+                {
+                    file.seekg(0, std::ios::end);
+
+                    const std::streamoff size = file.tellg();
+
+                    if (size <= 0)
+                        return false;
+
+                    file.seekg(0, std::ios::beg);
+
+                    output.resize(
+                        static_cast<size_t>(size)
+                    );
+
+                    file.read(
+                        reinterpret_cast<char*>(output.data()),
+                        size
+                    );
+
+                    if (file)
+                        return true;
+
+                    output.clear();
+                }
+            }
+        }
+        catch (...)
+        {
+            LogMessage("External asset access failed");
+        }
+
+        // ----------------------------------------------
+        // Embedded resource
+        // ----------------------------------------------
+
+        HRSRC resource = FindResourceA(
+            g_Module,
+            assetPath.c_str(),
+            RT_RCDATA
+        );
+
+        if (!resource)
+        {
+            LogMessage(
+                ("Embedded asset not found: " + assetPath).c_str()
+            );
+
+            return false;
+        }
+
+        HGLOBAL loaded = LoadResource(
+            g_Module,
+            resource
+        );
+
+        if (!loaded)
+            return false;
+
+        const DWORD size = SizeofResource(
+            g_Module,
+            resource
+        );
+
+        const void* data = LockResource(loaded);
+
+        if (!data || size == 0)
+            return false;
+
+        const unsigned char* bytes =
+            static_cast<const unsigned char*>(data);
+
+        output.assign(bytes, bytes + size);
+
+        return true;
     }
 
     // --------------------------------------------------
     // OBJ index parsing
     // --------------------------------------------------
 
-    // component:
-    // 0 = position
-    // 1 = texture coordinate
-    // 2 = normal
-
     static bool ParseObjIndex(
         const std::string& token,
         int component,
         size_t count,
-        int32_t& out
-    )
+        int32_t& output)
     {
         size_t start = 0;
 
@@ -248,14 +409,18 @@ namespace
         if (start >= end)
             return false;
 
-        const std::string text = token.substr(
+        std::string number = token.substr(
             start,
             end - start
         );
 
         char* parseEnd = nullptr;
 
-        long value = strtol(text.c_str(), &parseEnd, 10);
+        long value = strtol(
+            number.c_str(),
+            &parseEnd,
+            10
+        );
 
         if (!parseEnd || *parseEnd || value == 0)
             return false;
@@ -270,287 +435,267 @@ namespace
             return false;
         }
 
-        out = static_cast<int32_t>(resolved);
+        output = static_cast<int32_t>(resolved);
 
         return true;
     }
 
     // --------------------------------------------------
-    // OBJ loading
+    // Material management
     // --------------------------------------------------
 
-    static void LoadOBJ()
+    static int FindOrCreateMaterial(
+        const std::string& name,
+        std::map<std::string, int>& lookup)
     {
-        g_MeshAttempted = true;
+        auto found = lookup.find(name);
 
-        const std::string path = GetFilePath(
-            "objectToRender.obj"
+        if (found != lookup.end())
+            return found->second;
+
+        Material material;
+        material.name = name;
+
+        const int index = static_cast<int>(
+            g_Materials.size()
         );
 
-        std::ifstream input(path);
+        g_Materials.push_back(material);
 
-        if (!input)
+        lookup[name] = index;
+
+        return index;
+    }
+
+    // --------------------------------------------------
+    // MTL loading
+    // --------------------------------------------------
+
+    static void LoadMTL(
+        const std::string& mtlPath,
+        std::map<std::string, int>& lookup)
+    {
+        std::vector<unsigned char> bytes;
+
+        if (!ReadAsset(mtlPath, bytes))
         {
-            LogMessage("Cannot open objectToRender.obj beside DLL");
+            LogMessage(
+                ("Cannot load MTL: " + mtlPath).c_str()
+            );
+
             return;
         }
 
-        std::vector<Vertex3> sourceVertices;
-        std::vector<Vertex2> sourceTexcoords;
-        std::vector<Vertex3> sourceNormals;
-        std::vector<Triangle> faces;
+        std::string source(
+            reinterpret_cast<const char*>(bytes.data()),
+            bytes.size()
+        );
+
+        std::istringstream input(source);
 
         std::string line;
 
+        int currentMaterial = -1;
+
         while (std::getline(input, line))
         {
+            line = Trim(line);
+
             if (line.empty() || line[0] == '#')
                 continue;
 
             std::istringstream stream(line);
 
-            std::string type;
-            stream >> type;
+            std::string command;
+            stream >> command;
 
             // ------------------------------------------
-            // Positions
+            // Material name
             // ------------------------------------------
 
-            if (type == "v")
+            if (command == "newmtl")
             {
-                Vertex3 vertex{};
+                std::string name;
 
-                if (stream >> vertex.x >> vertex.y >> vertex.z)
-                    sourceVertices.push_back(vertex);
+                std::getline(stream, name);
+                name = Trim(name);
+
+                if (!name.empty())
+                {
+                    currentMaterial =
+                        FindOrCreateMaterial(name, lookup);
+                }
+
+                continue;
+            }
+
+            if (currentMaterial < 0)
+                continue;
+
+            Material& material =
+                g_Materials[currentMaterial];
+
+            // ------------------------------------------
+            // Ambient
+            // ------------------------------------------
+
+            if (command == "Ka")
+            {
+                stream >>
+                    material.ambient[0] >>
+                    material.ambient[1] >>
+                    material.ambient[2];
             }
 
             // ------------------------------------------
-            // Texture coordinates
+            // Diffuse
             // ------------------------------------------
 
-            else if (type == "vt")
+            else if (command == "Kd")
             {
-                Vertex2 texcoord{};
-
-                if (stream >> texcoord.u >> texcoord.v)
-                    sourceTexcoords.push_back(texcoord);
+                stream >>
+                    material.diffuse[0] >>
+                    material.diffuse[1] >>
+                    material.diffuse[2];
             }
 
             // ------------------------------------------
-            // Normals
+            // Specular
             // ------------------------------------------
 
-            else if (type == "vn")
+            else if (command == "Ks")
             {
-                Vertex3 normal{};
-
-                if (stream >> normal.x >> normal.y >> normal.z)
-                    sourceNormals.push_back(normal);
+                stream >>
+                    material.specular[0] >>
+                    material.specular[1] >>
+                    material.specular[2];
             }
 
             // ------------------------------------------
-            // Faces
+            // Shininess
             // ------------------------------------------
 
-            else if (type == "f")
+            else if (command == "Ns")
             {
-                std::vector<ObjCorner> face;
+                stream >> material.shininess;
+            }
 
+            // ------------------------------------------
+            // Diffuse texture
+            // ------------------------------------------
+
+            else if (command == "map_Kd")
+            {
+                // Supports:
+                // map_Kd texture.png
+                //
+                // Also tolerates common map options by
+                // using the final whitespace-separated token.
+                std::string texture;
                 std::string token;
 
                 while (stream >> token)
+                    texture = token;
+
+                if (!texture.empty())
                 {
-                    ObjCorner corner{};
-
-                    int32_t position = -1;
-                    int32_t texcoord = -1;
-                    int32_t normal = -1;
-
-                    if (!ParseObjIndex(
-                        token,
-                        0,
-                        sourceVertices.size(),
-                        position))
-                    {
-                        continue;
-                    }
-
-                    ParseObjIndex(
-                        token,
-                        1,
-                        sourceTexcoords.size(),
-                        texcoord
-                    );
-
-                    ParseObjIndex(
-                        token,
-                        2,
-                        sourceNormals.size(),
-                        normal
-                    );
-
-                    corner.position =
-                        static_cast<uint32_t>(position);
-
-                    corner.texcoord = texcoord;
-                    corner.normal = normal;
-
-                    face.push_back(corner);
-                }
-
-                // Fan triangulation.
-                for (size_t i = 1; i + 1 < face.size(); ++i)
-                {
-                    Triangle triangle{};
-
-                    triangle.corners[0] = face[0];
-                    triangle.corners[1] = face[i];
-                    triangle.corners[2] = face[i + 1];
-
-                    faces.push_back(triangle);
+                    material.diffuseTexturePath =
+                        ResolveRelativeAsset(
+                            mtlPath,
+                            texture
+                        );
                 }
             }
         }
 
-        if (sourceVertices.empty() || faces.empty())
-        {
-            LogMessage("OBJ has no usable vertices or faces");
-            return;
-        }
-
-        // ----------------------------------------------
-        // Calculate bounding box
-        // ----------------------------------------------
-
-        Vertex3 lo = sourceVertices.front();
-        Vertex3 hi = sourceVertices.front();
-
-        for (const Vertex3& v : sourceVertices)
-        {
-            lo.x = std::min(lo.x, v.x);
-            lo.y = std::min(lo.y, v.y);
-            lo.z = std::min(lo.z, v.z);
-
-            hi.x = std::max(hi.x, v.x);
-            hi.y = std::max(hi.y, v.y);
-            hi.z = std::max(hi.z, v.z);
-        }
-
-        // ----------------------------------------------
-        // Center and normalize model
-        // ----------------------------------------------
-
-        const float cx = (lo.x + hi.x) * 0.5f;
-        const float cy = (lo.y + hi.y) * 0.5f;
-        const float cz = (lo.z + hi.z) * 0.5f;
-
-        const float scale = 2.0f / std::max({
-            hi.x - lo.x,
-            hi.y - lo.y,
-            hi.z - lo.z,
-            0.0001f
-        });
-
-        g_Vertices.clear();
-        g_Vertices.reserve(sourceVertices.size());
-
-        for (const Vertex3& v : sourceVertices)
-        {
-            g_Vertices.push_back({
-                (v.x - cx) * scale,
-                (v.y - cy) * scale,
-                (v.z - cz) * scale
-            });
-        }
-
-        g_Texcoords = std::move(sourceTexcoords);
-        g_Normals = std::move(sourceNormals);
-        g_Triangles = std::move(faces);
-
-        g_MeshLoaded = true;
-
-        char msg[256];
-
-        snprintf(
-            msg,
-            sizeof(msg),
-            "Loaded OBJ: %zu positions, %zu UVs, %zu normals, %zu triangles",
-            g_Vertices.size(),
-            g_Texcoords.size(),
-            g_Normals.size(),
-            g_Triangles.size()
+        LogMessage(
+            ("Loaded MTL: " + mtlPath).c_str()
         );
-
-        LogMessage(msg);
     }
 
     // --------------------------------------------------
     // PNG loading
     // --------------------------------------------------
 
-    static void LoadPNG()
+    static void LoadMaterialTexture(Material& material)
     {
-        g_TextureAttempted = true;
+        if (material.textureAttempted)
+            return;
 
-        const std::string path = GetFilePath(
-            "objectToRender.png"
-        );
+        material.textureAttempted = true;
 
-        // OBJ UV coordinates use a bottom-left origin.
+        if (material.diffuseTexturePath.empty())
+            return;
+
+        std::vector<unsigned char> bytes;
+
+        if (!ReadAsset(
+            material.diffuseTexturePath,
+            bytes))
+        {
+            LogMessage(
+                ("Cannot load texture: " +
+                 material.diffuseTexturePath).c_str()
+            );
+
+            return;
+        }
+
+        if (bytes.size() > static_cast<size_t>(INT_MAX))
+            return;
+
         stbi_set_flip_vertically_on_load(1);
 
-        g_TexturePixels = stbi_load(
-            path.c_str(),
-            &g_TextureWidth,
-            &g_TextureHeight,
+        material.pixels = stbi_load_from_memory(
+            bytes.data(),
+            static_cast<int>(bytes.size()),
+            &material.width,
+            &material.height,
             nullptr,
             4
         );
 
-        if (!g_TexturePixels)
+        if (!material.pixels)
         {
-            LogMessage("Cannot load objectToRender.png");
+            LogMessage(
+                ("PNG decoding failed: " +
+                 material.diffuseTexturePath).c_str()
+            );
+
             return;
         }
 
-        g_TextureLoaded = true;
-
-        char msg[192];
-
-        snprintf(
-            msg,
-            sizeof(msg),
-            "Loaded PNG: %dx%d",
-            g_TextureWidth,
-            g_TextureHeight
+        LogMessage(
+            ("Decoded PNG: " +
+             material.diffuseTexturePath).c_str()
         );
-
-        LogMessage(msg);
     }
 
     // --------------------------------------------------
-    // Upload PNG to OpenGL
+    // OpenGL texture upload
     // --------------------------------------------------
 
-    static bool UploadTexture()
+    static bool UploadMaterialTexture(Material& material)
     {
-        if (!g_TextureLoaded || !g_TexturePixels)
+        LoadMaterialTexture(material);
+
+        if (!material.pixels)
             return false;
 
-        if (g_TextureId != 0)
+        if (material.textureId != 0)
             return true;
 
-        glGenTextures(1, &g_TextureId);
+        glGenTextures(
+            1,
+            &material.textureId
+        );
 
-        if (!g_TextureId)
-        {
-            LogMessage("Failed to create OpenGL texture");
+        if (!material.textureId)
             return false;
-        }
 
         glBindTexture(
             GL_TEXTURE_2D,
-            g_TextureId
+            material.textureId
         );
 
         glPixelStorei(
@@ -586,76 +731,322 @@ namespace
             GL_TEXTURE_2D,
             0,
             GL_RGBA,
-            g_TextureWidth,
-            g_TextureHeight,
+            material.width,
+            material.height,
             0,
             GL_RGBA,
             GL_UNSIGNED_BYTE,
-            g_TexturePixels
+            material.pixels
         );
 
-        GLenum error = glGetError();
+        const GLenum error = glGetError();
 
         if (error != GL_NO_ERROR)
         {
-            char msg[128];
+            char message[128];
 
             snprintf(
-                msg,
-                sizeof(msg),
-                "PNG texture upload failed: 0x%X",
+                message,
+                sizeof(message),
+                "Texture upload failed: 0x%X",
                 error
             );
 
-            LogMessage(msg);
+            LogMessage(message);
 
-            glDeleteTextures(1, &g_TextureId);
-            g_TextureId = 0;
+            glDeleteTextures(
+                1,
+                &material.textureId
+            );
+
+            material.textureId = 0;
 
             return false;
         }
-
-        LogMessage("PNG uploaded to OpenGL");
 
         return true;
     }
 
     // --------------------------------------------------
-    // Context initialization
+    // OBJ loading
     // --------------------------------------------------
 
-    static bool EnsureContext()
+    static void LoadOBJ()
     {
-        HGLRC context = wglGetCurrentContext();
+        g_MeshAttempted = true;
 
-        if (!context)
-            return false;
+        std::vector<unsigned char> bytes;
 
-        if (context != g_ResourceContext)
+        if (!ReadAsset(DEFAULT_OBJECT, bytes))
         {
-            g_ResourceContext = context;
+            LogMessage(
+                ("Cannot load OBJ: " +
+                 std::string(DEFAULT_OBJECT)).c_str()
+            );
 
-            g_UseProgram = nullptr;
-            g_ActiveTexture = nullptr;
-
-            // OpenGL texture IDs belong to their context.
-            g_TextureId = 0;
-
-            LogMessage("OpenGL context changed");
+            return;
         }
 
-        return LoadGLFunctions();
+        std::string source(
+            reinterpret_cast<const char*>(bytes.data()),
+            bytes.size()
+        );
+
+        std::istringstream input(source);
+
+        std::string line;
+
+        std::map<std::string, int> materialLookup;
+
+        g_Vertices.clear();
+        g_Texcoords.clear();
+        g_Normals.clear();
+        g_Triangles.clear();
+        g_Materials.clear();
+
+        // Default material for faces without usemtl.
+        Material defaultMaterial;
+        defaultMaterial.name = "__default";
+
+        g_Materials.push_back(defaultMaterial);
+        materialLookup["__default"] = 0;
+
+        int activeMaterial = 0;
+
+        while (std::getline(input, line))
+        {
+            line = Trim(line);
+
+            if (line.empty() || line[0] == '#')
+                continue;
+
+            std::istringstream stream(line);
+
+            std::string command;
+            stream >> command;
+
+            // ------------------------------------------
+            // Position
+            // ------------------------------------------
+
+            if (command == "v")
+            {
+                Vertex3 vertex{};
+
+                if (stream >>
+                    vertex.x >>
+                    vertex.y >>
+                    vertex.z)
+                {
+                    g_Vertices.push_back(vertex);
+                }
+            }
+
+            // ------------------------------------------
+            // UV
+            // ------------------------------------------
+
+            else if (command == "vt")
+            {
+                Vertex2 uv{};
+
+                if (stream >> uv.u >> uv.v)
+                    g_Texcoords.push_back(uv);
+            }
+
+            // ------------------------------------------
+            // Normal
+            // ------------------------------------------
+
+            else if (command == "vn")
+            {
+                Vertex3 normal{};
+
+                if (stream >>
+                    normal.x >>
+                    normal.y >>
+                    normal.z)
+                {
+                    g_Normals.push_back(normal);
+                }
+            }
+
+            // ------------------------------------------
+            // Material library
+            // ------------------------------------------
+
+            else if (command == "mtllib")
+            {
+                std::string filename;
+
+                std::getline(stream, filename);
+                filename = Trim(filename);
+
+                if (!filename.empty())
+                {
+                    const std::string mtlPath =
+                        ResolveRelativeAsset(
+                            DEFAULT_OBJECT,
+                            filename
+                        );
+
+                    if (!mtlPath.empty())
+                    {
+                        LoadMTL(
+                            mtlPath,
+                            materialLookup
+                        );
+                    }
+                }
+            }
+
+            // ------------------------------------------
+            // Active material
+            // ------------------------------------------
+
+            else if (command == "usemtl")
+            {
+                std::string name;
+
+                std::getline(stream, name);
+                name = Trim(name);
+
+                auto found = materialLookup.find(name);
+
+                activeMaterial =
+                    found != materialLookup.end()
+                        ? found->second
+                        : 0;
+            }
+
+            // ------------------------------------------
+            // Faces
+            // ------------------------------------------
+
+            else if (command == "f")
+            {
+                std::vector<ObjCorner> face;
+
+                std::string token;
+
+                while (stream >> token)
+                {
+                    ObjCorner corner;
+
+                    if (!ParseObjIndex(
+                        token,
+                        0,
+                        g_Vertices.size(),
+                        corner.position))
+                    {
+                        continue;
+                    }
+
+                    ParseObjIndex(
+                        token,
+                        1,
+                        g_Texcoords.size(),
+                        corner.texcoord
+                    );
+
+                    ParseObjIndex(
+                        token,
+                        2,
+                        g_Normals.size(),
+                        corner.normal
+                    );
+
+                    face.push_back(corner);
+                }
+
+                // Triangulate polygon faces.
+                for (size_t i = 1; i + 1 < face.size(); ++i)
+                {
+                    Triangle triangle{};
+
+                    triangle.corners[0] = face[0];
+                    triangle.corners[1] = face[i];
+                    triangle.corners[2] = face[i + 1];
+
+                    triangle.materialIndex = activeMaterial;
+
+                    g_Triangles.push_back(triangle);
+                }
+            }
+        }
+
+        // ----------------------------------------------
+        // Validate mesh
+        // ----------------------------------------------
+
+        if (g_Vertices.empty() || g_Triangles.empty())
+        {
+            LogMessage("OBJ has no usable vertices or faces");
+            return;
+        }
+
+        // ----------------------------------------------
+        // Bounding box
+        // ----------------------------------------------
+
+        Vertex3 lo = g_Vertices.front();
+        Vertex3 hi = g_Vertices.front();
+
+        for (const Vertex3& v : g_Vertices)
+        {
+            lo.x = (std::min)(lo.x, v.x);
+            lo.y = (std::min)(lo.y, v.y);
+            lo.z = (std::min)(lo.z, v.z);
+
+            hi.x = (std::max)(hi.x, v.x);
+            hi.y = (std::max)(hi.y, v.y);
+            hi.z = (std::max)(hi.z, v.z);
+        }
+
+        const float cx = (lo.x + hi.x) * 0.5f;
+        const float cy = (lo.y + hi.y) * 0.5f;
+        const float cz = (lo.z + hi.z) * 0.5f;
+
+        const float extent = (std::max)(
+            (std::max)(hi.x - lo.x, hi.y - lo.y),
+            (std::max)(hi.z - lo.z, 0.0001f)
+        );
+
+        const float scale = 2.0f / extent;
+
+        for (Vertex3& v : g_Vertices)
+        {
+            v.x = (v.x - cx) * scale;
+            v.y = (v.y - cy) * scale;
+            v.z = (v.z - cz) * scale;
+        }
+
+        g_MeshLoaded = true;
+
+        char message[256];
+
+        snprintf(
+            message,
+            sizeof(message),
+            "Loaded OBJ: %zu vertices, %zu UVs, %zu normals, %zu triangles, %zu materials",
+            g_Vertices.size(),
+            g_Texcoords.size(),
+            g_Normals.size(),
+            g_Triangles.size(),
+            g_Materials.size()
+        );
+
+        LogMessage(message);
     }
 
     // --------------------------------------------------
-    // Vector helpers
+    // Normal calculations
     // --------------------------------------------------
 
     static Vertex3 CalculateFaceNormal(
         const Vertex3& a,
         const Vertex3& b,
-        const Vertex3& c
-    )
+        const Vertex3& c)
     {
         const float ux = b.x - a.x;
         const float uy = b.y - a.y;
@@ -687,21 +1078,21 @@ namespace
         return normal;
     }
 
-    static Vertex3 NormalizeNormal(const Vertex3& input)
+    static Vertex3 NormalizeNormal(const Vertex3& normal)
     {
         const float length = std::sqrt(
-            input.x * input.x +
-            input.y * input.y +
-            input.z * input.z
+            normal.x * normal.x +
+            normal.y * normal.y +
+            normal.z * normal.z
         );
 
         if (length < 1e-8f)
             return { 0.0f, 0.0f, 1.0f };
 
         return {
-            input.x / length,
-            input.y / length,
-            input.z / length
+            normal.x / length,
+            normal.y / length,
+            normal.z / length
         };
     }
 
@@ -717,7 +1108,7 @@ namespace
             LIGHT_Z * LIGHT_Z
         );
 
-        const float diffuse = std::max(
+        const float diffuse = (std::max)(
             0.0f,
             (
                 normal.x * LIGHT_X +
@@ -726,14 +1117,171 @@ namespace
             ) / lightLength
         );
 
-        return std::min(
+        return (std::min)(
             1.0f,
             AMBIENT_LIGHT + DIFFUSE_LIGHT * diffuse
         );
     }
 
     // --------------------------------------------------
-    // Render OBJ
+    // OpenGL function loading
+    // --------------------------------------------------
+
+    static PROC GetGLProc(const char* name)
+    {
+        PROC proc = wglGetProcAddress(name);
+
+        if (!proc ||
+            proc == reinterpret_cast<PROC>(1) ||
+            proc == reinterpret_cast<PROC>(2) ||
+            proc == reinterpret_cast<PROC>(3) ||
+            proc == reinterpret_cast<PROC>(-1))
+        {
+            HMODULE gl = GetModuleHandleA("opengl32.dll");
+
+            proc = gl
+                ? GetProcAddress(gl, name)
+                : nullptr;
+        }
+
+        return proc;
+    }
+
+    static bool EnsureContext()
+    {
+        HGLRC context = wglGetCurrentContext();
+
+        if (!context)
+            return false;
+
+        if (context != g_ResourceContext)
+        {
+            g_ResourceContext = context;
+
+            g_UseProgram = nullptr;
+            g_ActiveTexture = nullptr;
+
+            // Texture IDs belong to their OpenGL context.
+            for (Material& material : g_Materials)
+                material.textureId = 0;
+
+            LogMessage("OpenGL context changed");
+        }
+
+        if (!g_UseProgram)
+        {
+            g_UseProgram =
+                reinterpret_cast<PFNGLUSEPROGRAMPROC>(
+                    GetGLProc("glUseProgram")
+                );
+        }
+
+        if (!g_ActiveTexture)
+        {
+            g_ActiveTexture =
+                reinterpret_cast<PFNGLACTIVETEXTUREPROC>(
+                    GetGLProc("glActiveTexture")
+                );
+        }
+
+        if (!g_UseProgram)
+        {
+            LogMessage("glUseProgram unavailable");
+            return false;
+        }
+
+        return true;
+    }
+
+    // --------------------------------------------------
+    // Triangle rendering
+    // --------------------------------------------------
+
+    static void RenderTriangle(const Triangle& triangle)
+    {
+        const ObjCorner* corners[3] = {
+            &triangle.corners[0],
+            &triangle.corners[1],
+            &triangle.corners[2]
+        };
+
+        const Vertex3* positions[3] = {
+            &g_Vertices[corners[0]->position],
+            &g_Vertices[corners[1]->position],
+            &g_Vertices[corners[2]->position]
+        };
+
+        const Vertex3 faceNormal = CalculateFaceNormal(
+            *positions[0],
+            *positions[1],
+            *positions[2]
+        );
+
+        const int materialIndex =
+            triangle.materialIndex >= 0 &&
+            static_cast<size_t>(triangle.materialIndex) <
+                g_Materials.size()
+                ? triangle.materialIndex
+                : 0;
+
+        const Material& material =
+            g_Materials[materialIndex];
+
+        for (int i = 0; i < 3; ++i)
+        {
+            const ObjCorner& corner = *corners[i];
+
+            Vertex3 normal = faceNormal;
+
+            if (corner.normal >= 0 &&
+                static_cast<size_t>(corner.normal) <
+                    g_Normals.size())
+            {
+                normal = NormalizeNormal(
+                    g_Normals[corner.normal]
+                );
+            }
+
+            const float brightness =
+                CalculateBrightness(normal);
+
+            glColor4f(
+                material.diffuse[0] * brightness,
+                material.diffuse[1] * brightness,
+                material.diffuse[2] * brightness,
+                1.0f
+            );
+
+            glNormal3f(
+                normal.x,
+                normal.y,
+                normal.z
+            );
+
+            if (corner.texcoord >= 0 &&
+                static_cast<size_t>(corner.texcoord) <
+                    g_Texcoords.size())
+            {
+                const Vertex2& uv =
+                    g_Texcoords[corner.texcoord];
+
+                glTexCoord2f(uv.u, uv.v);
+            }
+            else
+            {
+                glTexCoord2f(0.0f, 0.0f);
+            }
+
+            glVertex3f(
+                positions[i]->x,
+                positions[i]->y,
+                positions[i]->z
+            );
+        }
+    }
+
+    // --------------------------------------------------
+    // Main renderer
     // --------------------------------------------------
 
     static void RenderTriangleMesh()
@@ -746,16 +1294,6 @@ namespace
 
         if (!g_MeshLoaded)
             return;
-
-        if (!g_TextureAttempted)
-            LoadPNG();
-
-        if (g_Vertices.empty() || g_Triangles.empty())
-            return;
-
-        // --------------------------------------------------
-        // Save OpenGL state
-        // --------------------------------------------------
 
         GLint viewport[4] = {};
 
@@ -791,40 +1329,36 @@ namespace
             );
         }
 
-        // Save fixed-function attributes.
+        // ----------------------------------------------
+        // Save OpenGL state
+        // ----------------------------------------------
+
         glPushAttrib(GL_ALL_ATTRIB_BITS);
 
         if (g_ActiveTexture)
             g_ActiveTexture(GL_TEXTURE0);
 
-        // Save projection matrix.
         glMatrixMode(GL_PROJECTION);
         glPushMatrix();
 
-        // Save modelview matrix.
         glMatrixMode(GL_MODELVIEW);
         glPushMatrix();
 
-        // --------------------------------------------------
+        // ----------------------------------------------
         // Configure rendering
-        // --------------------------------------------------
+        // ----------------------------------------------
 
         g_UseProgram(0);
 
         glDisable(GL_CULL_FACE);
-
         glDisable(GL_STENCIL_TEST);
         glDisable(GL_SCISSOR_TEST);
-
         glDisable(GL_LIGHTING);
         glDisable(GL_FOG);
         glDisable(GL_COLOR_LOGIC_OP);
         glDisable(GL_POLYGON_OFFSET_FILL);
 
-        glPolygonMode(
-            GL_FRONT_AND_BACK,
-            GL_FILL
-        );
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
         glColorMask(
             GL_TRUE,
@@ -833,59 +1367,25 @@ namespace
             GL_TRUE
         );
 
-        // --------------------------------------------------
-        // Texture setup
-        // --------------------------------------------------
-
-        const bool textureReady = UploadTexture();
-
-        if (textureReady)
-        {
-            glEnable(GL_TEXTURE_2D);
-
-            glBindTexture(
-                GL_TEXTURE_2D,
-                g_TextureId
-            );
-
-            glTexEnvi(
-                GL_TEXTURE_ENV,
-                GL_TEXTURE_ENV_MODE,
-                GL_MODULATE
-            );
-
-            // Preserve transparent PNG pixels.
-            glEnable(GL_BLEND);
-
-            glBlendFunc(
-                GL_SRC_ALPHA,
-                GL_ONE_MINUS_SRC_ALPHA
-            );
-
-            glEnable(GL_ALPHA_TEST);
-            glAlphaFunc(GL_GREATER, 0.01f);
-        }
-        else
-        {
-            glDisable(GL_TEXTURE_2D);
-            glDisable(GL_BLEND);
-            glDisable(GL_ALPHA_TEST);
-        }
-
-        // --------------------------------------------------
-        // Depth buffer
-        // --------------------------------------------------
-
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LEQUAL);
         glDepthMask(GL_TRUE);
 
+        glEnable(GL_BLEND);
+        glBlendFunc(
+            GL_SRC_ALPHA,
+            GL_ONE_MINUS_SRC_ALPHA
+        );
+
+        glEnable(GL_ALPHA_TEST);
+        glAlphaFunc(GL_GREATER, 0.01f);
+
         glClearDepth(1.0);
         glClear(GL_DEPTH_BUFFER_BIT);
 
-        // --------------------------------------------------
-        // Perspective projection
-        // --------------------------------------------------
+        // ----------------------------------------------
+        // Perspective
+        // ----------------------------------------------
 
         const double aspect =
             static_cast<double>(viewport[2]) /
@@ -895,7 +1395,8 @@ namespace
         const double farPlane = 100.0;
 
         const double halfFov =
-            OBJECT_FOV * 3.14159265358979323846 / 360.0;
+            OBJECT_FOV *
+            3.14159265358979323846 / 360.0;
 
         const double halfHeight =
             nearPlane * std::tan(halfFov);
@@ -915,9 +1416,9 @@ namespace
             farPlane
         );
 
-        // --------------------------------------------------
+        // ----------------------------------------------
         // Model transformation
-        // --------------------------------------------------
+        // ----------------------------------------------
 
         glMatrixMode(GL_MODELVIEW);
         glLoadIdentity();
@@ -943,103 +1444,73 @@ namespace
             0.0f
         );
 
-        // --------------------------------------------------
-        // Render triangles
-        // --------------------------------------------------
+        // ----------------------------------------------
+        // Render each material separately
+        // ----------------------------------------------
 
-        glBegin(GL_TRIANGLES);
-
-        for (const Triangle& triangle : g_Triangles)
+        for (size_t materialIndex = 0;
+             materialIndex < g_Materials.size();
+             ++materialIndex)
         {
-            const ObjCorner& ca = triangle.corners[0];
-            const ObjCorner& cb = triangle.corners[1];
-            const ObjCorner& cc = triangle.corners[2];
+            Material& material =
+                g_Materials[materialIndex];
 
-            if (ca.position >= g_Vertices.size() ||
-                cb.position >= g_Vertices.size() ||
-                cc.position >= g_Vertices.size())
+            const bool textured =
+                UploadMaterialTexture(material);
+
+            if (textured)
             {
-                continue;
-            }
+                glEnable(GL_TEXTURE_2D);
 
-            const Vertex3& a = g_Vertices[ca.position];
-            const Vertex3& b = g_Vertices[cb.position];
-            const Vertex3& c = g_Vertices[cc.position];
-
-            const Vertex3 faceNormal =
-                CalculateFaceNormal(a, b, c);
-
-            const ObjCorner* corners[3] = {
-                &ca,
-                &cb,
-                &cc
-            };
-
-            const Vertex3* positions[3] = {
-                &a,
-                &b,
-                &c
-            };
-
-            for (int i = 0; i < 3; ++i)
-            {
-                const ObjCorner& corner = *corners[i];
-
-                const Vertex3& position = *positions[i];
-
-                Vertex3 normal = faceNormal;
-
-                if (corner.normal >= 0 &&
-                    static_cast<size_t>(corner.normal) < g_Normals.size())
-                {
-                    normal = NormalizeNormal(
-                        g_Normals[corner.normal]
-                    );
-                }
-
-                const float brightness =
-                    CalculateBrightness(normal);
-
-                glColor4f(
-                    OBJECT_COLOR_R * brightness,
-                    OBJECT_COLOR_G * brightness,
-                    OBJECT_COLOR_B * brightness,
-                    1.0f
+                glBindTexture(
+                    GL_TEXTURE_2D,
+                    material.textureId
                 );
 
-                glNormal3f(
-                    normal.x,
-                    normal.y,
-                    normal.z
-                );
-
-                if (textureReady &&
-                    corner.texcoord >= 0 &&
-                    static_cast<size_t>(corner.texcoord) < g_Texcoords.size())
-                {
-                    const Vertex2& uv =
-                        g_Texcoords[corner.texcoord];
-
-                    glTexCoord2f(uv.u, uv.v);
-                }
-                else
-                {
-                    glTexCoord2f(0.0f, 0.0f);
-                }
-
-                glVertex3f(
-                    position.x,
-                    position.y,
-                    position.z
+                glTexEnvi(
+                    GL_TEXTURE_ENV,
+                    GL_TEXTURE_ENV_MODE,
+                    GL_MODULATE
                 );
             }
+            else
+            {
+                glDisable(GL_TEXTURE_2D);
+            }
+
+            glBegin(GL_TRIANGLES);
+
+            for (const Triangle& triangle : g_Triangles)
+            {
+                if (triangle.materialIndex !=
+                    static_cast<int>(materialIndex))
+                {
+                    continue;
+                }
+
+                bool valid = true;
+
+                for (const ObjCorner& corner : triangle.corners)
+                {
+                    if (corner.position < 0 ||
+                        static_cast<size_t>(corner.position) >=
+                            g_Vertices.size())
+                    {
+                        valid = false;
+                        break;
+                    }
+                }
+
+                if (valid)
+                    RenderTriangle(triangle);
+            }
+
+            glEnd();
         }
 
-        glEnd();
-
-        // --------------------------------------------------
+        // ----------------------------------------------
         // Restore OpenGL state
-        // --------------------------------------------------
+        // ----------------------------------------------
 
         glMatrixMode(GL_MODELVIEW);
         glPopMatrix();
@@ -1105,5 +1576,8 @@ BOOL WINAPI DllMain(
 extern "C" __declspec(dllexport) int ModInit()
 {
     LogMessage("Isaac: ViewPoint initialized");
+    LogMessage("Default model: resources_ViewPoint/objects/sphere.obj");
+    LogMessage("External resources override embedded resources");
+
     return 0;
 }
