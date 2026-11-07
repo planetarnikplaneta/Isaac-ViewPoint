@@ -21,6 +21,10 @@
 #include "libzhl.h"
 #include "HookSystem.h"
 
+
+#include "Core/Logger.h"
+
+
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
@@ -352,62 +356,6 @@ namespace
 
     constexpr unsigned int CONFIG_CHECK_INTERVAL = 60;
 
-    // LOGGING
-
-    static bool ResetLogFile()
-    {
-        FILE *file = fopen(LOG_FILE, "w");
-
-        if (!file)
-        {
-            OutputDebugStringA(
-                "Isaac ViewPoint: Cannot reset log file.\n");
-
-            return false;
-        }
-
-        fprintf(file, "Isaac ViewPoint: Log started\n");
-        fclose(file);
-
-        return true;
-    }
-
-    static void LogMessage(const char *message)
-    {
-        FILE *file = fopen(LOG_FILE, "a");
-
-        if (!file)
-        {
-            OutputDebugStringA(
-                "Isaac ViewPoint: Cannot write log.\n");
-
-            return;
-        }
-
-        fprintf(
-            file,
-            "Isaac ViewPoint: %s\n",
-            message);
-
-        fclose(file);
-    }
-
-    static void LogNumber(
-        const char *label,
-        size_t value)
-    {
-        char message[256];
-
-        snprintf(
-            message,
-            sizeof(message),
-            "%s: %zu",
-            label,
-            value);
-
-        LogMessage(message);
-    }
-
     // STRING HELPERS
 
     static std::string Trim(const std::string &text)
@@ -712,7 +660,7 @@ namespace
 
                 if (!ParseObjectConfiguration(value, object))
                 {
-                    LogMessage(
+                    ViewPoint::LogMessage(
                         ("Invalid Object configuration: " +
                          value)
                             .c_str());
@@ -745,7 +693,7 @@ namespace
 
             if (object.path.empty())
             {
-                LogMessage(
+                ViewPoint::LogMessage(
                     "Invalid Model path in configuration.");
 
                 return false;
@@ -782,7 +730,7 @@ namespace
 
         if (!ReadConfiguration(configuredObjects))
         {
-            LogMessage(
+            ViewPoint::LogMessage(
                 "Configuration file not found or invalid; using default model.");
 
             configuredObjects.clear();
@@ -795,13 +743,13 @@ namespace
 
         g_ObjectConfigs = std::move(configuredObjects);
 
-        LogNumber(
+        ViewPoint::LogNumber(
             "Configured object count",
             g_ObjectConfigs.size());
 
         for (size_t i = 0; i < g_ObjectConfigs.size(); ++i)
         {
-            LogMessage(
+            ViewPoint::LogMessage(
                 ("Configured object " +
                  std::to_string(i) + ": " +
                  g_ObjectConfigs[i].path)
@@ -840,7 +788,7 @@ namespace
 
         if (resource)
         {
-            LogMessage(
+            ViewPoint::LogMessage(
                 ("Found quoted resource name: " +
                  quotedName)
                     .c_str());
@@ -856,7 +804,7 @@ namespace
             "Resource not found: %s",
             assetPath.c_str());
 
-        LogMessage(message);
+        ViewPoint::LogMessage(message);
 
         return nullptr;
     }
@@ -915,7 +863,7 @@ namespace
 
                     if (file)
                     {
-                        LogMessage(
+                        ViewPoint::LogMessage(
                             ("Loaded external asset: " +
                              assetPath)
                                 .c_str());
@@ -929,7 +877,7 @@ namespace
         }
         catch (...)
         {
-            LogMessage(
+            ViewPoint::LogMessage(
                 "External asset access failed.");
         }
 
@@ -943,7 +891,7 @@ namespace
 
         if (!resource)
         {
-            LogMessage(
+            ViewPoint::LogMessage(
                 ("Asset not found: " +
                  assetPath)
                     .c_str());
@@ -1158,7 +1106,7 @@ namespace
 
         if (!ReadAsset(mtlPath, bytes))
         {
-            LogMessage(
+            ViewPoint::LogMessage(
                 ("Cannot load MTL: " +
                  mtlPath)
                     .c_str());
@@ -1250,7 +1198,7 @@ namespace
                             mtlPath,
                             texture);
 
-                    LogMessage(
+                    ViewPoint::LogMessage(
                         ("Material texture: " +
                          material.name + " -> " +
                          material.diffuseTexturePath)
@@ -1259,7 +1207,7 @@ namespace
             }
         }
 
-        LogMessage(
+        ViewPoint::LogMessage(
             ("Loaded MTL: " + mtlPath).c_str());
     }
 
@@ -1282,7 +1230,7 @@ namespace
                 material.diffuseTexturePath,
                 bytes))
         {
-            LogMessage(
+            ViewPoint::LogMessage(
                 ("Cannot load texture: " +
                  material.diffuseTexturePath)
                     .c_str());
@@ -1293,7 +1241,7 @@ namespace
         if (bytes.size() >
             static_cast<size_t>(INT_MAX))
         {
-            LogMessage("Texture file is too large.");
+            ViewPoint::LogMessage("Texture file is too large.");
             return;
         }
 
@@ -1311,7 +1259,7 @@ namespace
 
         if (!decoded)
         {
-            LogMessage(
+            ViewPoint::LogMessage(
                 ("PNG decoding failed: " +
                  material.diffuseTexturePath)
                     .c_str());
@@ -1340,7 +1288,7 @@ namespace
             material.height,
             channels);
 
-        LogMessage(message);
+        ViewPoint::LogMessage(message);
     }
 
     // TEXTURE UPLOAD
@@ -1414,7 +1362,7 @@ namespace
                 "Texture upload failed: 0x%X",
                 error);
 
-            LogMessage(message);
+            ViewPoint::LogMessage(message);
 
             glDeleteTextures(
                 1,
@@ -1504,7 +1452,7 @@ namespace
 
         if (!ReadAsset(model.path, bytes))
         {
-            LogMessage(
+            ViewPoint::LogMessage(
                 ("Cannot load OBJ: " +
                  model.path)
                     .c_str());
@@ -1642,7 +1590,7 @@ namespace
                 {
                     activeMaterial = 0;
 
-                    LogMessage(
+                    ViewPoint::LogMessage(
                         ("Unknown material: " +
                          name)
                             .c_str());
@@ -1672,7 +1620,7 @@ namespace
                             model.vertices.size(),
                             corner.position))
                     {
-                        LogMessage(
+                        ViewPoint::LogMessage(
                             "Invalid OBJ position index.");
 
                         face.clear();
@@ -1737,7 +1685,7 @@ namespace
         if (model.vertices.empty() ||
             model.triangles.empty())
         {
-            LogMessage(
+            ViewPoint::LogMessage(
                 "OBJ contains no usable geometry.");
 
             return false;
@@ -1763,46 +1711,46 @@ namespace
             "Loaded OBJ: %s",
             model.path.c_str());
 
-        LogMessage(message);
+        ViewPoint::LogMessage(message);
 
-        LogNumber(
+        ViewPoint::LogNumber(
             "Vertex count",
             model.vertices.size());
 
-        LogNumber(
+        ViewPoint::LogNumber(
             "UV count",
             model.texcoords.size());
 
-        LogNumber(
+        ViewPoint::LogNumber(
             "Normal count",
             model.normals.size());
 
-        LogNumber(
+        ViewPoint::LogNumber(
             "Triangle count",
             model.triangles.size());
 
-        LogNumber(
+        ViewPoint::LogNumber(
             "Material count",
             model.materials.size());
 
-        LogNumber(
+        ViewPoint::LogNumber(
             "Faces without UV coordinates",
             facesWithoutUV);
 
-        LogNumber(
+        ViewPoint::LogNumber(
             "Faces without normals",
             facesWithoutNormals);
 
         for (const Material &material : model.materials)
         {
-            LogMessage(
+            ViewPoint::LogMessage(
                 ("Material loaded: " +
                  material.name)
                     .c_str());
 
             if (material.diffuseTexturePath.empty())
             {
-                LogMessage(
+                ViewPoint::LogMessage(
                     ("Material has no diffuse texture: " +
                      material.name)
                         .c_str());
@@ -1938,7 +1886,7 @@ namespace
             if (vertices.size() >
                 static_cast<size_t>(INT_MAX))
             {
-                LogMessage("GPU mesh contains too many vertices.");
+                ViewPoint::LogMessage("GPU mesh contains too many vertices.");
                 return false;
             }
 
@@ -1954,7 +1902,7 @@ namespace
 
             if (!batch.vertexBuffer)
             {
-                LogMessage("Failed to create a VBO.");
+                ViewPoint::LogMessage("Failed to create a VBO.");
                 return false;
             }
 
@@ -1981,7 +1929,7 @@ namespace
                     "VBO upload failed: 0x%X",
                     error);
 
-                LogMessage(message);
+                ViewPoint::LogMessage(message);
 
                 g_DeleteBuffers(
                     1,
@@ -1997,17 +1945,17 @@ namespace
 
         if (newBatches.empty())
         {
-            LogMessage("GPU mesh contains no drawable batches.");
+            ViewPoint::LogMessage("GPU mesh contains no drawable batches.");
             return false;
         }
 
         model.gpuBatches = std::move(newBatches);
         model.gpuReady = true;
 
-        LogMessage(
+        ViewPoint::LogMessage(
             ("GPU mesh created: " + model.path).c_str());
 
-        LogNumber(
+        ViewPoint::LogNumber(
             "GPU material batches",
             model.gpuBatches.size());
 
@@ -2024,7 +1972,7 @@ namespace
 
         if (configs.empty())
         {
-            LogMessage("Scene contains no objects.");
+            ViewPoint::LogMessage("Scene contains no objects.");
             return false;
         }
 
@@ -2043,7 +1991,7 @@ namespace
             model.rotation = config.rotation;
             model.scale = config.scale;
 
-            LogMessage(
+            ViewPoint::LogMessage(
                 ("Loading scene object " +
                  std::to_string(i) + ": " +
                  model.path)
@@ -2051,7 +1999,7 @@ namespace
 
             if (!LoadOBJ(model))
             {
-                LogMessage(
+                ViewPoint::LogMessage(
                     ("Scene loading failed at object " +
                      std::to_string(i) + ": " +
                      model.path)
@@ -2065,7 +2013,7 @@ namespace
 
         output = std::move(newModels);
 
-        LogNumber(
+        ViewPoint::LogNumber(
             "Successfully loaded scene objects",
             output.size());
 
@@ -2125,7 +2073,7 @@ namespace
 
         if (!ReadConfiguration(newConfigs))
         {
-            LogMessage(
+            ViewPoint::LogMessage(
                 "Configuration reload failed; keeping previous scene.");
 
             return;
@@ -2136,7 +2084,7 @@ namespace
 
         if (!LoadScene(newConfigs, newModels))
         {
-            LogMessage(
+            ViewPoint::LogMessage(
                 "Scene reload failed; keeping previous scene.");
 
             // Remember this timestamp so a failed configuration
@@ -2158,10 +2106,10 @@ namespace
 
         g_ConfigLastWriteTime = currentTimestamp;
 
-        LogMessage(
+        ViewPoint::LogMessage(
             "Scene successfully reloaded.");
 
-        LogNumber(
+        ViewPoint::LogNumber(
             "Active scene objects",
             g_Models.size());
     }
@@ -2273,7 +2221,7 @@ namespace
 
         if (!shader)
         {
-            LogMessage("glCreateShader failed.");
+            ViewPoint::LogMessage("glCreateShader failed.");
             return 0;
         }
 
@@ -2311,8 +2259,8 @@ namespace
                 nullptr,
                 log.data());
 
-            LogMessage("Shader compilation failed.");
-            LogMessage(log.data());
+            ViewPoint::LogMessage("Shader compilation failed.");
+            ViewPoint::LogMessage(log.data());
 
             g_DeleteShader(shader);
 
@@ -2416,7 +2364,7 @@ namespace
             g_DeleteShader(vertexShader);
             g_DeleteShader(fragmentShader);
 
-            LogMessage("glCreateProgram failed.");
+            ViewPoint::LogMessage("glCreateProgram failed.");
 
             return false;
         }
@@ -2455,8 +2403,8 @@ namespace
                 nullptr,
                 log.data());
 
-            LogMessage("Shader program linking failed.");
-            LogMessage(log.data());
+            ViewPoint::LogMessage("Shader program linking failed.");
+            ViewPoint::LogMessage(log.data());
 
             g_DeleteProgram(program);
 
@@ -2480,7 +2428,7 @@ namespace
         g_UniformDiffuse =
             g_GetUniformLocation(program, "uDiffuse");
 
-        LogMessage("GPU shader program successfully created.");
+        ViewPoint::LogMessage("GPU shader program successfully created.");
 
         return true;
     }
@@ -2538,7 +2486,7 @@ namespace
                 model.gpuBuildAttempted = false;
             }
 
-            LogMessage("OpenGL context changed.");
+            ViewPoint::LogMessage("OpenGL context changed.");
         }
 
 #define LOAD_GL_FUNCTION(variable, type, name) \
@@ -2685,7 +2633,7 @@ namespace
             !g_Uniform3f ||
             !g_DrawArrays)
         {
-            LogMessage(
+            ViewPoint::LogMessage(
                 "Required VBO or shader OpenGL functions are unavailable.");
 
             return false;
@@ -2818,12 +2766,12 @@ namespace
             if (!g_Camera.enabled)
             {
                 ReleaseCameraCursor();
-                LogMessage("First-person camera disabled.");
+                ViewPoint::LogMessage("First-person camera disabled.");
             }
             else
             {
                 g_CursorCaptured = false;
-                LogMessage("First-person camera enabled.");
+                ViewPoint::LogMessage("First-person camera enabled.");
             }
         }
 
@@ -3331,7 +3279,7 @@ namespace
                     model.path.c_str(),
                     drawError);
 
-                LogMessage(message);
+                ViewPoint::LogMessage(message);
             }
         }
 
@@ -3389,7 +3337,7 @@ namespace
 
             if (!LoadConfiguredScene())
             {
-                LogMessage(
+                ViewPoint::LogMessage(
                     "Initial scene loading failed.");
             }
         }
@@ -3439,7 +3387,7 @@ namespace
                 static_cast<unsigned>(
                     reinterpret_cast<ULONG_PTR>(name)));
 
-            LogMessage(message);
+            ViewPoint::LogMessage(message);
             return TRUE;
         }
 
@@ -3449,7 +3397,7 @@ namespace
             "Enumerated resource: %s",
             name);
 
-        LogMessage(message);
+        ViewPoint::LogMessage(message);
 
         SetLastError(ERROR_SUCCESS);
 
@@ -3460,7 +3408,7 @@ namespace
 
         if (resource)
         {
-            LogMessage(
+            ViewPoint::LogMessage(
                 "Lookup using enumerated name: SUCCESS");
         }
         else
@@ -3472,7 +3420,7 @@ namespace
                 static_cast<unsigned long>(
                     GetLastError()));
 
-            LogMessage(message);
+            ViewPoint::LogMessage(message);
         }
 
         return TRUE;
@@ -3488,7 +3436,7 @@ namespace
             "Resource enumeration module: %p",
             static_cast<void *>(g_Module));
 
-        LogMessage(message);
+        ViewPoint::LogMessage(message);
 
         EnumResourceNamesA(
             g_Module,
@@ -3534,19 +3482,19 @@ BOOL WINAPI DllMain(
 extern "C" __declspec(dllexport) int ModInit()
 {
     // Reset the log before writing initialization data.
-    ResetLogFile();
+    ViewPoint::ResetLogFile();
 
-    LogMessage(
+    ViewPoint::LogMessage(
         "Isaac: ViewPoint initialized.");
 
     LoadConfiguration();
 
-    LogMessage(
+    ViewPoint::LogMessage(
         ("Default model: " +
          std::string(DEFAULT_OBJECT))
             .c_str());
 
-    LogNumber(
+    ViewPoint::LogNumber(
         "Configured scene objects",
         g_ObjectConfigs.size());
 
