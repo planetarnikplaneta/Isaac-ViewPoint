@@ -15,6 +15,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <utility>
 
 #include "libzhl.h"
 #include "HookSystem.h"
@@ -157,8 +158,16 @@ namespace
     static PFNGLACTIVETEXTUREPROC g_ActiveTexture = nullptr;
 
     static Model g_Model;
-
+    
     static std::string g_ModelPath = DEFAULT_OBJECT;
+    
+    // Configuration hot-reload state.
+    static fs::file_time_type g_ConfigLastWriteTime{};
+    static bool g_ConfigTimestampValid = false;
+    
+    static unsigned int g_ConfigCheckCounter = 0;
+    
+    constexpr unsigned int CONFIG_CHECK_INTERVAL = 60;
 
     // ==================================================
     // LOGGING
@@ -365,34 +374,33 @@ namespace
             std::string(modulePath, length)
         ).parent_path();
     }
-
     // ==================================================
     // CONFIGURATION FILE
     // ==================================================
-
-    static void LoadConfiguration()
+    
+    static fs::path GetConfigurationPath()
     {
-        const fs::path configPath =
-            GetDllDirectory() / CONFIG_FILE;
-
+        return GetDllDirectory() / CONFIG_FILE;
+    }
+    
+    static bool ReadConfiguration(std::string& output)
+    {
+        const fs::path configPath = GetConfigurationPath();
+    
         std::ifstream file(configPath);
-
+    
         if (!file)
-        {
-            LogMessage(
-                "Configuration file not found; using default model."
-            );
-
-            g_ModelPath = DEFAULT_OBJECT;
-            return;
-        }
-
+            return false;
+    
+        // Default value if the file exists but Model is absent.
+        output = DEFAULT_OBJECT;
+    
         std::string line;
-
+    
         while (std::getline(file, line))
         {
             line = Trim(line);
-
+    
             if (line.empty() ||
                 line[0] == '#' ||
                 line[0] == ';' ||
@@ -400,34 +408,92 @@ namespace
             {
                 continue;
             }
-
-            const size_t equals =
-                line.find('=');
-
+    
+            const size_t equals = line.find('=');
+    
             if (equals == std::string::npos)
                 continue;
-
+    
             const std::string key =
                 Trim(line.substr(0, equals));
-
-            const std::string value =
+    
+            std::string value =
                 Trim(line.substr(equals + 1));
-
+    
             if (key == "Model")
             {
+                // Allow quoted paths.
+                if (value.size() >= 2 &&
+                    value.front() == '"' &&
+                    value.back() == '"')
+                {
+                    value = value.substr(
+                        1,
+                        value.size() - 2
+                    );
+                }
+    
                 const std::string normalized =
                     NormalizeAssetPath(value);
-
-                if (!normalized.empty())
+    
+                if (normalized.empty())
                 {
-                    g_ModelPath = normalized;
+                    LogMessage(
+                        "Invalid model path in configuration."
+                    );
+    
+                    return false;
                 }
+    
+                output = normalized;
             }
         }
-
+    
+        return true;
+    }
+    
+    static void UpdateConfigurationTimestamp()
+    {
+        std::error_code error;
+    
+        const fs::file_time_type timestamp =
+            fs::last_write_time(
+                GetConfigurationPath(),
+                error
+            );
+    
+        if (error)
+        {
+            g_ConfigTimestampValid = false;
+            return;
+        }
+    
+        g_ConfigLastWriteTime = timestamp;
+        g_ConfigTimestampValid = true;
+    }
+    
+    static void LoadConfiguration()
+    {
+        std::string configuredModel;
+    
+        if (!ReadConfiguration(configuredModel))
+        {
+            LogMessage(
+                "Configuration file not found or unreadable; using default model."
+            );
+    
+            g_ModelPath = DEFAULT_OBJECT;
+        }
+        else
+        {
+            g_ModelPath = configuredModel;
+        }
+    
         LogMessage(
             ("Configured model: " + g_ModelPath).c_str()
         );
+    
+        UpdateConfigurationTimestamp();
     }
 
     // ==================================================
@@ -1095,6 +1161,30 @@ namespace
     }
 
     // ==================================================
+    // MODEL TEXTURE CLEANUP
+    // ==================================================
+    
+    static void ReleaseModelTextures(Model& model)
+    {
+        // OpenGL resources can only be deleted when their
+        // owning context is current.
+        if (!wglGetCurrentContext())
+            return;
+    
+        for (Material& material : model.materials)
+        {
+            if (material.textureId != 0)
+            {
+                glDeleteTextures(
+                    1,
+                    &material.textureId
+                );
+    
+                material.textureId = 0;
+            }
+        }
+    }
+    // ==================================================
     // MODEL BOUNDING BOX / NORMALIZATION
     // ==================================================
 
@@ -1477,6 +1567,102 @@ namespace
         return true;
     }
 
+    // ==================================================
+    // LIVE CONFIGURATION RELOADING
+    // ==================================================
+    
+    static void CheckConfigurationReload()
+    {
+        ++g_ConfigCheckCounter;
+    
+        if (g_ConfigCheckCounter < CONFIG_CHECK_INTERVAL)
+            return;
+    
+        g_ConfigCheckCounter = 0;
+    
+        const fs::path configPath = GetConfigurationPath();
+    
+        std::error_code error;
+    
+        const fs::file_time_type currentTimestamp =
+            fs::last_write_time(
+                configPath,
+                error
+            );
+    
+        // The file may temporarily disappear while being saved.
+        // Keep the current model and try again later.
+        if (error)
+            return;
+    
+        // First timestamp observation.
+        if (!g_ConfigTimestampValid)
+        {
+            g_ConfigLastWriteTime = currentTimestamp;
+            g_ConfigTimestampValid = true;
+            return;
+        }
+    
+        // Nothing changed.
+        if (currentTimestamp == g_ConfigLastWriteTime)
+            return;
+    
+        std::string newModelPath;
+    
+        if (!ReadConfiguration(newModelPath))
+        {
+            LogMessage(
+                "Configuration reload failed; keeping current model."
+            );
+    
+            return;
+        }
+    
+        // Remember the new timestamp after successfully reading
+        // the configuration.
+        g_ConfigLastWriteTime = currentTimestamp;
+    
+        // No model change is necessary.
+        if (newModelPath == g_ModelPath)
+            return;
+    
+        LogMessage(
+            ("Configuration changed. Requested model: " +
+             newModelPath).c_str()
+        );
+    
+        // Load into a temporary object. The active model remains
+        // untouched if the new model cannot be loaded.
+        Model newModel;
+    
+        newModel.path = newModelPath;
+    
+        if (!LoadOBJ(newModel))
+        {
+            LogMessage(
+                ("Model reload failed: " +
+                 newModelPath).c_str()
+            );
+    
+            LogMessage(
+                "Previous model will remain active."
+            );
+    
+            return;
+        }
+    
+        // The old model can now be safely replaced.
+        ReleaseModelTextures(g_Model);
+    
+        g_Model = std::move(newModel);
+    
+        g_ModelPath = newModelPath;
+    
+        LogMessage(
+            ("Successfully switched model to: " +
+             g_ModelPath).c_str()
+        );
+    }
     // ==================================================
     // NORMAL CALCULATIONS
     // ==================================================
@@ -2007,22 +2193,26 @@ namespace
     // ==================================================
     // MAIN RENDERER
     // ==================================================
-
+    
     static void RenderTriangleMesh()
     {
         if (!EnsureContext())
             return;
-
+    
+        // Check for configuration changes.
+        CheckConfigurationReload();
+    
+        // Initial model loading.
         if (!g_Model.attempted)
         {
             g_Model.path = g_ModelPath;
-
+    
             LoadOBJ(g_Model);
         }
-
+    
         if (!g_Model.loaded)
             return;
-
+    
         RenderModel(g_Model);
     }
 
