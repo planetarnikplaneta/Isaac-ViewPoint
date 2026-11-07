@@ -377,24 +377,61 @@ glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         }
         glEnd();
 
-        // Composite the isolated render target; the game's depth buffer is untouched.
-        g_GL.bindFramebuffer(GL_FRAMEBUFFER, static_cast<GLuint>(oldFbo));
-        glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
-        glMatrixMode(GL_PROJECTION); glLoadIdentity(); glOrtho(0, viewport[2], viewport[3], 0, -1, 1);
-        glMatrixMode(GL_MODELVIEW); glLoadIdentity();
-        glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE); glDisable(GL_ALPHA_TEST);
-        glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glEnable(GL_TEXTURE_2D); glBindTexture(GL_TEXTURE_2D, g_ColorTexture);
-        glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE); glColor4f(1,1,1,1);
+        // Composite the isolated render target.
+g_GL.bindFramebuffer(GL_FRAMEBUFFER, static_cast<GLuint>(oldFbo));
 
-        const float side=static_cast<float>(std::min(viewport[2],viewport[3]))*0.72f;
-        const float left=(viewport[2]-side)*0.5f, top=(viewport[3]-side)*0.5f;
-        const float right=left+side, bottom=top+side;
-        glBegin(GL_QUADS);
-        glTexCoord2f(0,1); glVertex2f(left,top); glTexCoord2f(1,1); glVertex2f(right,top);
-        glTexCoord2f(1,0); glVertex2f(right,bottom); glTexCoord2f(0,0); glVertex2f(left,bottom);
-        glEnd();
+glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
 
+glDisable(GL_DEPTH_TEST);
+glDisable(GL_CULL_FACE);
+glDisable(GL_ALPHA_TEST);
+glDisable(GL_LIGHTING);
+glDisable(GL_FOG);
+glDisable(GL_SCISSOR_TEST);
+glDisable(GL_STENCIL_TEST);
+
+glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+
+glEnable(GL_BLEND);
+glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+glMatrixMode(GL_PROJECTION);
+glLoadIdentity();
+glOrtho(0, viewport[2], viewport[3], 0, -1, 1);
+
+glMatrixMode(GL_MODELVIEW);
+glLoadIdentity();
+
+glEnable(GL_TEXTURE_2D);
+glBindTexture(GL_TEXTURE_2D, g_ColorTexture);
+
+glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+glColor4f(1, 1, 1, 1);
+
+const float side =
+    static_cast<float>(std::min(viewport[2], viewport[3])) * 0.72f;
+
+const float left = (viewport[2] - side) * 0.5f;
+const float top = (viewport[3] - side) * 0.5f;
+const float right = left + side;
+const float bottom = top + side;
+
+glBegin(GL_QUADS);
+
+glTexCoord2f(0, 1);
+glVertex2f(left, top);
+
+glTexCoord2f(1, 1);
+glVertex2f(right, top);
+
+glTexCoord2f(1, 0);
+glVertex2f(right, bottom);
+
+glTexCoord2f(0, 0);
+glVertex2f(left, bottom);
+
+glEnd();
+        
         glMatrixMode(GL_MODELVIEW); glPopMatrix();
         glMatrixMode(GL_PROJECTION); glPopMatrix();
         glPopAttrib();
