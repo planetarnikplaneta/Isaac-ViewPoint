@@ -391,104 +391,25 @@ namespace
     // --------------------------------------------------
 
     static void RenderTriangleMesh()
-    {
-        if (!EnsureContext())
-            return;
-
-        if (!g_MeshLoaded)
-        {
-            LoadOBJ();
-
-            if (!g_MeshLoaded)
-                return;
-        }
-
-        if (g_Vertices.empty() || g_Triangles.empty())
-            return;
-
-        // --------------------------------------------------
-        // Save original OpenGL state
-        // --------------------------------------------------
-
-        GLint viewport[4] = {};
-
-        GLint oldProgram = 0;
+{
+        GLint viewport[4] = { 0, 0, 0, 0 };
         GLint oldMatrixMode = GL_MODELVIEW;
-        GLint oldActiveTexture = GL_TEXTURE0;
-
+        GLint oldProgram = 0;
+    
         glGetIntegerv(GL_VIEWPORT, viewport);
-
-        glGetIntegerv(
-            GL_CURRENT_PROGRAM,
-            &oldProgram
-        );
-
-        glGetIntegerv(
-            GL_MATRIX_MODE,
-            &oldMatrixMode
-        );
-
-        if (g_ActiveTexture)
-        {
-            glGetIntegerv(
-                GL_ACTIVE_TEXTURE,
-                &oldActiveTexture
-            );
-
-            g_ActiveTexture(GL_TEXTURE0);
-        }
-
+        glGetIntegerv(GL_MATRIX_MODE, &oldMatrixMode);
+    
         if (viewport[2] <= 0 || viewport[3] <= 0)
             return;
-
-        // --------------------------------------------------
-        // Context information
-        // --------------------------------------------------
-
-        if (!g_ContextLogged)
+    
+        if (glUseProgram)
         {
-            const GLubyte* version = glGetString(GL_VERSION);
-            const GLubyte* renderer = glGetString(GL_RENDERER);
-
-            char msg[512];
-
-            snprintf(
-                msg,
-                sizeof(msg),
-                "GL %s / %s; viewport %dx%d",
-                version
-                    ? reinterpret_cast<const char*>(version)
-                    : "unknown",
-                renderer
-                    ? reinterpret_cast<const char*>(renderer)
-                    : "unknown",
-                viewport[2],
-                viewport[3]
-            );
-
-            LogMessage(msg);
-
-            g_ContextLogged = true;
+            glGetIntegerv(GL_CURRENT_PROGRAM, &oldProgram);
+            glUseProgram(0);
         }
-
-        // --------------------------------------------------
-        // Save attributes and matrices
-        // --------------------------------------------------
-
+    
         glPushAttrib(GL_ALL_ATTRIB_BITS);
-
-        glMatrixMode(GL_PROJECTION);
-        glPushMatrix();
-
-        glMatrixMode(GL_MODELVIEW);
-        glPushMatrix();
-
-        // --------------------------------------------------
-        // Disable game rendering states
-        // --------------------------------------------------
-
-        g_UseProgram(0);
-
+    
         glDisable(GL_TEXTURE_2D);
         glDisable(GL_DEPTH_TEST);
         glDisable(GL_CULL_FACE);
@@ -496,184 +417,55 @@ namespace
         glDisable(GL_ALPHA_TEST);
         glDisable(GL_STENCIL_TEST);
         glDisable(GL_SCISSOR_TEST);
-
         glDisable(GL_LIGHTING);
         glDisable(GL_FOG);
         glDisable(GL_COLOR_LOGIC_OP);
-        glDisable(GL_POLYGON_OFFSET_FILL);
-
+    
+        glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-
-        glColorMask(
-            GL_TRUE,
-            GL_TRUE,
-            GL_TRUE,
-            GL_TRUE
-        );
-
-        // --------------------------------------------------
-        // Projection
-        // --------------------------------------------------
-
-        const float aspect =
-            static_cast<float>(viewport[2]) /
-            static_cast<float>(viewport[3]);
-
-        const double nearPlane = 0.1;
-        const double halfHeight =
-            nearPlane * std::tan(
-                OBJECT_FOV * 3.14159265358979323846 / 360.0
-            );
-
-        const double halfWidth = halfHeight * aspect;
-
+    
         glMatrixMode(GL_PROJECTION);
+        glPushMatrix();
         glLoadIdentity();
-
-        glFrustum(
-            -halfWidth,
-            halfWidth,
-            -halfHeight,
-            halfHeight,
-            nearPlane,
-            100.0
+    
+        glOrtho(
+            0,
+            viewport[2],
+            0,
+            viewport[3],
+            -1,
+            1
         );
-
-        // --------------------------------------------------
-        // Model transformation
-        // --------------------------------------------------
-
+    
         glMatrixMode(GL_MODELVIEW);
+        glPushMatrix();
         glLoadIdentity();
-
-        glTranslatef(0.0f, 0.0f, -OBJECT_DISTANCE);
-
-        glRotatef(
-            OBJECT_TILT,
-            1.0f,
-            0.0f,
-            0.0f
-        );
-
-        glRotatef(
-            static_cast<float>(GetTickCount64()) *
-                OBJECT_ROTATION_SPEED,
-            0.0f,
-            1.0f,
-            0.0f
-        );
-
-        // --------------------------------------------------
-        // Render OBJ directly to the game framebuffer
-        // --------------------------------------------------
-
-        if (!g_RenderLogged)
-        {
-            LogMessage("Rendering mesh directly to game framebuffer");
-            g_RenderLogged = true;
-        }
-
-        glBegin(GL_TRIANGLES);
-
-        for (const Triangle& t : g_Triangles)
-        {
-            if (t.a >= g_Vertices.size() ||
-                t.b >= g_Vertices.size() ||
-                t.c >= g_Vertices.size())
-            {
-                continue;
-            }
-
-            const Vertex3& a = g_Vertices[t.a];
-            const Vertex3& b = g_Vertices[t.b];
-            const Vertex3& c = g_Vertices[t.c];
-
-            // Calculate face normal.
-            const float ux = b.x - a.x;
-            const float uy = b.y - a.y;
-            const float uz = b.z - a.z;
-
-            const float vx = c.x - a.x;
-            const float vy = c.y - a.y;
-            const float vz = c.z - a.z;
-
-            float nx = uy * vz - uz * vy;
-            float ny = uz * vx - ux * vz;
-            float nz = ux * vy - uy * vx;
-
-            const float length =
-                std::sqrt(nx * nx + ny * ny + nz * nz);
-
-            if (length < 1e-8f)
-                continue;
-
-            nx /= length;
-            ny /= length;
-            nz /= length;
-
-            // Simple directional lighting.
-            const float lx = -0.35f;
-            const float ly = 0.55f;
-            const float lz = -0.76f;
-
-            const float lightLength =
-                std::sqrt(lx * lx + ly * ly + lz * lz);
-
-            const float diffuse = std::max(
-                0.0f,
-                (nx * lx + ny * ly + nz * lz) / lightLength
-            );
-
-            const float brightness =
-                0.25f + 0.75f * diffuse;
-
-            glColor4f(
-                OBJECT_COLOR_R * brightness,
-                OBJECT_COLOR_G * brightness,
-                OBJECT_COLOR_B * brightness,
-                1.0f
-            );
-
-            glNormal3f(nx, ny, nz);
-
-            glVertex3f(a.x, a.y, a.z);
-            glVertex3f(b.x, b.y, b.z);
-            glVertex3f(c.x, c.y, c.z);
-        }
-
+    
+        // Draw a large red rectangle in the center of the viewport.
+        glColor4f(1.0f, 0.0f, 0.0f, 1.0f);
+    
+        float centerX = viewport[2] * 0.5f;
+        float centerY = viewport[3] * 0.5f;
+    
+        glBegin(GL_QUADS);
+            glVertex2f(centerX - 100.0f, centerY - 100.0f);
+            glVertex2f(centerX + 100.0f, centerY - 100.0f);
+            glVertex2f(centerX + 100.0f, centerY + 100.0f);
+            glVertex2f(centerX - 100.0f, centerY + 100.0f);
         glEnd();
-
-        // --------------------------------------------------
-        // Restore matrices
-        // --------------------------------------------------
-
+    
         glMatrixMode(GL_MODELVIEW);
         glPopMatrix();
-
+    
         glMatrixMode(GL_PROJECTION);
         glPopMatrix();
-
-        // --------------------------------------------------
-        // Restore OpenGL state
-        // --------------------------------------------------
-
+    
         glPopAttrib();
-
-        g_UseProgram(
-            static_cast<GLuint>(oldProgram)
-        );
-
-        if (g_ActiveTexture)
-        {
-            g_ActiveTexture(
-                static_cast<GLenum>(oldActiveTexture)
-            );
-        }
-
-        glMatrixMode(
-            static_cast<GLenum>(oldMatrixMode)
-        );
-    }
+    
+        if (glUseProgram)
+            glUseProgram(oldProgram);
+    
+        glMatrixMode(oldMatrixMode);
 }
 
 // --------------------------------------------------
