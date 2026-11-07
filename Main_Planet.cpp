@@ -960,6 +960,31 @@ namespace
             nearPlane,
             farPlane);
 
+        // ----------------------------------------------
+        // First-person camera transformation
+        // ----------------------------------------------
+
+        glMatrixMode(GL_MODELVIEW);
+        glLoadIdentity();
+
+        // Apply inverse camera rotation.
+        glRotatef(
+            -g_Camera.pitch,
+            1.0f,
+            0.0f,
+            0.0f);
+
+        glRotatef(
+            -g_Camera.yaw,
+            0.0f,
+            1.0f,
+            0.0f);
+
+        // Apply inverse camera position.
+        glTranslatef(
+            -g_Camera.position.x,
+            -g_Camera.position.y,
+            -g_Camera.position.z);
 
         // ----------------------------------------------
         // Individual object transformation
