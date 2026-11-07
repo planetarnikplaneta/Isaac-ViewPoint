@@ -26,6 +26,7 @@
 
 #include "Core/Logger.h"
 #include "Core/Types.h"
+#include "Core/State.h"
 
 using namespace ViewPoint;
 
@@ -177,59 +178,6 @@ namespace
     constexpr float DIFFUSE_LIGHT = 0.60f;
 
     // GLOBAL STATE
-
-    static HMODULE g_Module = nullptr;
-
-    static HGLRC g_ResourceContext = nullptr;
-
-    static PFNGLUSEPROGRAMPROC g_UseProgram = nullptr;
-    static PFNGLACTIVETEXTUREPROC g_ActiveTexture = nullptr;
-    static PFNGLGENBUFFERSPROC g_GenBuffers = nullptr;
-    static PFNGLBINDBUFFERPROC g_BindBuffer = nullptr;
-    static PFNGLBUFFERDATAPROC g_BufferData = nullptr;
-    static PFNGLDELETEBUFFERSPROC g_DeleteBuffers = nullptr;
-
-    static PFNGLCREATESHADERPROC g_CreateShader = nullptr;
-    static PFNGLSHADERSOURCEPROC g_ShaderSource = nullptr;
-    static PFNGLCOMPILESHADERPROC g_CompileShader = nullptr;
-    static PFNGLGETSHADERIVPROC g_GetShaderiv = nullptr;
-    static PFNGLGETSHADERINFOLOGPROC g_GetShaderInfoLog = nullptr;
-    static PFNGLDELETESHADERPROC g_DeleteShader = nullptr;
-
-    static PFNGLCREATEPROGRAMPROC g_CreateProgram = nullptr;
-    static PFNGLATTACHSHADERPROC g_AttachShader = nullptr;
-    static PFNGLLINKPROGRAMPROC g_LinkProgram = nullptr;
-    static PFNGLGETPROGRAMIVPROC g_GetProgramiv = nullptr;
-    static PFNGLGETPROGRAMINFOLOGPROC g_GetProgramInfoLog = nullptr;
-    static PFNGLDELETEPROGRAMPROC g_DeleteProgram = nullptr;
-
-    static PFNGLGETUNIFORMLOCATIONPROC g_GetUniformLocation = nullptr;
-    static PFNGLUNIFORM1IPROC g_Uniform1i = nullptr;
-    static PFNGLUNIFORM1FPROC g_Uniform1f = nullptr;
-    static PFNGLUNIFORM3FPROC g_Uniform3f = nullptr;
-    static PFNGLDRAWARRAYSPROC g_DrawArrays = nullptr;
-
-    static GLuint g_ShaderProgram = 0;
-
-    static GLint g_UniformTexture = -1;
-    static GLint g_UniformUseTexture = -1;
-    static GLint g_UniformLightDirection = -1;
-    static GLint g_UniformAmbient = -1;
-    static GLint g_UniformDiffuse = -1;
-
-    static std::vector<Model> g_Models;
-
-    static std::vector<ObjectConfig> g_ObjectConfigs;
-    static Camera g_Camera;
-
-    static bool g_CursorCaptured = false;
-    static bool g_SceneAttempted = false;
-
-    // Configuration hot-reload state.
-    static fs::file_time_type g_ConfigLastWriteTime{};
-    static bool g_ConfigTimestampValid = false;
-
-    static unsigned int g_ConfigCheckCounter = 0;
 
     constexpr unsigned int CONFIG_CHECK_INTERVAL = 60;
 
