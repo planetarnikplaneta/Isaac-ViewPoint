@@ -70,6 +70,7 @@ jobs:
             Models\OBJLoader.cpp ^
             Models\Texture.cpp ^
             Models\GpuMesh.cpp ^
+            Camera\Camera.cpp ^
             ViewPointResources.res ^
             libzhl.lib ^
             /link /OUT:zhlMain_Planet.dll
