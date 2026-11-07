@@ -134,16 +134,32 @@ namespace
     struct Model
     {
         std::string path;
-
+    
         std::vector<Vertex3> vertices;
         std::vector<Vertex2> texcoords;
         std::vector<Vertex3> normals;
-
+    
         std::vector<Triangle> triangles;
         std::vector<Material> materials;
-
+    
+        // Instance transformation.
+        Vertex3 position = {0.0f, 0.0f, 0.0f};
+        Vertex3 rotation = {0.0f, 0.0f, 0.0f};
+    
+        float scale = 1.0f;
+    
         bool attempted = false;
         bool loaded = false;
+    };
+    
+    struct ObjectConfig
+    {
+        std::string path;
+    
+        Vertex3 position = {0.0f, 0.0f, 0.0f};
+        Vertex3 rotation = {0.0f, 0.0f, 0.0f};
+    
+        float scale = 1.0f;
     };
 
     // ==================================================
@@ -157,10 +173,11 @@ namespace
     static PFNGLUSEPROGRAMPROC g_UseProgram = nullptr;
     static PFNGLACTIVETEXTUREPROC g_ActiveTexture = nullptr;
 
-    static Model g_Model;
+    static std::vector<Model> g_Models;
     
-    static std::string g_ModelPath = DEFAULT_OBJECT;
-    
+    static std::vector<ObjectConfig> g_ObjectConfigs;
+    static bool g_SceneAttempted = false;
+
     // Configuration hot-reload state.
     static fs::file_time_type g_ConfigLastWriteTime{};
     static bool g_ConfigTimestampValid = false;
@@ -383,8 +400,126 @@ namespace
         return GetDllDirectory() / CONFIG_FILE;
     }
     
-    static bool ReadConfiguration(std::string& output)
+    static bool ParseVector3Text(
+        const std::string& text,
+        Vertex3& output)
     {
+        std::istringstream stream(text);
+    
+        std::string x;
+        std::string y;
+        std::string z;
+        std::string extra;
+    
+        if (!std::getline(stream, x, ',') ||
+            !std::getline(stream, y, ',') ||
+            !std::getline(stream, z, ','))
+        {
+            return false;
+        }
+    
+        if (std::getline(stream, extra, ','))
+            return false;
+    
+        try
+        {
+            size_t usedX = 0;
+            size_t usedY = 0;
+            size_t usedZ = 0;
+    
+            output.x = std::stof(Trim(x), &usedX);
+            output.y = std::stof(Trim(y), &usedY);
+            output.z = std::stof(Trim(z), &usedZ);
+    
+            if (usedX != Trim(x).size() ||
+                usedY != Trim(y).size() ||
+                usedZ != Trim(z).size())
+            {
+                return false;
+            }
+    
+            return std::isfinite(output.x) &&
+                   std::isfinite(output.y) &&
+                   std::isfinite(output.z);
+        }
+        catch (...)
+        {
+            return false;
+        }
+    }
+    
+    static bool ParseObjectConfiguration(
+        const std::string& value,
+        ObjectConfig& output)
+    {
+        std::istringstream stream(value);
+    
+        std::string path;
+        std::string position;
+        std::string rotation;
+        std::string scale;
+        std::string extra;
+    
+        if (!std::getline(stream, path, '|') ||
+            !std::getline(stream, position, '|') ||
+            !std::getline(stream, rotation, '|') ||
+            !std::getline(stream, scale, '|'))
+        {
+            return false;
+        }
+    
+        if (std::getline(stream, extra, '|'))
+            return false;
+    
+        path = Trim(path);
+        position = Trim(position);
+        rotation = Trim(rotation);
+        scale = Trim(scale);
+    
+        if (path.size() >= 2 &&
+            path.front() == '"' &&
+            path.back() == '"')
+        {
+            path = path.substr(1, path.size() - 2);
+        }
+    
+        output.path = NormalizeAssetPath(path);
+    
+        if (output.path.empty())
+            return false;
+    
+        if (!ParseVector3Text(position, output.position))
+            return false;
+    
+        if (!ParseVector3Text(rotation, output.rotation))
+            return false;
+    
+        try
+        {
+            size_t used = 0;
+    
+            output.scale = std::stof(scale, &used);
+    
+            if (used != scale.size() ||
+                !std::isfinite(output.scale) ||
+                output.scale <= 0.0f)
+            {
+                return false;
+            }
+        }
+        catch (...)
+        {
+            return false;
+        }
+    
+        return true;
+    }
+    
+    static bool ReadConfiguration(
+        std::vector<ObjectConfig>& output)
+    {
+        output.clear();
+    
         const fs::path configPath = GetConfigurationPath();
     
         std::ifstream file(configPath);
@@ -392,8 +527,7 @@ namespace
         if (!file)
             return false;
     
-        // Default value if the file exists but Model is absent.
-        output = DEFAULT_OBJECT;
+        std::string legacyModel;
     
         std::string line;
     
@@ -417,36 +551,60 @@ namespace
             const std::string key =
                 Trim(line.substr(0, equals));
     
-            std::string value =
+            const std::string value =
                 Trim(line.substr(equals + 1));
     
             if (key == "Model")
             {
-                // Allow quoted paths.
-                if (value.size() >= 2 &&
-                    value.front() == '"' &&
-                    value.back() == '"')
-                {
-                    value = value.substr(
-                        1,
-                        value.size() - 2
-                    );
-                }
+                legacyModel = value;
+            }
+            else if (key == "Object")
+            {
+                ObjectConfig object;
     
-                const std::string normalized =
-                    NormalizeAssetPath(value);
-    
-                if (normalized.empty())
+                if (!ParseObjectConfiguration(value, object))
                 {
                     LogMessage(
-                        "Invalid model path in configuration."
+                        ("Invalid Object configuration: " +
+                         value).c_str()
                     );
     
                     return false;
                 }
     
-                output = normalized;
+                output.push_back(std::move(object));
             }
+        }
+    
+        // Backwards compatibility with the old Model= format.
+        if (output.empty())
+        {
+            ObjectConfig object;
+    
+            std::string path =
+                legacyModel.empty()
+                    ? DEFAULT_OBJECT
+                    : legacyModel;
+            
+            if (path.size() >= 2 &&
+                path.front() == '"' &&
+                path.back() == '"')
+            {
+                path = path.substr(1, path.size() - 2);
+            }
+    
+            object.path = NormalizeAssetPath(path);
+    
+            if (object.path.empty())
+            {
+                LogMessage(
+                    "Invalid Model path in configuration."
+                );
+    
+                return false;
+            }
+    
+            output.push_back(std::move(object));
         }
     
         return true;
@@ -474,24 +632,37 @@ namespace
     
     static void LoadConfiguration()
     {
-        std::string configuredModel;
+        std::vector<ObjectConfig> configuredObjects;
     
-        if (!ReadConfiguration(configuredModel))
+        if (!ReadConfiguration(configuredObjects))
         {
             LogMessage(
-                "Configuration file not found or unreadable; using default model."
+                "Configuration file not found or invalid; using default model."
             );
     
-            g_ModelPath = DEFAULT_OBJECT;
-        }
-        else
-        {
-            g_ModelPath = configuredModel;
+            configuredObjects.clear();
+    
+            ObjectConfig defaultObject;
+            defaultObject.path = DEFAULT_OBJECT;
+    
+            configuredObjects.push_back(defaultObject);
         }
     
-        LogMessage(
-            ("Configured model: " + g_ModelPath).c_str()
+        g_ObjectConfigs = std::move(configuredObjects);
+    
+        LogNumber(
+            "Configured object count",
+            g_ObjectConfigs.size()
         );
+    
+        for (size_t i = 0; i < g_ObjectConfigs.size(); ++i)
+        {
+            LogMessage(
+                ("Configured object " +
+                 std::to_string(i) + ": " +
+                 g_ObjectConfigs[i].path).c_str()
+            );
+        }
     
         UpdateConfigurationTimestamp();
     }
@@ -1568,6 +1739,83 @@ namespace
     }
 
     // ==================================================
+    // SCENE LOADING
+    // ==================================================
+    
+    static bool LoadScene(
+        const std::vector<ObjectConfig>& configs,
+        std::vector<Model>& output)
+    {
+        output.clear();
+    
+        if (configs.empty())
+        {
+            LogMessage("Scene contains no objects.");
+            return false;
+        }
+    
+        std::vector<Model> newModels;
+    
+        newModels.reserve(configs.size());
+    
+        for (size_t i = 0; i < configs.size(); ++i)
+        {
+            const ObjectConfig& config = configs[i];
+    
+            Model model;
+    
+            model.path = config.path;
+            model.position = config.position;
+            model.rotation = config.rotation;
+            model.scale = config.scale;
+    
+            LogMessage(
+                ("Loading scene object " +
+                 std::to_string(i) + ": " +
+                 model.path).c_str()
+            );
+    
+            if (!LoadOBJ(model))
+            {
+                LogMessage(
+                    ("Scene loading failed at object " +
+                     std::to_string(i) + ": " +
+                     model.path).c_str()
+                );
+    
+                return false;
+            }
+    
+            newModels.push_back(std::move(model));
+        }
+    
+        output = std::move(newModels);
+    
+        LogNumber(
+            "Successfully loaded scene objects",
+            output.size()
+        );
+    
+        return true;
+    }
+    
+    static bool LoadConfiguredScene()
+    {
+        std::vector<Model> newModels;
+    
+        if (!LoadScene(g_ObjectConfigs, newModels))
+            return false;
+    
+        // Only replace the active scene after every object
+        // has loaded successfully.
+        for (Model& model : g_Models)
+            ReleaseModelTextures(model);
+    
+        g_Models = std::move(newModels);
+    
+        return true;
+    }
+    // ==================================================
     // LIVE CONFIGURATION RELOADING
     // ==================================================
     
@@ -1580,89 +1828,72 @@ namespace
     
         g_ConfigCheckCounter = 0;
     
-        const fs::path configPath = GetConfigurationPath();
-    
         std::error_code error;
     
         const fs::file_time_type currentTimestamp =
             fs::last_write_time(
-                configPath,
+                GetConfigurationPath(),
                 error
             );
     
-        // The file may temporarily disappear while being saved.
-        // Keep the current model and try again later.
         if (error)
             return;
     
-        // First timestamp observation.
-        if (!g_ConfigTimestampValid)
+        if (g_ConfigTimestampValid &&
+            currentTimestamp == g_ConfigLastWriteTime)
         {
-            g_ConfigLastWriteTime = currentTimestamp;
-            g_ConfigTimestampValid = true;
             return;
         }
+        
+        g_ConfigLastWriteTime = currentTimestamp;
+        g_ConfigTimestampValid = true;
     
-        // Nothing changed.
-        if (currentTimestamp == g_ConfigLastWriteTime)
-            return;
+        std::vector<ObjectConfig> newConfigs;
     
-        std::string newModelPath;
-    
-        if (!ReadConfiguration(newModelPath))
+        if (!ReadConfiguration(newConfigs))
         {
             LogMessage(
-                "Configuration reload failed; keeping current model."
+                "Configuration reload failed; keeping previous scene."
             );
     
             return;
         }
     
-        // Remember the new timestamp after successfully reading
-        // the configuration.
+        // Load the complete new scene before touching the old one.
+        std::vector<Model> newModels;
+    
+        if (!LoadScene(newConfigs, newModels))
+        {
+            LogMessage(
+                "Scene reload failed; keeping previous scene."
+            );
+    
+            // Remember this timestamp so a failed configuration
+            // is not repeatedly loaded every 60 frames.
+            g_ConfigLastWriteTime = currentTimestamp;
+    
+            return;
+        }
+    
+        // Release old GPU textures while the OpenGL context is current.
+        for (Model& model : g_Models)
+            ReleaseModelTextures(model);
+    
+        g_Models = std::move(newModels);
+        g_ObjectConfigs = std::move(newConfigs);
+    
         g_ConfigLastWriteTime = currentTimestamp;
     
-        // No model change is necessary.
-        if (newModelPath == g_ModelPath)
-            return;
-    
         LogMessage(
-            ("Configuration changed. Requested model: " +
-             newModelPath).c_str()
+            "Scene successfully reloaded."
         );
     
-        // Load into a temporary object. The active model remains
-        // untouched if the new model cannot be loaded.
-        Model newModel;
-    
-        newModel.path = newModelPath;
-    
-        if (!LoadOBJ(newModel))
-        {
-            LogMessage(
-                ("Model reload failed: " +
-                 newModelPath).c_str()
-            );
-    
-            LogMessage(
-                "Previous model will remain active."
-            );
-    
-            return;
-        }
-    
-        // The old model can now be safely replaced.
-        ReleaseModelTextures(g_Model);
-    
-        g_Model = std::move(newModel);
-    
-        g_ModelPath = newModelPath;
-    
-        LogMessage(
-            ("Successfully switched model to: " +
-             g_ModelPath).c_str()
+        LogNumber(
+            "Active scene objects",
+            g_Models.size()
         );
     }
+
     // ==================================================
     // NORMAL CALCULATIONS
     // ==================================================
@@ -1788,8 +2019,13 @@ namespace
             g_UseProgram = nullptr;
             g_ActiveTexture = nullptr;
 
-            for (Material& material : g_Model.materials)
+        for (Model& model : g_Models)
+        {
+            for (Material& material : model.materials)
+            {
                 material.textureId = 0;
+            }
+        }
 
             LogMessage("OpenGL context changed.");
         }
@@ -2026,9 +2262,6 @@ namespace
         glEnable(GL_ALPHA_TEST);
         glAlphaFunc(GL_GREATER, 0.01f);
 
-        glClearDepth(1.0);
-        glClear(GL_DEPTH_BUFFER_BIT);
-
         // ----------------------------------------------
         // Projection
         // ----------------------------------------------
@@ -2068,26 +2301,65 @@ namespace
 
         glMatrixMode(GL_MODELVIEW);
         glLoadIdentity();
-
+        
+        // Shared scene distance.
         glTranslatef(
             0.0f,
             0.0f,
             -OBJECT_DISTANCE
         );
-
+        
+        // Shared viewing tilt.
         glRotatef(
             OBJECT_TILT,
             1.0f,
             0.0f,
             0.0f
         );
-
+        
+        // Shared scene rotation.
         glRotatef(
             static_cast<float>(GetTickCount64()) *
                 OBJECT_ROTATION_SPEED,
             0.0f,
             1.0f,
             0.0f
+        );
+        
+        // Individual object position.
+        glTranslatef(
+            model.position.x,
+            model.position.y,
+            model.position.z
+        );
+        
+        // Individual object rotation.
+        glRotatef(
+            model.rotation.x,
+            1.0f,
+            0.0f,
+            0.0f
+        );
+        
+        glRotatef(
+            model.rotation.y,
+            0.0f,
+            1.0f,
+            0.0f
+        );
+        
+        glRotatef(
+            model.rotation.z,
+            0.0f,
+            0.0f,
+            1.0f
+        );
+        
+        // Individual object scale.
+        glScalef(
+            model.scale,
+            model.scale,
+            model.scale
         );
 
         // ----------------------------------------------
@@ -2199,21 +2471,47 @@ namespace
         if (!EnsureContext())
             return;
     
-        // Check for configuration changes.
+        // Detect configuration changes.
         CheckConfigurationReload();
     
-        // Initial model loading.
-        if (!g_Model.attempted)
+        // Initial scene loading.
+        if (!g_SceneAttempted)
         {
-            g_Model.path = g_ModelPath;
+            g_SceneAttempted = true;
     
-            LoadOBJ(g_Model);
+            if (!LoadConfiguredScene())
+            {
+                LogMessage(
+                    "Initial scene loading failed."
+                );
+            }
         }
     
-        if (!g_Model.loaded)
+        if (g_Models.empty())
             return;
     
-        RenderModel(g_Model);
+        // Clear the depth buffer once for the whole scene.
+        // Preserve the game's depth/scissor state.
+        glPushAttrib(
+            GL_DEPTH_BUFFER_BIT |
+            GL_SCISSOR_BIT
+        );
+    
+        glDisable(GL_SCISSOR_TEST);
+        glDepthMask(GL_TRUE);
+        glClearDepth(1.0);
+        glClear(GL_DEPTH_BUFFER_BIT);
+    
+        glPopAttrib();
+    
+        // Render every model using the same depth buffer.
+        for (Model& model : g_Models)
+        {
+            if (model.loaded)
+            {
+                RenderModel(model);
+            }
+        }
     }
 
     // ==================================================
@@ -2360,10 +2658,10 @@ int ModInit()
         ("Default model: " +
          std::string(DEFAULT_OBJECT)).c_str()
     );
-
-    LogMessage(
-        ("Selected model: " +
-         g_ModelPath).c_str()
+    
+    LogNumber(
+        "Configured scene objects",
+        g_ObjectConfigs.size()
     );
 
     DiagnoseEmbeddedResources();
