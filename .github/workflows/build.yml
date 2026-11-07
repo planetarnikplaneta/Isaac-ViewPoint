@@ -67,6 +67,7 @@ jobs:
             Core\AssetPaths.cpp ^
             Core\Config.cpp ^
             Models\OBJLoader.cpp ^
+            Models\Texture.cpp ^
             Resources\ResourceManager.cpp ^
             ViewPointResources.res ^
             libzhl.lib ^
