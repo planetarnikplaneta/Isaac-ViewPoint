@@ -766,6 +766,7 @@ static void RenderTriangleMesh()
         static_cast<GLenum>(oldMatrixMode)
     );
 }
+}
 
 // --------------------------------------------------
 // REPENTOGON hook
