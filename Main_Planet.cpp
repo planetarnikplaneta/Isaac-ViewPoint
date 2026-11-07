@@ -112,16 +112,6 @@ namespace
 
     constexpr unsigned int CONFIG_CHECK_INTERVAL = 60;
 
-    // OBJ LOADING
-
-    static Vertex3 CalculateFaceNormal(
-        const Vertex3 &a,
-        const Vertex3 &b,
-        const Vertex3 &c);
-
-    static Vertex3 NormalizeNormal(
-        const Vertex3 &normal);
-
     // SCENE LOADING
 
     static bool LoadScene(
