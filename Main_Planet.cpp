@@ -389,60 +389,7 @@ namespace
     // --------------------------------------------------
     // Mesh rendering
     // --------------------------------------------------
-void RenderDiagnosticQuad()
-{
-    GLint oldProgram = 0;
-    GLint oldMatrixMode = GL_MODELVIEW;
 
-    glGetIntegerv(GL_CURRENT_PROGRAM, &oldProgram);
-    glGetIntegerv(GL_MATRIX_MODE, &oldMatrixMode);
-
-    glPushAttrib(GL_ALL_ATTRIB_BITS);
-
-    if (pglUseProgram)
-        pglUseProgram(0);
-
-    glDisable(GL_DEPTH_TEST);
-    glDisable(GL_TEXTURE_2D);
-    glDisable(GL_BLEND);
-    glDisable(GL_ALPHA_TEST);
-    glDisable(GL_STENCIL_TEST);
-    glDisable(GL_SCISSOR_TEST);
-    glDisable(GL_CULL_FACE);
-    glDisable(GL_LIGHTING);
-
-    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-
-    glMatrixMode(GL_PROJECTION);
-    glPushMatrix();
-    glLoadIdentity();
-
-    glMatrixMode(GL_MODELVIEW);
-    glPushMatrix();
-    glLoadIdentity();
-
-    glColor4f(1.0f, 0.0f, 0.0f, 1.0f);
-
-    glBegin(GL_QUADS);
-        glVertex2f(-0.5f, -0.5f);
-        glVertex2f( 0.5f, -0.5f);
-        glVertex2f( 0.5f,  0.5f);
-        glVertex2f(-0.5f,  0.5f);
-    glEnd();
-
-    glPopMatrix();
-
-    glMatrixMode(GL_PROJECTION);
-    glPopMatrix();
-
-    glMatrixMode(oldMatrixMode);
-
-    glPopAttrib();
-
-    if (pglUseProgram)
-        pglUseProgram(oldProgram);
-}
     static void RenderTriangleMesh()
     {
         if (!EnsureContext())
@@ -755,7 +702,7 @@ HOOK_METHOD_PRIORITY(
 
     if (_playerHudIndex == 0)
     {
-        RenderDiagnosticQuad();
+        RenderTriangleMesh();
     }
 }
 
