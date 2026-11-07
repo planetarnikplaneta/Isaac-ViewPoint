@@ -1,4 +1,3 @@
-
 name: Build Native Plugin
 
 on:
@@ -11,8 +10,16 @@ jobs:
     runs-on: windows-latest
 
     steps:
+      # --------------------------------------------
+      # Download project
+      # --------------------------------------------
+
       - name: Checkout native mod
         uses: actions/checkout@v4
+
+      # --------------------------------------------
+      # Download REPENTOGON
+      # --------------------------------------------
 
       - name: Checkout REPENTOGON headers
         uses: actions/checkout@v4
@@ -21,19 +28,52 @@ jobs:
           ref: 1.1.3
           path: REPENTOGON
 
+      # --------------------------------------------
+      # Configure Visual Studio
+      # --------------------------------------------
+
       - name: Configure MSVC x86
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x86
 
+      # --------------------------------------------
+      # Compile embedded resources
+      # --------------------------------------------
+
+      - name: Compile ViewPoint resources
+        shell: pwsh
+        run: |
+          ./GenerateResources.ps1
+
+          if ($LASTEXITCODE -ne 0) {
+              exit $LASTEXITCODE
+          }
+
+      # --------------------------------------------
+      # Compile DLL
+      # --------------------------------------------
+
       - name: Build DLL
         shell: cmd
         run: |
-          cl /nologo /LD /EHsc /std:c++17 /MD /I REPENTOGON/include /I REPENTOGON/libzhl /I REPENTOGON/libs/lua Main_Planet.cpp libzhl.lib /link /OUT:zhlMain_Planet.dll
+          cl /nologo /LD /EHsc /std:c++17 /MD ^
+            /I REPENTOGON/include ^
+            /I REPENTOGON/libzhl ^
+            /I REPENTOGON/libs/lua ^
+            Main_Planet.cpp ^
+            ViewPointResources.res ^
+            libzhl.lib ^
+            /link /OUT:zhlMain_Planet.dll
+
           if errorlevel 1 exit /b 1
+
+      # --------------------------------------------
+      # Upload artifact
+      # --------------------------------------------
 
       - name: Upload DLL
         uses: actions/upload-artifact@v4
         with:
-          name: Main_Planet
+          name: Isaac-ViewPoint
           path: zhlMain_Planet.dll
