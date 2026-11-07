@@ -319,12 +319,34 @@ std::vector<uint32_t> face;
 
         if (g_GL.activeTexture) g_GL.activeTexture(GL_TEXTURE0);
         g_GL.useProgram(0);
-        g_GL.bindFramebuffer(GL_FRAMEBUFFER, g_Fbo);
-        glViewport(0, 0, kRenderSize, kRenderSize);
-        glDisable(GL_SCISSOR_TEST); glDisable(GL_BLEND); glDisable(GL_ALPHA_TEST);
-        glDisable(GL_STENCIL_TEST); glDisable(GL_CULL_FACE); glDisable(GL_TEXTURE_2D);
-        glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LEQUAL); glDepthMask(GL_TRUE);
-        glClearColor(0, 0, 0, 0); glClearDepth(1.0); glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+g_GL.bindFramebuffer(GL_FRAMEBUFFER, g_Fbo);
+
+glViewport(0, 0, kRenderSize, kRenderSize);
+
+glDisable(GL_SCISSOR_TEST);
+glDisable(GL_BLEND);
+glDisable(GL_ALPHA_TEST);
+glDisable(GL_STENCIL_TEST);
+glDisable(GL_CULL_FACE);
+glDisable(GL_TEXTURE_2D);
+
+glDisable(GL_LIGHTING);
+glDisable(GL_FOG);
+glDisable(GL_COLOR_LOGIC_OP);
+glDisable(GL_POLYGON_OFFSET_FILL);
+
+glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+glDepthMask(GL_TRUE);
+
+glEnable(GL_DEPTH_TEST);
+glDepthFunc(GL_LEQUAL);
+
+glClearColor(0, 0, 0, 0);
+glClearDepth(1.0);
+
+glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glMatrixMode(GL_PROJECTION); glLoadIdentity();
         const double n = 0.1, half = n * 0.41421356237;
