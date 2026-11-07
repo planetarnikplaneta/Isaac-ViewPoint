@@ -399,8 +399,8 @@ static void RenderDiagnosticQuad()
 
     glPushAttrib(GL_ALL_ATTRIB_BITS);
 
-    if (pglUseProgram)
-        pglUseProgram(0);
+if (g_UseProgram)
+    g_UseProgram(0);
 
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_TEXTURE_2D);
@@ -440,8 +440,8 @@ static void RenderDiagnosticQuad()
 
     glPopAttrib();
 
-    if (pglUseProgram)
-        pglUseProgram(oldProgram);
+if (g_UseProgram)
+    g_UseProgram(static_cast<GLuint>(oldProgram));
 }
 
     static void RenderTriangleMesh()
