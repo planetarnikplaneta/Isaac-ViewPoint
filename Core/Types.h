@@ -1,3 +1,16 @@
+#pragma once
+
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+
+#include <Windows.h>
+#include <gl/GL.h>
+
+#include <cstdint>
+#include <string>
+#include <vector>
+
 namespace ViewPoint
 {
 struct Vertex3
