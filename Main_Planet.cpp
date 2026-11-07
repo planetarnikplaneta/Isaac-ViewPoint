@@ -285,17 +285,52 @@ static std::string ToUpperResourceName(const std::string& name)
 
 static HRSRC FindEmbeddedResource(
     HMODULE module,
-    const std::string& assetPath
-)
+    const std::string& assetPath)
 {
     const std::string resourceName =
         ToUpperResourceName(assetPath);
 
-    return FindResourceA(
+    char message[512];
+
+    snprintf(
+        message,
+        sizeof(message),
+        "Resource lookup: module=%p, requested=\"%s\", lookup=\"%s\"",
+        static_cast<void*>(module),
+        assetPath.c_str(),
+        resourceName.c_str()
+    );
+
+    LogMessage(message);
+
+    SetLastError(ERROR_SUCCESS);
+
+    HRSRC resource = FindResourceA(
         module,
         resourceName.c_str(),
         RT_RCDATA
     );
+
+    if (!resource)
+    {
+        const DWORD error = GetLastError();
+
+        snprintf(
+            message,
+            sizeof(message),
+            "FindResourceA failed: error=%lu, lookup=\"%s\"",
+            static_cast<unsigned long>(error),
+            resourceName.c_str()
+        );
+
+        LogMessage(message);
+    }
+    else
+    {
+        LogMessage("FindResourceA succeeded.");
+    }
+
+    return resource;
 }
 
     static bool ReadAsset(
