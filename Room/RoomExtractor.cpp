@@ -1,6 +1,6 @@
 #include "RoomExtractor.h"
 
-#include "IsaacRepentance.h"
+#include "../IsaacRepentance.h"
 #include "../Core/Logger.h"
 
 #include <cstdio>
