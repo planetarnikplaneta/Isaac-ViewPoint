@@ -221,14 +221,14 @@ namespace ViewPoint
         }
 
         // Backwards compatibility with the old Model= format.
-        // A missing or invalid config should not silently inject an
-        // extra sphere into the scene; only a real configured object
-        // should be loaded.
-        if (output.empty() && !legacyModel.empty())
+        if (output.empty())
         {
             ObjectConfig object;
 
-            std::string path = legacyModel;
+            std::string path =
+                legacyModel.empty()
+                    ? DEFAULT_OBJECT
+                    : legacyModel;
 
             if (path.size() >= 2 &&
                 path.front() == '"' &&
@@ -260,9 +260,14 @@ namespace ViewPoint
         if (!ReadConfiguration(configuredObjects))
         {
             LogMessage(
-                "Configuration file not found or invalid; leaving scene empty until a valid object is configured.");
+                "Configuration file not found or invalid; using default model.");
 
             configuredObjects.clear();
+
+            ObjectConfig defaultObject;
+            defaultObject.path = DEFAULT_OBJECT;
+
+            configuredObjects.push_back(defaultObject);
         }
 
         g_ObjectConfigs = std::move(configuredObjects);

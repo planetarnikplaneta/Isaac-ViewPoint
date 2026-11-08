@@ -39,8 +39,9 @@ HOOK_GLOBAL(
         HWND window = WindowFromDC(hdc);
 
         glPushAttrib(GL_DEPTH_BUFFER_BIT | GL_ENABLE_BIT);
-        glDisable(GL_DEPTH_TEST);
-        glDepthMask(GL_FALSE);
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LEQUAL);
+        glDepthMask(GL_TRUE);
 
         RenderTriangleMesh(window);
 
