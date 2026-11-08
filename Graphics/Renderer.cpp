@@ -1014,7 +1014,9 @@ namespace ViewPoint
             static_cast<GLenum>(oldMatrixMode));
     }
     }
+ // MAIN RENDERER
 
+    void RenderTriangleMesh(HWND window)
     {
         if (!EnsureContext())
             return;
