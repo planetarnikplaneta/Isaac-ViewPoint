@@ -53,142 +53,161 @@ namespace ViewPoint
         constexpr int MAT_POOP = 7;
         constexpr int MAT_FIRE = 8;
 
-        Room* g_LastRoom = nullptr;
+        Room *g_LastRoom = nullptr;
         int g_LastRoomIndex = -1;
         int g_LastDimension = -1;
 
         Model g_RoomModel;
 
         bool CopyIsaacFloorTexture(
-            Room* room,
-            Material& material)
+            Room *room,
+            Material &material)
         {
             if (!room)
                 return false;
-        
-            Backdrop* backdrop = room->GetBackdrop();
-        
+
+            Backdrop *backdrop = room->GetBackdrop();
+
             if (!backdrop)
             {
                 LogMessage(
                     "RoomExtractor: Current room has no backdrop.");
-        
+
                 return false;
             }
-        
-            KAGE_Graphics_ImageBase* image =
+
+            KAGE_Graphics_ImageBase *image =
                 backdrop->floorBuffer.image;
-        
+
             if (!image)
             {
                 LogMessage(
                     "RoomExtractor: Backdrop floor image is null.");
-        
+
                 return false;
             }
-        
+
             const int width = image->GetWidth();
             const int height = image->GetHeight();
-        
+            LogNumber("Floor width", image->GetWidth());
+            LogNumber("Floor height", image->GetHeight());
+            LogNumber("Floor padded width", image->GetPaddedWidth());
+            LogNumber("Floor padded height", image->GetPaddedHeight());
+            Backdrop *backdrop = room->GetBackdrop();
+
+            if (backdrop->floorSurface2.image)
+            {
+                LogNumber("FloorSurface2 width",
+                          backdrop->floorSurface2.image->GetWidth());
+
+                LogNumber("FloorSurface2 height",
+                          backdrop->floorSurface2.image->GetHeight());
+
+                LogNumber("FloorSurface2 padded width",
+                          backdrop->floorSurface2.image->GetPaddedWidth());
+
+                LogNumber("FloorSurface2 padded height",
+                          backdrop->floorSurface2.image->GetPaddedHeight());
+            }
             if (width <= 0 || height <= 0)
             {
                 LogMessage(
                     "RoomExtractor: Invalid floor texture dimensions.");
-        
+
                 return false;
             }
-        
+
             const size_t w = static_cast<size_t>(width);
             const size_t h = static_cast<size_t>(height);
-        
+
             if (w > std::numeric_limits<size_t>::max() / h ||
                 w * h > std::numeric_limits<size_t>::max() / 4)
             {
                 LogMessage(
                     "RoomExtractor: Floor texture is too large.");
-        
+
                 return false;
             }
-        
+
             const size_t pixelSize = w * h * 4;
-        
+
             std::vector<unsigned char> pixels(pixelSize);
-        
+
             image->GetTexelRegion(
                 0,
                 0,
                 static_cast<unsigned int>(width),
                 static_cast<unsigned int>(height),
                 pixels.data());
-        
+
             material.width = width;
             material.height = height;
             material.pixels = std::move(pixels);
-        
+
             // Prevent Texture.cpp from attempting to load a file.
             material.textureAttempted = true;
             material.diffuseTexturePath.clear();
-        
+
             LogMessage(
                 "RoomExtractor: Copied Isaac floor texture.");
-        
+
             LogNumber(
                 "RoomExtractor: Floor texture width",
                 width);
-        
+
             LogNumber(
                 "RoomExtractor: Floor texture height",
                 height);
-        
+
             return true;
         }
 
-void RefreshIsaacFloorTexture(
-    Room* room,
-    Material& material)
-{
-    if (!room)
-        return;
+        void RefreshIsaacFloorTexture(
+            Room *room,
+            Material &material)
+        {
+            if (!room)
+                return;
 
-    Backdrop* backdrop = room->GetBackdrop();
+            Backdrop *backdrop = room->GetBackdrop();
 
-    if (!backdrop || !backdrop->floorBuffer.image)
-        return;
+            if (!backdrop || !backdrop->floorBuffer.image)
+                return;
 
-    KAGE_Graphics_ImageBase* image =
-        backdrop->floorBuffer.image;
+            KAGE_Graphics_ImageBase *image =
+                backdrop->floorBuffer.image;
 
-    const int width = image->GetWidth();
-    const int height = image->GetHeight();
+            const int width = image->GetWidth();
+            const int height = image->GetHeight();
 
-    if (width <= 0 || height <= 0)
-        return;
+            if (width <= 0 || height <= 0)
+                return;
 
-    const size_t w = static_cast<size_t>(width);
-    const size_t h = static_cast<size_t>(height);
+            const size_t w = static_cast<size_t>(width);
+            const size_t h = static_cast<size_t>(height);
 
-    if (w > std::numeric_limits<size_t>::max() / h ||
-        w * h > std::numeric_limits<size_t>::max() / 4)
-        return;
+            if (w > std::numeric_limits<size_t>::max() / h ||
+                w * h > std::numeric_limits<size_t>::max() / 4)
+                return;
 
-    std::vector<unsigned char> pixels(w * h * 4);
+            std::vector<unsigned char> pixels(w * h * 4);
 
-    image->GetTexelRegion(
-        0,
-        0,
-        static_cast<unsigned int>(width),
-        static_cast<unsigned int>(height),
-        pixels.data());
+            image->GetTexelRegion(
+                0,
+                0,
+                static_cast<unsigned int>(width),
+                static_cast<unsigned int>(height),
+                pixels.data());
 
-    UpdateMaterialTexture(
-        material,
-        width,
-        height,
-        std::move(pixels));
-}
+            UpdateMaterialTexture(
+                material,
+                width,
+                height,
+                std::move(pixels));
+        }
 
         void AddTriangle(
-            Model& model,
+            Model &model,
             int materialIndex,
             int a,
             int b,
@@ -206,12 +225,12 @@ void RefreshIsaacFloorTexture(
         }
 
         void AddQuad(
-            Model& model,
+            Model &model,
             int materialIndex,
-            const Vertex3& a,
-            const Vertex3& b,
-            const Vertex3& c,
-            const Vertex3& d)
+            const Vertex3 &a,
+            const Vertex3 &b,
+            const Vertex3 &c,
+            const Vertex3 &d)
         {
             const int base =
                 static_cast<int>(model.vertices.size());
@@ -237,21 +256,21 @@ void RefreshIsaacFloorTexture(
         }
 
         void AddTexturedFloorQuad(
-            Model& model,
+            Model &model,
             int materialIndex,
-            const Vertex3& a,
-            const Vertex3& b,
-            const Vertex3& c,
-            const Vertex3& d)
+            const Vertex3 &a,
+            const Vertex3 &b,
+            const Vertex3 &c,
+            const Vertex3 &d)
         {
             const int texcoordBase =
                 static_cast<int>(model.texcoords.size());
-        
+
             model.texcoords.push_back({0.0f, 0.0f});
             model.texcoords.push_back({1.0f, 0.0f});
             model.texcoords.push_back({1.0f, 1.0f});
             model.texcoords.push_back({0.0f, 1.0f});
-        
+
             AddQuad(
                 model,
                 materialIndex,
@@ -259,24 +278,24 @@ void RefreshIsaacFloorTexture(
                 b,
                 c,
                 d);
-        
+
             const size_t triangleBase =
                 model.triangles.size() - 2;
-        
-            Triangle& first = model.triangles[triangleBase];
-            Triangle& second = model.triangles[triangleBase + 1];
-        
+
+            Triangle &first = model.triangles[triangleBase];
+            Triangle &second = model.triangles[triangleBase + 1];
+
             first.corners[0].texcoord = texcoordBase;
             first.corners[1].texcoord = texcoordBase + 1;
             first.corners[2].texcoord = texcoordBase + 2;
-        
+
             second.corners[0].texcoord = texcoordBase;
             second.corners[1].texcoord = texcoordBase + 2;
             second.corners[2].texcoord = texcoordBase + 3;
         }
 
         void AddBox(
-            Model& model,
+            Model &model,
             int materialIndex,
             float centerX,
             float centerZ,
@@ -335,7 +354,7 @@ void RefreshIsaacFloorTexture(
         }
 
         void AddPyramid(
-            Model& model,
+            Model &model,
             int materialIndex,
             float centerX,
             float centerZ,
@@ -372,7 +391,7 @@ void RefreshIsaacFloorTexture(
         }
 
         void AddWallBlock(
-            Model& model,
+            Model &model,
             float centerX,
             float centerZ)
         {
@@ -388,7 +407,7 @@ void RefreshIsaacFloorTexture(
         }
 
         void AddRock(
-            Model& model,
+            Model &model,
             float centerX,
             float centerZ)
         {
@@ -429,7 +448,7 @@ void RefreshIsaacFloorTexture(
         }
 
         void AddPit(
-            Model& model,
+            Model &model,
             float centerX,
             float centerZ)
         {
@@ -446,7 +465,7 @@ void RefreshIsaacFloorTexture(
         }
 
         void AddSpikes(
-            Model& model,
+            Model &model,
             float centerX,
             float centerZ)
         {
@@ -478,7 +497,7 @@ void RefreshIsaacFloorTexture(
         }
 
         void AddWeb(
-            Model& model,
+            Model &model,
             float centerX,
             float centerZ)
         {
@@ -523,7 +542,7 @@ void RefreshIsaacFloorTexture(
         }
 
         void AddLock(
-            Model& model,
+            Model &model,
             float centerX,
             float centerZ)
         {
@@ -550,7 +569,7 @@ void RefreshIsaacFloorTexture(
         }
 
         void AddTNT(
-            Model& model,
+            Model &model,
             float centerX,
             float centerZ)
         {
@@ -577,7 +596,7 @@ void RefreshIsaacFloorTexture(
         }
 
         void AddFireplace(
-            Model& model,
+            Model &model,
             float centerX,
             float centerZ)
         {
@@ -603,7 +622,7 @@ void RefreshIsaacFloorTexture(
         }
 
         void AddPoop(
-            Model& model,
+            Model &model,
             float centerX,
             float centerZ)
         {
@@ -630,28 +649,27 @@ void RefreshIsaacFloorTexture(
 
         bool IsRockType(int type)
         {
-            return
-                type == GRID_ROCK ||
-                type == GRID_ROCKB ||
-                type == GRID_ROCKT ||
-                type == GRID_ROCK_BOMB ||
-                type == GRID_ROCK_ALT ||
-                type == GRID_ROCK_SS ||
-                type == GRID_ROCK_SPIKED ||
-                type == GRID_ROCK_ALT2 ||
-                type == GRID_ROCK_GOLD;
+            return type == GRID_ROCK ||
+                   type == GRID_ROCKB ||
+                   type == GRID_ROCKT ||
+                   type == GRID_ROCK_BOMB ||
+                   type == GRID_ROCK_ALT ||
+                   type == GRID_ROCK_SS ||
+                   type == GRID_ROCK_SPIKED ||
+                   type == GRID_ROCK_ALT2 ||
+                   type == GRID_ROCK_GOLD;
         }
 
         void AddGridEntityGeometry(
-            Model& model,
+            Model &model,
             int entityType,
             float centerX,
             float centerZ,
-            unsigned int& rockCount,
-            unsigned int& pitCount,
-            unsigned int& spikeCount,
-            unsigned int& webCount,
-            unsigned int& objectCount)
+            unsigned int &rockCount,
+            unsigned int &pitCount,
+            unsigned int &spikeCount,
+            unsigned int &webCount,
+            unsigned int &objectCount)
         {
             if (IsRockType(entityType))
             {
@@ -712,7 +730,7 @@ void RefreshIsaacFloorTexture(
         }
 
         bool BuildRoomModel(
-            Room* room,
+            Room *room,
             int roomIndex,
             int dimension)
         {
@@ -752,10 +770,10 @@ void RefreshIsaacFloorTexture(
 
             Material floorMaterial;
             floorMaterial.name = "RoomFloor";
-            
+
             const bool hasFloorTexture =
                 CopyIsaacFloorTexture(room, floorMaterial);
-            
+
             if (hasFloorTexture)
             {
                 floorMaterial.diffuse[0] = 1.0f;
@@ -833,14 +851,14 @@ void RefreshIsaacFloorTexture(
             const float halfHeight =
                 static_cast<float>(height) * TILE_SIZE * 0.5f;
 
-        AddTexturedFloorQuad(
-            model,
-            MAT_FLOOR,
-            {-halfWidth, FLOOR_Y, -halfHeight},
-            {halfWidth, FLOOR_Y, -halfHeight},
-            {halfWidth, FLOOR_Y, halfHeight},
-            {-halfWidth, FLOOR_Y, halfHeight});
-            
+            AddTexturedFloorQuad(
+                model,
+                MAT_FLOOR,
+                {-halfWidth, FLOOR_Y, -halfHeight},
+                {halfWidth, FLOOR_Y, -halfHeight},
+                {halfWidth, FLOOR_Y, halfHeight},
+                {-halfWidth, FLOOR_Y, halfHeight});
+
             unsigned int wallCount = 0;
             unsigned int doorCount = 0;
             unsigned int rockCount = 0;
@@ -851,7 +869,7 @@ void RefreshIsaacFloorTexture(
 
             for (unsigned int i = 0; i < cellCount; ++i)
             {
-                GridEntity* grid =
+                GridEntity *grid =
                     room->GetGridEntity(static_cast<int>(i));
 
                 if (!grid)
@@ -905,7 +923,8 @@ void RefreshIsaacFloorTexture(
 
             LogMessage(
                 ("RoomExtractor: Generated room mesh: " +
-                 g_RoomModel.path).c_str());
+                 g_RoomModel.path)
+                    .c_str());
 
             LogNumber("RoomExtractor: Wall blocks", wallCount);
             LogNumber("RoomExtractor: Door openings", doorCount);
@@ -922,7 +941,7 @@ void RefreshIsaacFloorTexture(
         }
 
         void LogRoom(
-            Room* room,
+            Room *room,
             int roomIndex,
             int dimension)
         {
@@ -952,7 +971,7 @@ void RefreshIsaacFloorTexture(
 
             for (unsigned int i = 0; i < cellCount; ++i)
             {
-                GridEntity* grid =
+                GridEntity *grid =
                     room->GetGridEntity(static_cast<int>(i));
 
                 if (grid)
@@ -971,11 +990,11 @@ void RefreshIsaacFloorTexture(
         }
     }
 
-    Model* GetRoomModel()
+    Model *GetRoomModel()
     {
         return g_RoomModel.loaded
-            ? &g_RoomModel
-            : nullptr;
+                   ? &g_RoomModel
+                   : nullptr;
     }
 
     void UpdateRoomExtractor()
@@ -983,7 +1002,7 @@ void RefreshIsaacFloorTexture(
         if (!g_Game)
             return;
 
-        Room* room = g_Game->GetCurrentRoom();
+        Room *room = g_Game->GetCurrentRoom();
 
         if (!room)
         {
@@ -1001,19 +1020,19 @@ void RefreshIsaacFloorTexture(
         const int dimension =
             g_Game->GetDimension();
 
-if (room == g_LastRoom &&
-    roomIndex == g_LastRoomIndex &&
-    dimension == g_LastDimension)
-{
-    if (g_RoomModel.materials.size() > MAT_FLOOR)
-    {
-        RefreshIsaacFloorTexture(
-            room,
-            g_RoomModel.materials[MAT_FLOOR]);
-    }
+        if (room == g_LastRoom &&
+            roomIndex == g_LastRoomIndex &&
+            dimension == g_LastDimension)
+        {
+            if (g_RoomModel.materials.size() > MAT_FLOOR)
+            {
+                RefreshIsaacFloorTexture(
+                    room,
+                    g_RoomModel.materials[MAT_FLOOR]);
+            }
 
-    return;
-}
+            return;
+        }
 
         g_LastRoom = room;
         g_LastRoomIndex = roomIndex;

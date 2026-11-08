@@ -10,7 +10,7 @@
 #include <fstream>
 #include <sstream>
 #include <utility>
-// 
+
 namespace
 {
     namespace fs = std::filesystem;
