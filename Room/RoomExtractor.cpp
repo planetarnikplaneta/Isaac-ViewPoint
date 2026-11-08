@@ -58,7 +58,72 @@ namespace ViewPoint
         int g_LastDimension = -1;
 
         Model g_RoomModel;
+        void DiagnoseFloorImage(
+            const char *name,
+            KAGE_Graphics_ImageBase *image)
+        {
+            if (!image)
+            {
+                LogMessage(name);
+                return;
+            }
 
+            const int width = image->GetWidth();
+            const int height = image->GetHeight();
+
+            if (width <= 0 || height <= 0)
+                return;
+
+            std::vector<unsigned char> pixels(
+                static_cast<size_t>(width) * height * 4);
+
+            image->GetTexelRegion(
+                0,
+                0,
+                static_cast<unsigned int>(width),
+                static_cast<unsigned int>(height),
+                pixels.data());
+
+            int minX = width;
+            int minY = height;
+            int maxX = -1;
+            int maxY = -1;
+
+            uint64_t count = 0;
+
+            for (int y = 0; y < height; ++y)
+            {
+                for (int x = 0; x < width; ++x)
+                {
+                    const size_t i =
+                        (static_cast<size_t>(y) * width + x) * 4;
+
+                    if (pixels[i + 3] == 0 &&
+                        pixels[i] == 0 &&
+                        pixels[i + 1] == 0 &&
+                        pixels[i + 2] == 0)
+                        continue;
+
+                    if (x < minX)
+                        minX = x;
+                    if (y < minY)
+                        minY = y;
+                    if (x > maxX)
+                        maxX = x;
+                    if (y > maxY)
+                        maxY = y;
+
+                    ++count;
+                }
+            }
+
+            LogMessage(name);
+            LogNumber("Image content min X", minX);
+            LogNumber("Image content min Y", minY);
+            LogNumber("Image content max X", maxX);
+            LogNumber("Image content max Y", maxY);
+            LogNumber("Image content pixels", static_cast<double>(count));
+        }
         bool CopyIsaacFloorTexture(
             Room *room,
             Material &material)
@@ -67,7 +132,13 @@ namespace ViewPoint
                 return false;
 
             Backdrop *backdrop = room->GetBackdrop();
+            DiagnoseFloorImage(
+                "Diagnosing floorBuffer",
+                backdrop->floorBuffer.image);
 
+            DiagnoseFloorImage(
+                "Diagnosing floorSurface2",
+                backdrop->floorSurface2.image);
             if (!backdrop)
             {
                 LogMessage(
