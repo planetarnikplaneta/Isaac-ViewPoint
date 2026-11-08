@@ -1059,7 +1059,7 @@ namespace ViewPoint
         {
             if (model.loaded)
             {
-               // RenderModel(model);
+                RenderModel(model);
             }
         }
 
@@ -1068,7 +1068,7 @@ namespace ViewPoint
 
         if (roomModel && roomModel->loaded)
         {
-           // RenderModel(*roomModel);
+            RenderModel(*roomModel);
         }
     }
 }

@@ -33,11 +33,19 @@ HOOK_GLOBAL(
     __stdcall)
 {
     ViewPoint::UpdateRoomExtractor();
-    if (wglGetCurrentContext())
-    {
-        HWND window = WindowFromDC(hdc);
 
+    if (!wglGetCurrentContext())
+        return super(hdc);
+
+    HWND window = WindowFromDC(hdc);
+    Model *roomModel = ViewPoint::GetRoomModel();
+
+    if (roomModel && roomModel->loaded)
+    {
+        // Render the generated room as the frame and suppress the
+        // game's original room draw to avoid a duplicate pass.
         RenderTriangleMesh(window);
+        return true;
     }
 
     return super(hdc);
