@@ -37,7 +37,7 @@ HOOK_GLOBAL(
     {
         HWND window = WindowFromDC(hdc);
 
-        //RenderTriangleMesh(window);
+        RenderTriangleMesh(window);
     }
 
     return super(hdc);
