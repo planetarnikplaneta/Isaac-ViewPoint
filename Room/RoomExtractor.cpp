@@ -1,3 +1,4 @@
+
 #include "RoomExtractor.h"
 
 #include "../IsaacRepentance.h"
@@ -15,11 +16,40 @@ namespace ViewPoint
     {
         constexpr unsigned int MAX_GRID_CELLS = 447;
 
-        constexpr int GRID_WALL_TYPE = 15;
+        constexpr int GRID_ROCK = 2;
+        constexpr int GRID_ROCKB = 3;
+        constexpr int GRID_ROCKT = 4;
+        constexpr int GRID_ROCK_BOMB = 5;
+        constexpr int GRID_ROCK_ALT = 6;
+        constexpr int GRID_PIT = 7;
+        constexpr int GRID_SPIKES = 8;
+        constexpr int GRID_SPIKES_ONOFF = 9;
+        constexpr int GRID_SPIDERWEB = 10;
+        constexpr int GRID_LOCK = 11;
+        constexpr int GRID_TNT = 12;
+        constexpr int GRID_FIREPLACE = 13;
+        constexpr int GRID_POOP = 14;
+        constexpr int GRID_WALL = 15;
+        constexpr int GRID_DOOR = 16;
+        constexpr int GRID_ROCK_SS = 22;
+        constexpr int GRID_ROCK_SPIKED = 25;
+        constexpr int GRID_ROCK_ALT2 = 26;
+        constexpr int GRID_ROCK_GOLD = 27;
 
         constexpr float FLOOR_Y = -1.5f;
         constexpr float WALL_TOP_Y = 1.5f;
         constexpr float TILE_SIZE = 1.0f;
+
+        // Material indices.
+        constexpr int MAT_FLOOR = 0;
+        constexpr int MAT_WALL = 1;
+        constexpr int MAT_ROCK = 2;
+        constexpr int MAT_PIT = 3;
+        constexpr int MAT_SPIKES = 4;
+        constexpr int MAT_WEB = 5;
+        constexpr int MAT_OBJECT = 6;
+        constexpr int MAT_POOP = 7;
+        constexpr int MAT_FIRE = 8;
 
         Room* g_LastRoom = nullptr;
         int g_LastRoomIndex = -1;
@@ -76,75 +106,432 @@ namespace ViewPoint
                 base + 3);
         }
 
-        void AddWallBlock(
+        void AddBox(
             Model& model,
+            int materialIndex,
             float centerX,
-            float centerZ)
+            float centerZ,
+            float halfWidth,
+            float bottom,
+            float top,
+            float halfDepth)
         {
-            const float half = TILE_SIZE * 0.5f;
+            const float left = centerX - halfWidth;
+            const float right = centerX + halfWidth;
 
-            const float left = centerX - half;
-            const float right = centerX + half;
+            const float front = centerZ - halfDepth;
+            const float back = centerZ + halfDepth;
 
-            const float front = centerZ - half;
-            const float back = centerZ + half;
-
-            const float bottom = FLOOR_Y;
-            const float top = WALL_TOP_Y;
-
-            // Front.
             AddQuad(
-                model,
-                1,
+                model, materialIndex,
                 {left, bottom, front},
                 {right, bottom, front},
                 {right, top, front},
                 {left, top, front});
 
-            // Back.
             AddQuad(
-                model,
-                1,
+                model, materialIndex,
                 {right, bottom, back},
                 {left, bottom, back},
                 {left, top, back},
                 {right, top, back});
 
-            // Left.
             AddQuad(
-                model,
-                1,
+                model, materialIndex,
                 {left, bottom, back},
                 {left, bottom, front},
                 {left, top, front},
                 {left, top, back});
 
-            // Right.
             AddQuad(
-                model,
-                1,
+                model, materialIndex,
                 {right, bottom, front},
                 {right, bottom, back},
                 {right, top, back},
                 {right, top, front});
 
-            // Top.
             AddQuad(
-                model,
-                1,
+                model, materialIndex,
                 {left, top, front},
                 {right, top, front},
                 {right, top, back},
                 {left, top, back});
 
-            // Bottom.
             AddQuad(
-                model,
-                1,
+                model, materialIndex,
                 {left, bottom, back},
                 {right, bottom, back},
                 {right, bottom, front},
                 {left, bottom, front});
+        }
+
+        void AddPyramid(
+            Model& model,
+            int materialIndex,
+            float centerX,
+            float centerZ,
+            float halfWidth,
+            float bottom,
+            float top,
+            float halfDepth)
+        {
+            const int base =
+                static_cast<int>(model.vertices.size());
+
+            model.vertices.push_back(
+                {centerX - halfWidth, bottom, centerZ - halfDepth});
+
+            model.vertices.push_back(
+                {centerX + halfWidth, bottom, centerZ - halfDepth});
+
+            model.vertices.push_back(
+                {centerX + halfWidth, bottom, centerZ + halfDepth});
+
+            model.vertices.push_back(
+                {centerX - halfWidth, bottom, centerZ + halfDepth});
+
+            model.vertices.push_back(
+                {centerX, top, centerZ});
+
+            AddTriangle(model, materialIndex, base, base + 1, base + 2);
+            AddTriangle(model, materialIndex, base, base + 2, base + 3);
+
+            AddTriangle(model, materialIndex, base, base + 4, base + 1);
+            AddTriangle(model, materialIndex, base + 1, base + 4, base + 2);
+            AddTriangle(model, materialIndex, base + 2, base + 4, base + 3);
+            AddTriangle(model, materialIndex, base + 3, base + 4, base);
+        }
+
+        void AddWallBlock(
+            Model& model,
+            float centerX,
+            float centerZ)
+        {
+            AddBox(
+                model,
+                MAT_WALL,
+                centerX,
+                centerZ,
+                TILE_SIZE * 0.5f,
+                FLOOR_Y,
+                WALL_TOP_Y,
+                TILE_SIZE * 0.5f);
+        }
+
+        void AddRock(
+            Model& model,
+            float centerX,
+            float centerZ)
+        {
+            const float bottom = FLOOR_Y + 0.03f;
+            const float middle = FLOOR_Y + 0.43f;
+            const float top = FLOOR_Y + 0.85f;
+
+            const int base =
+                static_cast<int>(model.vertices.size());
+
+            model.vertices.push_back(
+                {centerX - 0.43f, middle, centerZ - 0.38f});
+
+            model.vertices.push_back(
+                {centerX + 0.39f, middle, centerZ - 0.42f});
+
+            model.vertices.push_back(
+                {centerX + 0.44f, middle, centerZ + 0.36f});
+
+            model.vertices.push_back(
+                {centerX - 0.38f, middle, centerZ + 0.43f});
+
+            model.vertices.push_back(
+                {centerX - 0.12f, top, centerZ - 0.10f});
+
+            model.vertices.push_back(
+                {centerX + 0.08f, bottom, centerZ + 0.05f});
+
+            AddTriangle(model, MAT_ROCK, base, base + 1, base + 4);
+            AddTriangle(model, MAT_ROCK, base + 1, base + 2, base + 4);
+            AddTriangle(model, MAT_ROCK, base + 2, base + 3, base + 4);
+            AddTriangle(model, MAT_ROCK, base + 3, base, base + 4);
+
+            AddTriangle(model, MAT_ROCK, base + 1, base, base + 5);
+            AddTriangle(model, MAT_ROCK, base + 2, base + 1, base + 5);
+            AddTriangle(model, MAT_ROCK, base + 3, base + 2, base + 5);
+            AddTriangle(model, MAT_ROCK, base, base + 3, base + 5);
+        }
+
+        void AddPit(
+            Model& model,
+            float centerX,
+            float centerZ)
+        {
+            const float half = TILE_SIZE * 0.46f;
+            const float pitY = FLOOR_Y + 0.015f;
+
+            AddQuad(
+                model,
+                MAT_PIT,
+                {centerX - half, pitY, centerZ - half},
+                {centerX + half, pitY, centerZ - half},
+                {centerX + half, pitY, centerZ + half},
+                {centerX - half, pitY, centerZ + half});
+        }
+
+        void AddSpikes(
+            Model& model,
+            float centerX,
+            float centerZ)
+        {
+            const float base = FLOOR_Y + 0.03f;
+            const float top = FLOOR_Y + 0.48f;
+
+            const float offset = 0.23f;
+            const float halfSize = 0.17f;
+
+            AddPyramid(
+                model, MAT_SPIKES,
+                centerX - offset, centerZ - offset,
+                halfSize, base, top, halfSize);
+
+            AddPyramid(
+                model, MAT_SPIKES,
+                centerX + offset, centerZ - offset,
+                halfSize, base, top, halfSize);
+
+            AddPyramid(
+                model, MAT_SPIKES,
+                centerX - offset, centerZ + offset,
+                halfSize, base, top, halfSize);
+
+            AddPyramid(
+                model, MAT_SPIKES,
+                centerX + offset, centerZ + offset,
+                halfSize, base, top, halfSize);
+        }
+
+        void AddWeb(
+            Model& model,
+            float centerX,
+            float centerZ)
+        {
+            const float y = FLOOR_Y + 0.025f;
+            const float half = 0.43f;
+            const float thickness = 0.025f;
+
+            // Diagonal strip one.
+            AddQuad(
+                model,
+                MAT_WEB,
+                {centerX - half, y, centerZ - half + thickness},
+                {centerX - half + thickness, y, centerZ - half},
+                {centerX + half, y, centerZ + half - thickness},
+                {centerX + half - thickness, y, centerZ + half});
+
+            // Diagonal strip two.
+            AddQuad(
+                model,
+                MAT_WEB,
+                {centerX + half - thickness, y, centerZ - half},
+                {centerX + half, y, centerZ - half + thickness},
+                {centerX - half + thickness, y, centerZ + half},
+                {centerX - half, y, centerZ + half - thickness});
+
+            // Horizontal and vertical strands.
+            AddQuad(
+                model,
+                MAT_WEB,
+                {centerX - half, y, centerZ - thickness},
+                {centerX + half, y, centerZ - thickness},
+                {centerX + half, y, centerZ + thickness},
+                {centerX - half, y, centerZ + thickness});
+
+            AddQuad(
+                model,
+                MAT_WEB,
+                {centerX - thickness, y, centerZ - half},
+                {centerX + thickness, y, centerZ - half},
+                {centerX + thickness, y, centerZ + half},
+                {centerX - thickness, y, centerZ + half});
+        }
+
+        void AddLock(
+            Model& model,
+            float centerX,
+            float centerZ)
+        {
+            AddBox(
+                model,
+                MAT_OBJECT,
+                centerX,
+                centerZ,
+                0.25f,
+                FLOOR_Y + 0.03f,
+                FLOOR_Y + 0.55f,
+                0.22f);
+
+            // Raised lock shackle.
+            AddBox(
+                model,
+                MAT_OBJECT,
+                centerX,
+                centerZ,
+                0.13f,
+                FLOOR_Y + 0.50f,
+                FLOOR_Y + 0.82f,
+                0.10f);
+        }
+
+        void AddTNT(
+            Model& model,
+            float centerX,
+            float centerZ)
+        {
+            AddBox(
+                model,
+                MAT_OBJECT,
+                centerX,
+                centerZ,
+                0.34f,
+                FLOOR_Y + 0.03f,
+                FLOOR_Y + 0.72f,
+                0.34f);
+
+            // Top fuse.
+            AddBox(
+                model,
+                MAT_OBJECT,
+                centerX,
+                centerZ,
+                0.055f,
+                FLOOR_Y + 0.72f,
+                FLOOR_Y + 0.91f,
+                0.055f);
+        }
+
+        void AddFireplace(
+            Model& model,
+            float centerX,
+            float centerZ)
+        {
+            AddBox(
+                model,
+                MAT_OBJECT,
+                centerX,
+                centerZ,
+                0.36f,
+                FLOOR_Y + 0.03f,
+                FLOOR_Y + 0.42f,
+                0.34f);
+
+            AddPyramid(
+                model,
+                MAT_FIRE,
+                centerX,
+                centerZ,
+                0.22f,
+                FLOOR_Y + 0.42f,
+                FLOOR_Y + 1.05f,
+                0.20f);
+        }
+
+        void AddPoop(
+            Model& model,
+            float centerX,
+            float centerZ)
+        {
+            AddBox(
+                model,
+                MAT_POOP,
+                centerX,
+                centerZ,
+                0.34f,
+                FLOOR_Y + 0.03f,
+                FLOOR_Y + 0.42f,
+                0.32f);
+
+            AddBox(
+                model,
+                MAT_POOP,
+                centerX,
+                centerZ,
+                0.25f,
+                FLOOR_Y + 0.42f,
+                FLOOR_Y + 0.68f,
+                0.24f);
+        }
+
+        bool IsRockType(int type)
+        {
+            return
+                type == GRID_ROCK ||
+                type == GRID_ROCKB ||
+                type == GRID_ROCKT ||
+                type == GRID_ROCK_BOMB ||
+                type == GRID_ROCK_ALT ||
+                type == GRID_ROCK_SS ||
+                type == GRID_ROCK_SPIKED ||
+                type == GRID_ROCK_ALT2 ||
+                type == GRID_ROCK_GOLD;
+        }
+
+        void AddGridEntityGeometry(
+            Model& model,
+            int entityType,
+            float centerX,
+            float centerZ,
+            unsigned int& rockCount,
+            unsigned int& pitCount,
+            unsigned int& spikeCount,
+            unsigned int& webCount,
+            unsigned int& objectCount)
+        {
+            if (IsRockType(entityType))
+            {
+                AddRock(model, centerX, centerZ);
+                ++rockCount;
+                return;
+            }
+
+            switch (entityType)
+            {
+            case GRID_PIT:
+                AddPit(model, centerX, centerZ);
+                ++pitCount;
+                break;
+
+            case GRID_SPIKES:
+            case GRID_SPIKES_ONOFF:
+                AddSpikes(model, centerX, centerZ);
+                ++spikeCount;
+                break;
+
+            case GRID_SPIDERWEB:
+                AddWeb(model, centerX, centerZ);
+                ++webCount;
+                break;
+
+            case GRID_LOCK:
+                AddLock(model, centerX, centerZ);
+                ++objectCount;
+                break;
+
+            case GRID_TNT:
+                AddTNT(model, centerX, centerZ);
+                ++objectCount;
+                break;
+
+            case GRID_FIREPLACE:
+                AddFireplace(model, centerX, centerZ);
+                ++objectCount;
+                break;
+
+            case GRID_POOP:
+                AddPoop(model, centerX, centerZ);
+                ++objectCount;
+                break;
+
+            default:
+                break;
+            }
         }
 
         void ResetRoomModel()
@@ -194,25 +581,69 @@ namespace ViewPoint
             model.rotation = {0.0f, 0.0f, 0.0f};
             model.scale = 1.0f;
 
-            // Floor material.
             Material floorMaterial;
             floorMaterial.name = "RoomFloor";
             floorMaterial.diffuse[0] = 0.32f;
             floorMaterial.diffuse[1] = 0.30f;
             floorMaterial.diffuse[2] = 0.29f;
 
-            // Wall material.
             Material wallMaterial;
             wallMaterial.name = "RoomWalls";
             wallMaterial.diffuse[0] = 0.62f;
             wallMaterial.diffuse[1] = 0.60f;
             wallMaterial.diffuse[2] = 0.57f;
 
-            model.materials.push_back(
-                std::move(floorMaterial));
+            Material rockMaterial;
+            rockMaterial.name = "GridRocks";
+            rockMaterial.diffuse[0] = 0.42f;
+            rockMaterial.diffuse[1] = 0.39f;
+            rockMaterial.diffuse[2] = 0.35f;
 
-            model.materials.push_back(
-                std::move(wallMaterial));
+            Material pitMaterial;
+            pitMaterial.name = "GridPits";
+            pitMaterial.diffuse[0] = 0.035f;
+            pitMaterial.diffuse[1] = 0.025f;
+            pitMaterial.diffuse[2] = 0.025f;
+
+            Material spikeMaterial;
+            spikeMaterial.name = "GridSpikes";
+            spikeMaterial.diffuse[0] = 0.72f;
+            spikeMaterial.diffuse[1] = 0.72f;
+            spikeMaterial.diffuse[2] = 0.68f;
+
+            Material webMaterial;
+            webMaterial.name = "GridWebs";
+            webMaterial.diffuse[0] = 0.78f;
+            webMaterial.diffuse[1] = 0.75f;
+            webMaterial.diffuse[2] = 0.69f;
+
+            Material objectMaterial;
+            objectMaterial.name = "GridObjects";
+            objectMaterial.diffuse[0] = 0.65f;
+            objectMaterial.diffuse[1] = 0.20f;
+            objectMaterial.diffuse[2] = 0.12f;
+
+            Material poopMaterial;
+            poopMaterial.name = "GridPoop";
+            poopMaterial.diffuse[0] = 0.38f;
+            poopMaterial.diffuse[1] = 0.20f;
+            poopMaterial.diffuse[2] = 0.09f;
+
+            Material fireMaterial;
+            fireMaterial.name = "GridFire";
+            fireMaterial.diffuse[0] = 1.0f;
+            fireMaterial.diffuse[1] = 0.35f;
+            fireMaterial.diffuse[2] = 0.035f;
+
+            model.materials.push_back(std::move(floorMaterial));
+            model.materials.push_back(std::move(wallMaterial));
+            model.materials.push_back(std::move(rockMaterial));
+            model.materials.push_back(std::move(pitMaterial));
+            model.materials.push_back(std::move(spikeMaterial));
+            model.materials.push_back(std::move(webMaterial));
+            model.materials.push_back(std::move(objectMaterial));
+            model.materials.push_back(std::move(poopMaterial));
+            model.materials.push_back(std::move(fireMaterial));
 
             const float halfWidth =
                 static_cast<float>(width) * TILE_SIZE * 0.5f;
@@ -220,10 +651,9 @@ namespace ViewPoint
             const float halfHeight =
                 static_cast<float>(height) * TILE_SIZE * 0.5f;
 
-            // One continuous floor.
             AddQuad(
                 model,
-                0,
+                MAT_FLOOR,
                 {-halfWidth, FLOOR_Y, -halfHeight},
                 {halfWidth, FLOOR_Y, -halfHeight},
                 {halfWidth, FLOOR_Y, halfHeight},
@@ -231,6 +661,11 @@ namespace ViewPoint
 
             unsigned int wallCount = 0;
             unsigned int doorCount = 0;
+            unsigned int rockCount = 0;
+            unsigned int pitCount = 0;
+            unsigned int spikeCount = 0;
+            unsigned int webCount = 0;
+            unsigned int objectCount = 0;
 
             for (unsigned int i = 0; i < cellCount; ++i)
             {
@@ -242,15 +677,6 @@ namespace ViewPoint
 
                 const int entityType =
                     static_cast<int>(grid->GetType());
-
-                if (entityType == 16)
-                {
-                    ++doorCount;
-                    continue;
-                }
-
-                if (entityType != GRID_WALL_TYPE)
-                    continue;
 
                 const unsigned int row = i / width;
                 const unsigned int column = i % width;
@@ -265,12 +691,29 @@ namespace ViewPoint
                      static_cast<float>(row)) *
                     TILE_SIZE;
 
-                AddWallBlock(
-                    model,
-                    centerX,
-                    centerZ);
+                if (entityType == GRID_DOOR)
+                {
+                    ++doorCount;
+                    continue;
+                }
 
-                ++wallCount;
+                if (entityType == GRID_WALL)
+                {
+                    AddWallBlock(model, centerX, centerZ);
+                    ++wallCount;
+                    continue;
+                }
+
+                AddGridEntityGeometry(
+                    model,
+                    entityType,
+                    centerX,
+                    centerZ,
+                    rockCount,
+                    pitCount,
+                    spikeCount,
+                    webCount,
+                    objectCount);
             }
 
             model.loaded = true;
@@ -282,14 +725,13 @@ namespace ViewPoint
                 ("RoomExtractor: Generated room mesh: " +
                  g_RoomModel.path).c_str());
 
-            LogNumber(
-                "RoomExtractor: Generated wall blocks",
-                wallCount);
-
-            LogNumber(
-                "RoomExtractor: Door openings",
-                doorCount);
-
+            LogNumber("RoomExtractor: Wall blocks", wallCount);
+            LogNumber("RoomExtractor: Door openings", doorCount);
+            LogNumber("RoomExtractor: Rocks", rockCount);
+            LogNumber("RoomExtractor: Pits", pitCount);
+            LogNumber("RoomExtractor: Spikes", spikeCount);
+            LogNumber("RoomExtractor: Spider webs", webCount);
+            LogNumber("RoomExtractor: Other grid objects", objectCount);
             LogNumber(
                 "RoomExtractor: Generated triangles",
                 g_RoomModel.triangles.size());
@@ -339,10 +781,7 @@ namespace ViewPoint
                 "RoomExtractor: Occupied grid cells",
                 occupiedCells);
 
-            if (!BuildRoomModel(
-                    room,
-                    roomIndex,
-                    dimension))
+            if (!BuildRoomModel(room, roomIndex, dimension))
             {
                 LogMessage(
                     "RoomExtractor: Room mesh generation failed.");
@@ -371,7 +810,6 @@ namespace ViewPoint
             g_LastDimension = -1;
 
             ResetRoomModel();
-
             return;
         }
 
@@ -394,12 +832,8 @@ namespace ViewPoint
 
         ResetRoomModel();
 
-        LogMessage(
-            "RoomExtractor: Room changed.");
+        LogMessage("RoomExtractor: Room changed.");
 
-        LogRoom(
-            room,
-            roomIndex,
-            dimension);
+        LogRoom(room, roomIndex, dimension);
     }
 }
