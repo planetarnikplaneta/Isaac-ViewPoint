@@ -11,6 +11,7 @@
 #include "../Models/GpuMesh.h"
 #include "../Camera/Camera.h"
 #include "../Scene/Scene.h"
+#include "../Room/RoomExtractor.h"
 
 #include <Windows.h>
 #include <gl/GL.h>
@@ -1037,7 +1038,7 @@ namespace ViewPoint
             }
         }
 
-        if (g_Models.empty())
+        if (g_Models.empty() && !GetRoomModel())
             return;
 
         // Clear the depth buffer once for the whole scene.
@@ -1060,6 +1061,14 @@ namespace ViewPoint
             {
                 RenderModel(model);
             }
+        }
+
+        // Render the automatically generated Isaac room.
+        Model* roomModel = GetRoomModel();
+        
+        if (roomModel && roomModel->loaded)
+        {
+            RenderModel(*roomModel);
         }
     }
 }
