@@ -9,6 +9,8 @@
 #include <cstdint>
 #include <string>
 #include <utility>
+#include <limits>
+#include <vector>
 
 namespace ViewPoint
 {
@@ -57,6 +59,90 @@ namespace ViewPoint
 
         Model g_RoomModel;
 
+        bool CopyIsaacFloorTexture(
+            Room* room,
+            Material& material)
+        {
+            if (!room)
+                return false;
+        
+            Backdrop* backdrop = room->GetBackdrop();
+        
+            if (!backdrop)
+            {
+                LogMessage(
+                    "RoomExtractor: Current room has no backdrop.");
+        
+                return false;
+            }
+        
+            KAGE_Graphics_ImageBase* image =
+                backdrop->floorBuffer.image;
+        
+            if (!image)
+            {
+                LogMessage(
+                    "RoomExtractor: Backdrop floor image is null.");
+        
+                return false;
+            }
+        
+            const int width = image->GetWidth();
+            const int height = image->GetHeight();
+        
+            if (width <= 0 || height <= 0)
+            {
+                LogMessage(
+                    "RoomExtractor: Invalid floor texture dimensions.");
+        
+                return false;
+            }
+        
+            const size_t w = static_cast<size_t>(width);
+            const size_t h = static_cast<size_t>(height);
+        
+            if (w > std::numeric_limits<size_t>::max() / h ||
+                w * h > std::numeric_limits<size_t>::max() / 4)
+            {
+                LogMessage(
+                    "RoomExtractor: Floor texture is too large.");
+        
+                return false;
+            }
+        
+            const size_t pixelSize = w * h * 4;
+        
+            std::vector<unsigned char> pixels(pixelSize);
+        
+            image->GetTexelRegion(
+                0,
+                0,
+                static_cast<unsigned int>(width),
+                static_cast<unsigned int>(height),
+                pixels.data());
+        
+            material.width = width;
+            material.height = height;
+            material.pixels = std::move(pixels);
+        
+            // Prevent Texture.cpp from attempting to load a file.
+            material.textureAttempted = true;
+            material.diffuseTexturePath.clear();
+        
+            LogMessage(
+                "RoomExtractor: Copied Isaac floor texture.");
+        
+            LogNumber(
+                "RoomExtractor: Floor texture width",
+                width);
+        
+            LogNumber(
+                "RoomExtractor: Floor texture height",
+                height);
+        
+            return true;
+        }
+
         void AddTriangle(
             Model& model,
             int materialIndex,
@@ -104,6 +190,45 @@ namespace ViewPoint
                 base,
                 base + 2,
                 base + 3);
+        }
+
+        void AddTexturedFloorQuad(
+            Model& model,
+            int materialIndex,
+            const Vertex3& a,
+            const Vertex3& b,
+            const Vertex3& c,
+            const Vertex3& d)
+        {
+            const int texcoordBase =
+                static_cast<int>(model.texcoords.size());
+        
+            model.texcoords.push_back({0.0f, 0.0f});
+            model.texcoords.push_back({1.0f, 0.0f});
+            model.texcoords.push_back({1.0f, 1.0f});
+            model.texcoords.push_back({0.0f, 1.0f});
+        
+            AddQuad(
+                model,
+                materialIndex,
+                a,
+                b,
+                c,
+                d);
+        
+            const size_t triangleBase =
+                model.triangles.size() - 2;
+        
+            Triangle& first = model.triangles[triangleBase];
+            Triangle& second = model.triangles[triangleBase + 1];
+        
+            first.corners[0].texcoord = texcoordBase;
+            first.corners[1].texcoord = texcoordBase + 1;
+            first.corners[2].texcoord = texcoordBase + 2;
+        
+            second.corners[0].texcoord = texcoordBase;
+            second.corners[1].texcoord = texcoordBase + 2;
+            second.corners[2].texcoord = texcoordBase + 3;
         }
 
         void AddBox(
@@ -583,9 +708,22 @@ namespace ViewPoint
 
             Material floorMaterial;
             floorMaterial.name = "RoomFloor";
-            floorMaterial.diffuse[0] = 0.32f;
-            floorMaterial.diffuse[1] = 0.30f;
-            floorMaterial.diffuse[2] = 0.29f;
+            
+            const bool hasFloorTexture =
+                CopyIsaacFloorTexture(room, floorMaterial);
+            
+            if (hasFloorTexture)
+            {
+                floorMaterial.diffuse[0] = 1.0f;
+                floorMaterial.diffuse[1] = 1.0f;
+                floorMaterial.diffuse[2] = 1.0f;
+            }
+            else
+            {
+                floorMaterial.diffuse[0] = 0.32f;
+                floorMaterial.diffuse[1] = 0.30f;
+                floorMaterial.diffuse[2] = 0.29f;
+            }
 
             Material wallMaterial;
             wallMaterial.name = "RoomWalls";
@@ -651,14 +789,14 @@ namespace ViewPoint
             const float halfHeight =
                 static_cast<float>(height) * TILE_SIZE * 0.5f;
 
-            AddQuad(
-                model,
-                MAT_FLOOR,
-                {-halfWidth, FLOOR_Y, -halfHeight},
-                {halfWidth, FLOOR_Y, -halfHeight},
-                {halfWidth, FLOOR_Y, halfHeight},
-                {-halfWidth, FLOOR_Y, halfHeight});
-
+        AddTexturedFloorQuad(
+            model,
+            MAT_FLOOR,
+            {-halfWidth, FLOOR_Y, -halfHeight},
+            {halfWidth, FLOOR_Y, -halfHeight},
+            {halfWidth, FLOOR_Y, halfHeight},
+            {-halfWidth, FLOOR_Y, halfHeight});
+            
             unsigned int wallCount = 0;
             unsigned int doorCount = 0;
             unsigned int rockCount = 0;
