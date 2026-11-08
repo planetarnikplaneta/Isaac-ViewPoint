@@ -173,7 +173,6 @@ namespace ViewPoint
         if (!file)
             return false;
 
-        std::string legacyModel;
         std::string line;
 
         while (std::getline(file, line))
@@ -199,11 +198,7 @@ namespace ViewPoint
             const std::string value =
                 Trim(line.substr(equals + 1));
 
-            if (key == "Model")
-            {
-                legacyModel = value;
-            }
-            else if (key == "Object")
+            if (key == "Object")
             {
                 ObjectConfig object;
 
@@ -218,34 +213,11 @@ namespace ViewPoint
 
                 output.push_back(std::move(object));
             }
-        }
-
-        // Backwards compatibility with the old Model= format.
-        // Do not auto-load the sphere when no explicit object is configured.
-        if (output.empty() && !legacyModel.empty())
-        {
-            ObjectConfig object;
-
-            std::string path = legacyModel;
-
-            if (path.size() >= 2 &&
-                path.front() == '"' &&
-                path.back() == '"')
-            {
-                path = path.substr(1, path.size() - 2);
-            }
-
-            object.path = NormalizeAssetPath(path);
-
-            if (object.path.empty())
+            else if (key == "Model")
             {
                 LogMessage(
-                    "Invalid Model path in configuration.");
-
-                return false;
+                    "Legacy Model= entry ignored; object rendering is disabled by default.");
             }
-
-            output.push_back(std::move(object));
         }
 
         return true;
