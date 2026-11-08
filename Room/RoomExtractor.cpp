@@ -124,111 +124,53 @@ namespace ViewPoint
             LogNumber("Image content max Y", maxY);
             LogNumber("Image content pixels", static_cast<double>(count));
         }
-        bool CopyIsaacFloorTexture(
-            Room *room,
-            Material &material)
+        bool ExtractFloorTexture(
+            KAGE_Graphics_ImageBase *image,
+            int &outWidth,
+            int &outHeight,
+            std::vector<unsigned char> &outPixels)
         {
-            if (!room)
-                return false;
-
-            Backdrop *backdrop = room->GetBackdrop();
-            DiagnoseFloorImage(
-                "Diagnosing floorBuffer",
-                backdrop->floorBuffer.image);
-
-            DiagnoseFloorImage(
-                "Diagnosing floorSurface2",
-                backdrop->floorSurface2.image);
-            if (!backdrop)
-            {
-                LogMessage(
-                    "RoomExtractor: Current room has no backdrop.");
-
-                return false;
-            }
-
-            if (backdrop->floorBuffer.image)
-            {
-                auto *image = backdrop->floorBuffer.image;
-
-                LogNumber("FloorBuffer width", image->GetWidth());
-                LogNumber("FloorBuffer height", image->GetHeight());
-                LogNumber("FloorBuffer padded width", image->GetPaddedWidth());
-                LogNumber("FloorBuffer padded height", image->GetPaddedHeight());
-            }
-
-            if (backdrop->floorSurface2.image)
-            {
-                auto *image = backdrop->floorSurface2.image;
-
-                LogNumber("FloorSurface2 width", image->GetWidth());
-                LogNumber("FloorSurface2 height", image->GetHeight());
-                LogNumber("FloorSurface2 padded width", image->GetPaddedWidth());
-                LogNumber("FloorSurface2 padded height", image->GetPaddedHeight());
-            }
-            KAGE_Graphics_ImageBase *image =
-                backdrop->floorBuffer.image;
-
             if (!image)
-            {
-                LogMessage(
-                    "RoomExtractor: Backdrop floor image is null.");
-
                 return false;
-            }
 
             const int width = image->GetWidth();
             const int height = image->GetHeight();
 
             if (width <= 0 || height <= 0)
-            {
-                LogMessage(
-                    "RoomExtractor: Invalid floor texture dimensions.");
-
                 return false;
-            }
 
             const size_t w = static_cast<size_t>(width);
             const size_t h = static_cast<size_t>(height);
 
             if (w > std::numeric_limits<size_t>::max() / h ||
                 w * h > std::numeric_limits<size_t>::max() / 4)
-            {
-                LogMessage(
-                    "RoomExtractor: Floor texture is too large.");
-
                 return false;
-            }
 
-            const size_t pixelSize = w * h * 4;
-
-            std::vector<unsigned char> pixels(pixelSize);
+            std::vector<unsigned char> source(w * h * 4);
 
             image->GetTexelRegion(
                 0,
                 0,
                 static_cast<unsigned int>(width),
                 static_cast<unsigned int>(height),
-                pixels.data());
+                source.data());
+
             int minX = width;
             int minY = height;
             int maxX = -1;
             int maxY = -1;
 
-            uint64_t quadrants[4] = {};
-
             for (int y = 0; y < height; ++y)
             {
                 for (int x = 0; x < width; ++x)
                 {
-                    const size_t i = (static_cast<size_t>(y) * width + x) * 4;
+                    const size_t i =
+                        (static_cast<size_t>(y) * width + x) * 4;
 
-                    const unsigned char r = pixels[i + 0];
-                    const unsigned char g = pixels[i + 1];
-                    const unsigned char b = pixels[i + 2];
-                    const unsigned char a = pixels[i + 3];
-
-                    if (a == 0 && r == 0 && g == 0 && b == 0)
+                    if (source[i] == 0 &&
+                        source[i + 1] == 0 &&
+                        source[i + 2] == 0 &&
+                        source[i + 3] == 0)
                         continue;
 
                     if (x < minX)
@@ -239,46 +181,103 @@ namespace ViewPoint
                         maxX = x;
                     if (y > maxY)
                         maxY = y;
-
-                    const int quadrant =
-                        (x >= width / 2 ? 1 : 0) +
-                        (y >= height / 2 ? 2 : 0);
-
-                    ++quadrants[quadrant];
                 }
             }
 
-            LogNumber("Floor content min X", minX);
-            LogNumber("Floor content min Y", minY);
-            LogNumber("Floor content max X", maxX);
-            LogNumber("Floor content max Y", maxY);
+            if (maxX < minX || maxY < minY)
+                return false;
 
-            LogNumber("Floor top-left pixels", static_cast<double>(quadrants[0]));
-            LogNumber("Floor top-right pixels", static_cast<double>(quadrants[1]));
-            LogNumber("Floor bottom-left pixels", static_cast<double>(quadrants[2]));
-            LogNumber("Floor bottom-right pixels", static_cast<double>(quadrants[3]));
+            outWidth = maxX - minX + 1;
+            outHeight = maxY - minY + 1;
+
+            outPixels.resize(
+                static_cast<size_t>(outWidth) * outHeight * 4);
+
+            for (int y = 0; y < outHeight; ++y)
+            {
+                for (int x = 0; x < outWidth; ++x)
+                {
+                    const size_t sourceIndex =
+                        (static_cast<size_t>(y + minY) * width +
+                         (x + minX)) *
+                        4;
+
+                    const size_t destinationIndex =
+                        (static_cast<size_t>(y) * outWidth + x) * 4;
+
+                    outPixels[destinationIndex] = source[sourceIndex];
+                    outPixels[destinationIndex + 1] = source[sourceIndex + 1];
+                    outPixels[destinationIndex + 2] = source[sourceIndex + 2];
+                    outPixels[destinationIndex + 3] = source[sourceIndex + 3];
+                }
+            }
+
+            LogNumber("Floor crop X", minX);
+            LogNumber("Floor crop Y", minY);
+            LogNumber("Floor crop width", outWidth);
+            LogNumber("Floor crop height", outHeight);
+
+            return true;
+        }
+        bool CopyIsaacFloorTexture(
+            Room *room,
+            Material &material)
+        {
+            if (!room)
+                return false;
+
+            Backdrop *backdrop = room->GetBackdrop();
+
+            if (!backdrop)
+            {
+                LogMessage(
+                    "RoomExtractor: Current room has no backdrop.");
+                return false;
+            }
+
+            KAGE_Graphics_ImageBase *image =
+                backdrop->floorBuffer.image;
+
+            if (!image)
+            {
+                LogMessage(
+                    "RoomExtractor: Backdrop floor image is null.");
+                return false;
+            }
+
+            LogNumber("FloorBuffer width", image->GetWidth());
+            LogNumber("FloorBuffer height", image->GetHeight());
+
+            std::vector<unsigned char> pixels;
+            int width = 0;
+            int height = 0;
+
+            if (!ExtractFloorTexture(
+                    image,
+                    width,
+                    height,
+                    pixels))
+            {
+                LogMessage(
+                    "RoomExtractor: Failed to extract floor texture.");
+                return false;
+            }
+
             material.width = width;
             material.height = height;
             material.pixels = std::move(pixels);
 
-            // Prevent Texture.cpp from attempting to load a file.
             material.textureAttempted = true;
             material.diffuseTexturePath.clear();
 
             LogMessage(
-                "RoomExtractor: Copied Isaac floor texture.");
+                "RoomExtractor: Copied cropped Isaac floor texture.");
 
-            LogNumber(
-                "RoomExtractor: Floor texture width",
-                width);
-
-            LogNumber(
-                "RoomExtractor: Floor texture height",
-                height);
+            LogNumber("RoomExtractor: Floor texture width", width);
+            LogNumber("RoomExtractor: Floor texture height", height);
 
             return true;
         }
-
         void RefreshIsaacFloorTexture(
             Room *room,
             Material &material)
@@ -291,30 +290,16 @@ namespace ViewPoint
             if (!backdrop || !backdrop->floorBuffer.image)
                 return;
 
-            KAGE_Graphics_ImageBase *image =
-                backdrop->floorBuffer.image;
+            std::vector<unsigned char> pixels;
+            int width = 0;
+            int height = 0;
 
-            const int width = image->GetWidth();
-            const int height = image->GetHeight();
-
-            if (width <= 0 || height <= 0)
+            if (!ExtractFloorTexture(
+                    backdrop->floorBuffer.image,
+                    width,
+                    height,
+                    pixels))
                 return;
-
-            const size_t w = static_cast<size_t>(width);
-            const size_t h = static_cast<size_t>(height);
-
-            if (w > std::numeric_limits<size_t>::max() / h ||
-                w * h > std::numeric_limits<size_t>::max() / 4)
-                return;
-
-            std::vector<unsigned char> pixels(w * h * 4);
-
-            image->GetTexelRegion(
-                0,
-                0,
-                static_cast<unsigned int>(width),
-                static_cast<unsigned int>(height),
-                pixels.data());
 
             UpdateMaterialTexture(
                 material,
@@ -322,7 +307,6 @@ namespace ViewPoint
                 height,
                 std::move(pixels));
         }
-
         void AddTriangle(
             Model &model,
             int materialIndex,
