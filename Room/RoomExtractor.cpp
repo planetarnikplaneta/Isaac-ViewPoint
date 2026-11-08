@@ -64,7 +64,17 @@ namespace ViewPoint
                 const int entityType = grid
                     ? static_cast<int>(grid->GetType())
                     : -1;
-
+                float renderX = 0.0f;
+                float renderY = 0.0f;
+                
+                if (grid)
+                {
+                    Vector renderPosition;
+                    grid->GetRenderPosition(&renderPosition);
+                
+                    renderX = renderPosition.x;
+                    renderY = renderPosition.y;
+                }
                 const unsigned int gridIndex = grid
                     ? static_cast<unsigned int>(grid->_gridIndex)
                     : 0;
@@ -72,11 +82,13 @@ namespace ViewPoint
                 std::snprintf(
                     message,
                     sizeof(message),
-                    "RoomExtractor: Cell %u | EntityType: %d | Collision: %u | GridIndex: %u",
+                    "RoomExtractor: Cell %u | EntityType: %d | Collision: %u | GridIndex: %u | RenderPosition: %.2f, %.2f",
                     i,
                     entityType,
                     collision,
-                    gridIndex
+                    gridIndex,
+                    renderX,
+                    renderY
                 );
 
                 LogMessage(message);
