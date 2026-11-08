@@ -33,12 +33,6 @@ HOOK_GLOBAL(
     __stdcall)
 {
     ViewPoint::UpdateRoomExtractor();
-    if (wglGetCurrentContext())
-    {
-        HWND window = WindowFromDC(hdc);
-
-        // RenderTriangleMesh(window);
-    }
 
     return super(hdc);
 }
