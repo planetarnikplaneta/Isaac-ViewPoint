@@ -10,3 +10,5 @@ How to download:
 - go to your "steamapps/common/The Binding of Isaac Rebirth/Repentogon/" Repentogon folder
 - and paste it directly to that folder, "Repentogon/zhlMain_ViewPoint.dll"
 - and now run the game with REPENTOGON
+
+<img width="2560" height="1080" alt="Screenshot_20261108_094730" src="https://github.com/user-attachments/assets/8258a20e-0092-46d1-8eef-42dc25a1d25e" />
