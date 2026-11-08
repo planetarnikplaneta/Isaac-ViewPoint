@@ -139,26 +139,53 @@ namespace ViewPoint
                 static_cast<unsigned int>(width),
                 static_cast<unsigned int>(height),
                 pixels.data());
-            uint64_t nonTransparent = 0;
-            uint64_t nonBlack = 0;
+            int minX = width;
+            int minY = height;
+            int maxX = -1;
+            int maxY = -1;
 
-            for (size_t i = 0; i < pixels.size(); i += 4)
+            uint64_t quadrants[4] = {};
+
+            for (int y = 0; y < height; ++y)
             {
-                const unsigned char r = pixels[i + 0];
-                const unsigned char g = pixels[i + 1];
-                const unsigned char b = pixels[i + 2];
-                const unsigned char a = pixels[i + 3];
+                for (int x = 0; x < width; ++x)
+                {
+                    const size_t i = (static_cast<size_t>(y) * width + x) * 4;
 
-                if (a != 0)
-                    ++nonTransparent;
+                    const unsigned char r = pixels[i + 0];
+                    const unsigned char g = pixels[i + 1];
+                    const unsigned char b = pixels[i + 2];
+                    const unsigned char a = pixels[i + 3];
 
-                if (r != 0 || g != 0 || b != 0)
-                    ++nonBlack;
+                    if (a == 0 && r == 0 && g == 0 && b == 0)
+                        continue;
+
+                    if (x < minX)
+                        minX = x;
+                    if (y < minY)
+                        minY = y;
+                    if (x > maxX)
+                        maxX = x;
+                    if (y > maxY)
+                        maxY = y;
+
+                    const int quadrant =
+                        (x >= width / 2 ? 1 : 0) +
+                        (y >= height / 2 ? 2 : 0);
+
+                    ++quadrants[quadrant];
+                }
             }
 
-            LogNumber("Floor non-transparent pixels", static_cast<double>(nonTransparent));
-            LogNumber("Floor non-black pixels", static_cast<double>(nonBlack));
-            LogNumber("Floor total pixels", static_cast<double>(width * height));
+            LogNumber("Floor content min X", minX);
+            LogNumber("Floor content min Y", minY);
+            LogNumber("Floor content max X", maxX);
+            LogNumber("Floor content max Y", maxY);
+
+            LogNumber("Floor top-left pixels", static_cast<double>(quadrants[0]));
+            LogNumber("Floor top-right pixels", static_cast<double>(quadrants[1]));
+            LogNumber("Floor bottom-left pixels", static_cast<double>(quadrants[2]));
+            LogNumber("Floor bottom-right pixels", static_cast<double>(quadrants[3]));
             material.width = width;
             material.height = height;
             material.pixels = std::move(pixels);
