@@ -97,7 +97,7 @@ jobs:
             Room\RoomExtractor.cpp ^
             ViewPointResources.res ^
             libzhl.lib ^
-            /link /OUT:zhlMain_Planet.dll
+            /link /OUT:zhlMain_ViewPoint.dll
 
           if errorlevel 1 exit /b 1
 
@@ -109,4 +109,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Isaac-ViewPoint
-          path: zhlMain_Planet.dll
+          path: zhlMain_ViewPoint.dll
