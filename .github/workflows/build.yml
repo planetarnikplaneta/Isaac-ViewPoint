@@ -1,4 +1,4 @@
-name: Build Native Plugin
+name: Build Isaac ViewPoint Dll Mod
 
 on:
   workflow_dispatch:
@@ -82,7 +82,7 @@ jobs:
             /I REPENTOGON/libzhl ^
             /I REPENTOGON/libs/lua ^
             /I "%RAPIDXML_INCLUDE%" ^
-            Main_Planet.cpp ^
+            Main_ViewPoint.cpp ^
             Core\Logger.cpp ^
             Core\State.cpp ^
             Core\AssetPaths.cpp ^
