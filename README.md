@@ -1,4 +1,5 @@
-Isaac ViewPoint - play The Binding of Isaac from 1st perspective
+Isaac ViewPoint - play The Binding of Isaac from 1st perspective.
+
 This is still a super early build!
 
 How to download:
