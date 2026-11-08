@@ -3,6 +3,7 @@
 #include "../IsaacRepentance.h"
 #include "../Core/Logger.h"
 #include "../Models/GpuMesh.h"
+#include "../Models/Texture.h"
 
 #include <cstdint>
 #include <string>
