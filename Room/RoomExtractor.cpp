@@ -1,6 +1,6 @@
 #include "RoomExtractor.h"
 
-#include "../IsaacRepentance.h"
+#include "IsaacRepentance.h"
 #include "../Core/Logger.h"
 
 #include <cstdio>
@@ -10,7 +10,7 @@ namespace ViewPoint
 {
     namespace
     {
-        constexpr unsigned int MAX_GRID_ENTITIES = 447;
+        constexpr unsigned int MAX_GRID_CELLS = 447;
 
         Room* g_LastRoom = nullptr;
         int g_LastRoomIndex = -1;
@@ -21,8 +21,11 @@ namespace ViewPoint
             if (!room)
                 return;
 
-            const unsigned int width = room->_gridWidth;
-            const unsigned int height = room->_gridHeight;
+            const unsigned int width =
+                static_cast<unsigned int>(room->_gridWidth);
+
+            const unsigned int height =
+                static_cast<unsigned int>(room->_gridHeight);
 
             char message[256];
 
@@ -40,8 +43,8 @@ namespace ViewPoint
 
             unsigned int cellCount = width * height;
 
-            if (cellCount > MAX_GRID_ENTITIES)
-                cellCount = MAX_GRID_ENTITIES;
+            if (cellCount > MAX_GRID_CELLS)
+                cellCount = MAX_GRID_CELLS;
 
             LogNumber("RoomExtractor: Grid cells", cellCount);
 
@@ -49,26 +52,41 @@ namespace ViewPoint
 
             for (unsigned int i = 0; i < cellCount; ++i)
             {
-                GridEntity* grid = room->GetGridEntity(i);
+                GridEntity* grid =
+                    room->GetGridEntity(static_cast<int>(i));
 
-                if (!grid)
-                    continue;
+                const unsigned int collision =
+                    room->GetGridCollision(static_cast<int>(i));
 
-                ++occupiedCells;
+                if (grid)
+                    ++occupiedCells;
+
+                const int entityType = grid
+                    ? static_cast<int>(grid->GetType())
+                    : -1;
+
+                const unsigned int gridIndex = grid
+                    ? static_cast<unsigned int>(grid->_gridIndex)
+                    : 0;
 
                 std::snprintf(
                     message,
                     sizeof(message),
-                    "RoomExtractor: Grid entity | Cell: %u | Type: %d | GridIndex: %u",
+                    "RoomExtractor: Cell %u | EntityType: %d | Collision: %u | GridIndex: %u",
                     i,
-                    grid->GetType(),
-                    grid->_gridIndex
+                    entityType,
+                    collision,
+                    gridIndex
                 );
 
                 LogMessage(message);
             }
 
-            LogNumber("RoomExtractor: Occupied grid cells", occupiedCells);
+            LogNumber(
+                "RoomExtractor: Occupied grid cells",
+                occupiedCells
+            );
+
             LogMessage("RoomExtractor: Extraction finished.");
         }
     }
