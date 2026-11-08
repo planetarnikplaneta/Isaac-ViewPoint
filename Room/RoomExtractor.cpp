@@ -14,7 +14,7 @@ namespace ViewPoint
 {
     namespace
     {
-        constexpr unsigned int MAX_GRID_CELLS = 447;
+        constexpr unsigned int MAX_GRID_CELLS = 448;
 
         constexpr int GRID_ROCK = 2;
         constexpr int GRID_ROCKB = 3;
