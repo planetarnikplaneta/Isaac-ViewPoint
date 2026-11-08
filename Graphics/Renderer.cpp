@@ -1026,10 +1026,17 @@ namespace ViewPoint
         // Detect configuration changes.
         CheckConfigurationReload();
 
-        // Initial scene loading.
-        if (!g_SceneAttempted)
+        // Initial scene loading. Some games create multiple OpenGL
+        // contexts, and each one needs its own scene instance. Reusing
+        // a stale scene across contexts causes the same model to be
+        // rendered a second time.
+        const HGLRC currentContext = wglGetCurrentContext();
+
+        if (!g_SceneAttempted ||
+            g_SceneContext != currentContext)
         {
             g_SceneAttempted = true;
+            g_SceneContext = currentContext;
 
             if (!LoadConfiguredScene())
             {
