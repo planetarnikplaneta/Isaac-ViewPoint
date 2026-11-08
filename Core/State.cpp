@@ -5,6 +5,7 @@ namespace ViewPoint
     HMODULE g_Module = nullptr;
     HGLRC g_ResourceContext = nullptr;
     HGLRC g_SceneContext = nullptr;
+    HWND g_RenderWindow = nullptr;
 
     PFNGLUSEPROGRAMPROC g_UseProgram = nullptr;
     PFNGLACTIVETEXTUREPROC g_ActiveTexture = nullptr;

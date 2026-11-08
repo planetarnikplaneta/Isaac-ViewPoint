@@ -47,6 +47,7 @@ namespace ViewPoint
     extern HMODULE g_Module;
     extern HGLRC g_ResourceContext;
     extern HGLRC g_SceneContext;
+    extern HWND g_RenderWindow;
 
     // OpenGL function pointers.
     extern PFNGLUSEPROGRAMPROC g_UseProgram;

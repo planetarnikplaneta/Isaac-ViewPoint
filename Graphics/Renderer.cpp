@@ -1018,6 +1018,21 @@ namespace ViewPoint
 
     void RenderTriangleMesh(HWND window)
     {
+        if (!window)
+            return;
+
+        if (!g_RenderWindow)
+        {
+            g_RenderWindow = window;
+        }
+        else if (g_RenderWindow != window)
+        {
+            // Ignore duplicate render passes from alternate windows or
+            // hidden resource contexts. The scene should only initialize
+            // once for the real game view.
+            return;
+        }
+
         if (!EnsureContext())
             return;
 
@@ -1026,9 +1041,7 @@ namespace ViewPoint
         if (g_SceneAttempted &&
             g_SceneContext != currentContext)
         {
-            // Ignore alternate OpenGL contexts. Some engines create a
-            // hidden resource context that re-enters the hook and would
-            // reload the same scene a second time.
+            // Ignore alternate OpenGL contexts for the same window.
             return;
         }
 
