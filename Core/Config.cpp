@@ -221,14 +221,12 @@ namespace ViewPoint
         }
 
         // Backwards compatibility with the old Model= format.
-        if (output.empty())
+        // Do not auto-load the sphere when no explicit object is configured.
+        if (output.empty() && !legacyModel.empty())
         {
             ObjectConfig object;
 
-            std::string path =
-                legacyModel.empty()
-                    ? DEFAULT_OBJECT
-                    : legacyModel;
+            std::string path = legacyModel;
 
             if (path.size() >= 2 &&
                 path.front() == '"' &&
@@ -260,14 +258,9 @@ namespace ViewPoint
         if (!ReadConfiguration(configuredObjects))
         {
             LogMessage(
-                "Configuration file not found or invalid; using default model.");
+                "Configuration file not found or invalid; leaving scene empty.");
 
             configuredObjects.clear();
-
-            ObjectConfig defaultObject;
-            defaultObject.path = DEFAULT_OBJECT;
-
-            configuredObjects.push_back(defaultObject);
         }
 
         g_ObjectConfigs = std::move(configuredObjects);

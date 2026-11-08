@@ -89,8 +89,7 @@ extern "C" __declspec(dllexport) int ModInit()
     LoadConfiguration();
 
     ViewPoint::LogMessage(
-        ("Default model: " +
-         std::string(DEFAULT_OBJECT)).c_str());
+        "Default model: disabled; scene starts empty.");
 
     ViewPoint::LogNumber(
         "Configured scene objects",
