@@ -212,10 +212,10 @@ namespace ViewPoint
                 }
             }
 
-            LogNumber("Floor crop X", minX);
-            LogNumber("Floor crop Y", minY);
-            LogNumber("Floor crop width", outWidth);
-            LogNumber("Floor crop height", outHeight);
+          //  LogNumber("Floor crop X", minX);
+           // LogNumber("Floor crop Y", minY);
+          //  LogNumber("Floor crop width", outWidth);
+           // LogNumber("Floor crop height", outHeight);
 
             return true;
         }
@@ -355,7 +355,10 @@ namespace ViewPoint
                 base + 2,
                 base + 3);
         }
-
+LogNumber("Room grid width", width);
+LogNumber("Room grid height", height);
+LogNumber("Floor quad width", halfWidth * 2.0f);
+LogNumber("Floor quad height", halfHeight * 2.0f);
         void AddTexturedFloorQuad(
             Model &model,
             int materialIndex,
