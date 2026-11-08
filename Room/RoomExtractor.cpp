@@ -76,6 +76,25 @@ namespace ViewPoint
                 return false;
             }
 
+            if (backdrop->floorBuffer.image)
+            {
+                auto *image = backdrop->floorBuffer.image;
+
+                LogNumber("FloorBuffer width", image->GetWidth());
+                LogNumber("FloorBuffer height", image->GetHeight());
+                LogNumber("FloorBuffer padded width", image->GetPaddedWidth());
+                LogNumber("FloorBuffer padded height", image->GetPaddedHeight());
+            }
+
+            if (backdrop->floorSurface2.image)
+            {
+                auto *image = backdrop->floorSurface2.image;
+
+                LogNumber("FloorSurface2 width", image->GetWidth());
+                LogNumber("FloorSurface2 height", image->GetHeight());
+                LogNumber("FloorSurface2 padded width", image->GetPaddedWidth());
+                LogNumber("FloorSurface2 padded height", image->GetPaddedHeight());
+            }
             KAGE_Graphics_ImageBase *image =
                 backdrop->floorBuffer.image;
 
@@ -89,26 +108,7 @@ namespace ViewPoint
 
             const int width = image->GetWidth();
             const int height = image->GetHeight();
-            LogNumber("Floor width", image->GetWidth());
-            LogNumber("Floor height", image->GetHeight());
-            LogNumber("Floor padded width", image->GetPaddedWidth());
-            LogNumber("Floor padded height", image->GetPaddedHeight());
-            Backdrop *backdrop = room->GetBackdrop();
 
-            if (backdrop->floorSurface2.image)
-            {
-                LogNumber("FloorSurface2 width",
-                          backdrop->floorSurface2.image->GetWidth());
-
-                LogNumber("FloorSurface2 height",
-                          backdrop->floorSurface2.image->GetHeight());
-
-                LogNumber("FloorSurface2 padded width",
-                          backdrop->floorSurface2.image->GetPaddedWidth());
-
-                LogNumber("FloorSurface2 padded height",
-                          backdrop->floorSurface2.image->GetPaddedHeight());
-            }
             if (width <= 0 || height <= 0)
             {
                 LogMessage(
