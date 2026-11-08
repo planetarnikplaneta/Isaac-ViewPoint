@@ -32,11 +32,20 @@ HOOK_GLOBAL(
     (HDC hdc)->bool,
     __stdcall)
 {
-    ViewPoint::UpdateRoomExtractor();
-
     if (wglGetCurrentContext())
     {
-        HWND window = WindowFromDC(hdc);
+        const HWND window = WindowFromDC(hdc);
+
+        if (!ViewPoint::g_RenderWindow)
+        {
+            ViewPoint::g_RenderWindow = window;
+        }
+        else if (ViewPoint::g_RenderWindow != window)
+        {
+            return super(hdc);
+        }
+
+        ViewPoint::UpdateRoomExtractor();
 
         glPushAttrib(GL_DEPTH_BUFFER_BIT | GL_ENABLE_BIT);
         glEnable(GL_DEPTH_TEST);
