@@ -143,6 +143,50 @@ namespace ViewPoint
             return true;
         }
 
+void RefreshIsaacFloorTexture(
+    Room* room,
+    Material& material)
+{
+    if (!room)
+        return;
+
+    Backdrop* backdrop = room->GetBackdrop();
+
+    if (!backdrop || !backdrop->floorBuffer.image)
+        return;
+
+    KAGE_Graphics_ImageBase* image =
+        backdrop->floorBuffer.image;
+
+    const int width = image->GetWidth();
+    const int height = image->GetHeight();
+
+    if (width <= 0 || height <= 0)
+        return;
+
+    const size_t w = static_cast<size_t>(width);
+    const size_t h = static_cast<size_t>(height);
+
+    if (w > std::numeric_limits<size_t>::max() / h ||
+        w * h > std::numeric_limits<size_t>::max() / 4)
+        return;
+
+    std::vector<unsigned char> pixels(w * h * 4);
+
+    image->GetTexelRegion(
+        0,
+        0,
+        static_cast<unsigned int>(width),
+        static_cast<unsigned int>(height),
+        pixels.data());
+
+    UpdateMaterialTexture(
+        material,
+        width,
+        height,
+        std::move(pixels));
+}
+
         void AddTriangle(
             Model& model,
             int materialIndex,
@@ -957,12 +1001,19 @@ namespace ViewPoint
         const int dimension =
             g_Game->GetDimension();
 
-        if (room == g_LastRoom &&
-            roomIndex == g_LastRoomIndex &&
-            dimension == g_LastDimension)
-        {
-            return;
-        }
+if (room == g_LastRoom &&
+    roomIndex == g_LastRoomIndex &&
+    dimension == g_LastDimension)
+{
+    if (g_RoomModel.materials.size() > MAT_FLOOR)
+    {
+        RefreshIsaacFloorTexture(
+            room,
+            g_RoomModel.materials[MAT_FLOOR]);
+    }
+
+    return;
+}
 
         g_LastRoom = room;
         g_LastRoomIndex = roomIndex;
