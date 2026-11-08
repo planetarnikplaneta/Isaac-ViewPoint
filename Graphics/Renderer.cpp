@@ -1021,19 +1021,23 @@ namespace ViewPoint
         if (!EnsureContext())
             return;
 
+        const HGLRC currentContext = wglGetCurrentContext();
+
+        if (g_SceneAttempted &&
+            g_SceneContext != currentContext)
+        {
+            // Ignore alternate OpenGL contexts. Some engines create a
+            // hidden resource context that re-enters the hook and would
+            // reload the same scene a second time.
+            return;
+        }
+
         UpdateCamera(window);
 
         // Detect configuration changes.
         CheckConfigurationReload();
 
-        // Initial scene loading. Some games create multiple OpenGL
-        // contexts, and each one needs its own scene instance. Reusing
-        // a stale scene across contexts causes the same model to be
-        // rendered a second time.
-        const HGLRC currentContext = wglGetCurrentContext();
-
-        if (!g_SceneAttempted ||
-            g_SceneContext != currentContext)
+        if (!g_SceneAttempted)
         {
             g_SceneAttempted = true;
             g_SceneContext = currentContext;
