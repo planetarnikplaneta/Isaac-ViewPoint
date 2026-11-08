@@ -139,7 +139,26 @@ namespace ViewPoint
                 static_cast<unsigned int>(width),
                 static_cast<unsigned int>(height),
                 pixels.data());
+            uint64_t nonTransparent = 0;
+            uint64_t nonBlack = 0;
 
+            for (size_t i = 0; i < pixels.size(); i += 4)
+            {
+                const unsigned char r = pixels[i + 0];
+                const unsigned char g = pixels[i + 1];
+                const unsigned char b = pixels[i + 2];
+                const unsigned char a = pixels[i + 3];
+
+                if (a != 0)
+                    ++nonTransparent;
+
+                if (r != 0 || g != 0 || b != 0)
+                    ++nonBlack;
+            }
+
+            LogNumber("Floor non-transparent pixels", static_cast<double>(nonTransparent));
+            LogNumber("Floor non-black pixels", static_cast<double>(nonBlack));
+            LogNumber("Floor total pixels", static_cast<double>(width * height));
             material.width = width;
             material.height = height;
             material.pixels = std::move(pixels);
