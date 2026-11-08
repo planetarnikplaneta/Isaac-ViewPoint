@@ -41,6 +41,12 @@ namespace ViewPoint
         constexpr float FLOOR_Y = -1.5f;
         constexpr float WALL_TOP_Y = 1.5f;
         constexpr float TILE_SIZE = 1.0f;
+        constexpr int FLOOR_SOURCE_X = 52;
+        constexpr int FLOOR_SOURCE_Y = 52;
+        constexpr int FLOOR_SOURCE_WIDTH = 338;
+        constexpr int FLOOR_SOURCE_HEIGHT = 182;
+
+        constexpr float FLOOR_PIXELS_PER_TILE = 52.0f;
 
         // Material indices.
         constexpr int MAT_FLOOR = 0;
@@ -124,6 +130,7 @@ namespace ViewPoint
             LogNumber("Image content max Y", maxY);
             LogNumber("Image content pixels", static_cast<double>(count));
         }
+
         bool ExtractFloorTexture(
             KAGE_Graphics_ImageBase *image,
             int &outWidth,
@@ -133,92 +140,30 @@ namespace ViewPoint
             if (!image)
                 return false;
 
-            const int width = image->GetWidth();
-            const int height = image->GetHeight();
+            const int imageWidth = image->GetWidth();
+            const int imageHeight = image->GetHeight();
 
-            if (width <= 0 || height <= 0)
+            if (imageWidth < FLOOR_SOURCE_X + FLOOR_SOURCE_WIDTH ||
+                imageHeight < FLOOR_SOURCE_Y + FLOOR_SOURCE_HEIGHT)
                 return false;
 
-            const size_t w = static_cast<size_t>(width);
-            const size_t h = static_cast<size_t>(height);
-
-            if (w > std::numeric_limits<size_t>::max() / h ||
-                w * h > std::numeric_limits<size_t>::max() / 4)
-                return false;
-
-            std::vector<unsigned char> source(w * h * 4);
-
-            image->GetTexelRegion(
-                0,
-                0,
-                static_cast<unsigned int>(width),
-                static_cast<unsigned int>(height),
-                source.data());
-
-            int minX = width;
-            int minY = height;
-            int maxX = -1;
-            int maxY = -1;
-
-            for (int y = 0; y < height; ++y)
-            {
-                for (int x = 0; x < width; ++x)
-                {
-                    const size_t i =
-                        (static_cast<size_t>(y) * width + x) * 4;
-
-                    if (source[i] == 0 &&
-                        source[i + 1] == 0 &&
-                        source[i + 2] == 0 &&
-                        source[i + 3] == 0)
-                        continue;
-
-                    if (x < minX)
-                        minX = x;
-                    if (y < minY)
-                        minY = y;
-                    if (x > maxX)
-                        maxX = x;
-                    if (y > maxY)
-                        maxY = y;
-                }
-            }
-
-            if (maxX < minX || maxY < minY)
-                return false;
-
-            outWidth = maxX - minX + 1;
-            outHeight = maxY - minY + 1;
+            outWidth = FLOOR_SOURCE_WIDTH;
+            outHeight = FLOOR_SOURCE_HEIGHT;
 
             outPixels.resize(
-                static_cast<size_t>(outWidth) * outHeight * 4);
+                static_cast<size_t>(outWidth) *
+                outHeight * 4);
 
-            for (int y = 0; y < outHeight; ++y)
-            {
-                for (int x = 0; x < outWidth; ++x)
-                {
-                    const size_t sourceIndex =
-                        (static_cast<size_t>(y + minY) * width +
-                         (x + minX)) *
-                        4;
-
-                    const size_t destinationIndex =
-                        (static_cast<size_t>(y) * outWidth + x) * 4;
-
-                    outPixels[destinationIndex] = source[sourceIndex];
-                    outPixels[destinationIndex + 1] = source[sourceIndex + 1];
-                    outPixels[destinationIndex + 2] = source[sourceIndex + 2];
-                    outPixels[destinationIndex + 3] = source[sourceIndex + 3];
-                }
-            }
-
-          //  LogNumber("Floor crop X", minX);
-           // LogNumber("Floor crop Y", minY);
-          //  LogNumber("Floor crop width", outWidth);
-           // LogNumber("Floor crop height", outHeight);
+            image->GetTexelRegion(
+                FLOOR_SOURCE_X,
+                FLOOR_SOURCE_Y,
+                static_cast<unsigned int>(outWidth),
+                static_cast<unsigned int>(outHeight),
+                outPixels.data());
 
             return true;
         }
+
         bool CopyIsaacFloorTexture(
             Room *room,
             Material &material)
@@ -355,10 +300,7 @@ namespace ViewPoint
                 base + 2,
                 base + 3);
         }
-LogNumber("Room grid width", width);
-LogNumber("Room grid height", height);
-LogNumber("Floor quad width", halfWidth * 2.0f);
-LogNumber("Floor quad height", halfHeight * 2.0f);
+
         void AddTexturedFloorQuad(
             Model &model,
             int materialIndex,
@@ -955,13 +897,29 @@ LogNumber("Floor quad height", halfHeight * 2.0f);
             const float halfHeight =
                 static_cast<float>(height) * TILE_SIZE * 0.5f;
 
+            const float leftX =
+                -static_cast<float>(width) * TILE_SIZE * 0.5f +
+                static_cast<float>(FLOOR_SOURCE_X) / FLOOR_PIXELS_PER_TILE;
+
+            const float rightX =
+                leftX +
+                static_cast<float>(FLOOR_SOURCE_WIDTH) / FLOOR_PIXELS_PER_TILE;
+
+            const float topZ =
+                static_cast<float>(height) * TILE_SIZE * 0.5f -
+                static_cast<float>(FLOOR_SOURCE_Y) / FLOOR_PIXELS_PER_TILE;
+
+            const float bottomZ =
+                topZ -
+                static_cast<float>(FLOOR_SOURCE_HEIGHT) / FLOOR_PIXELS_PER_TILE;
+
             AddTexturedFloorQuad(
                 model,
                 MAT_FLOOR,
-                {-halfWidth, FLOOR_Y, -halfHeight},
-                {halfWidth, FLOOR_Y, -halfHeight},
-                {halfWidth, FLOOR_Y, halfHeight},
-                {-halfWidth, FLOOR_Y, halfHeight});
+                {leftX, FLOOR_Y, topZ},
+                {rightX, FLOOR_Y, topZ},
+                {rightX, FLOOR_Y, bottomZ},
+                {leftX, FLOOR_Y, bottomZ});
 
             unsigned int wallCount = 0;
             unsigned int doorCount = 0;
