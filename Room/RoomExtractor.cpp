@@ -136,7 +136,7 @@ namespace ViewPoint
                 return false;
 
             constexpr int PIXELS_PER_TILE = 26;
-            constexpr int FLOOR_INSET_TILES = 1;
+            constexpr int CROP_OFFSET = 52;
 
             const int gridWidth = room->_gridWidth;
             const int gridHeight = room->_gridHeight;
@@ -144,22 +144,22 @@ namespace ViewPoint
             const int imageWidth = image->GetWidth();
             const int imageHeight = image->GetHeight();
 
-            if (gridWidth <= FLOOR_INSET_TILES * 2 ||
-                gridHeight <= FLOOR_INSET_TILES * 2 ||
+            if (gridWidth <= 2 ||
+                gridHeight <= 2 ||
                 imageWidth <= 0 ||
                 imageHeight <= 0)
+            {
                 return false;
+            }
 
-            const int cropX = FLOOR_INSET_TILES * PIXELS_PER_TILE;
-            const int cropY = FLOOR_INSET_TILES * PIXELS_PER_TILE;
+            const int cropX = CROP_OFFSET;
+            const int cropY = CROP_OFFSET;
 
             const int cropWidth =
-                (gridWidth - FLOOR_INSET_TILES * 2) *
-                PIXELS_PER_TILE;
+                (gridWidth - 2) * PIXELS_PER_TILE;
 
             const int cropHeight =
-                (gridHeight - FLOOR_INSET_TILES * 2) *
-                PIXELS_PER_TILE;
+                (gridHeight - 2) * PIXELS_PER_TILE;
 
             if (cropX < 0 ||
                 cropY < 0 ||
