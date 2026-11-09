@@ -112,7 +112,26 @@ namespace ViewPoint
             g_Camera.yaw =
                 g_Camera.playerBaseYaw +
                 g_Camera.playerYawOffset;
+            static unsigned int debugCounter = 0;
 
+            if (++debugCounter >= 60)
+            {
+                debugCounter = 0;
+
+                LogNumber("VP Player X", playerPosition->x);
+                LogNumber("VP Player Y", playerPosition->y);
+
+                LogNumber(
+                    "VP Grid Width",
+                    static_cast<float>(room->_gridWidth));
+
+                LogNumber(
+                    "VP Grid Height",
+                    static_cast<float>(room->_gridHeight));
+
+                LogNumber("VP Camera X", g_Camera.position.x);
+                LogNumber("VP Camera Z", g_Camera.position.z);
+            }
             return true;
         }
     }
