@@ -903,7 +903,7 @@ namespace ViewPoint
 
             const float rightX =
                 leftX +
-                static_cast<float>(FLOOR_SOURCE_WIDTH) / FLOOR_PIXELS_PER_TILE;
+                static_cast<float>(FLOOR_SOURCE_WIDTH*2.0f) / FLOOR_PIXELS_PER_TILE;
 
             const float topZ =
                 static_cast<float>(height) * TILE_SIZE * 0.5f -
@@ -911,7 +911,7 @@ namespace ViewPoint
 
             const float bottomZ =
                 topZ -
-                static_cast<float>(FLOOR_SOURCE_HEIGHT) / FLOOR_PIXELS_PER_TILE;
+                static_cast<float>(FLOOR_SOURCE_HEIGHT*2.0f) / FLOOR_PIXELS_PER_TILE;
 
             AddTexturedFloorQuad(
                 model,
