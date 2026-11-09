@@ -32,30 +32,6 @@
 #define GL_TEXTURE0 0x84C0
 #endif
 
-#ifndef GL_RGBA
-#define GL_RGBA 0x1908
-#endif
-
-#ifndef GL_UNSIGNED_BYTE
-#define GL_UNSIGNED_BYTE 0x1401
-#endif
-
-#ifndef GL_TEXTURE_MIN_FILTER
-#define GL_TEXTURE_MIN_FILTER 0x2801
-#endif
-
-#ifndef GL_TEXTURE_MAG_FILTER
-#define GL_TEXTURE_MAG_FILTER 0x2800
-#endif
-
-#ifndef GL_TEXTURE_WRAP_S
-#define GL_TEXTURE_WRAP_S 0x2802
-#endif
-
-#ifndef GL_TEXTURE_WRAP_T
-#define GL_TEXTURE_WRAP_T 0x2803
-#endif
-
 #ifndef GL_CLAMP_TO_EDGE
 #define GL_CLAMP_TO_EDGE 0x812F
 #endif
@@ -64,75 +40,83 @@
 #define GL_QUADS 0x0007
 #endif
 
-#ifndef GL_LINES
-#define GL_LINES 0x0001
-#endif
-
-#ifndef GL_LINE_LOOP
-#define GL_LINE_LOOP 0x0002
-#endif
-
 namespace ViewPoint
 {
     namespace
     {
         constexpr float PI = 3.14159265358979323846f;
-
-        constexpr float ISAAC_PIXELS_PER_TILE = 40.0f;
-
-        constexpr float ROOM_FLOOR_Y = -1.5f;
-
-        constexpr float CAPSULE_HEIGHT_OFFSET = 0.025f;
-
-        constexpr int CAPSULE_SEGMENTS = 16;
+        constexpr float PIXELS_PER_TILE = 40.0f;
+        constexpr float FLOOR_Y = -1.5f;
+        constexpr float COLLISION_Y_OFFSET = 0.035f;
+        constexpr int CAPSULE_SEGMENTS = 24;
 
         struct SpriteTexture
         {
-            GLuint texture = 0;
+            GLuint id = 0;
             int width = 0;
             int height = 0;
         };
 
-        // Keyed by the actual REPENTOGON image pointer.
-        std::unordered_map<
-            KAGE_Graphics_ImageBase *,
-            SpriteTexture>
+        std::unordered_map<KAGE_Graphics_ImageBase*, SpriteTexture>
             g_SpriteTextures;
 
-        HGLRC g_EntityTextureContext = nullptr;
+        HGLRC g_TextureContext = nullptr;
 
-        // --------------------------------------------------
-        // ROOM POSITION CONVERSION
-        // --------------------------------------------------
+        struct WorldPoint
+        {
+            float x;
+            float y;
+            float z;
+        };
 
-        static Vector IsaacPositionToWorld(
-            const Vector &position,
-            Room *room)
+        struct SpriteVertex
+        {
+            float x;
+            float y;
+            float z;
+            float u;
+            float v;
+        };
+
+        // ------------------------------------------------------------
+        // ISAAC POSITION TO VIEWPOINT WORLD POSITION
+        // ------------------------------------------------------------
+
+        static WorldPoint IsaacToWorld(
+            const Vector& position,
+            Room* room)
         {
             const float roomCenterX =
                 320.0f +
                 (static_cast<float>(room->_gridWidth) - 15.0f) *
-                    20.0f;
+                20.0f;
 
             const float roomCenterY =
                 280.0f +
                 (static_cast<float>(room->_gridHeight) - 9.0f) *
-                    20.0f;
+                20.0f;
 
-            return Vector(
+            WorldPoint result{};
+
+            result.x =
                 (position.x - roomCenterX) /
-                    ISAAC_PIXELS_PER_TILE,
+                PIXELS_PER_TILE;
 
+            result.y = FLOOR_Y;
+
+            result.z =
                 (roomCenterY - position.y) /
-                    ISAAC_PIXELS_PER_TILE);
+                PIXELS_PER_TILE;
+
+            return result;
         }
 
-        // --------------------------------------------------
-        // SPRITE TEXTURE CACHE
-        // --------------------------------------------------
+        // ------------------------------------------------------------
+        // SPRITESHEET TEXTURE CACHE
+        // ------------------------------------------------------------
 
-        static SpriteTexture *GetSpriteTexture(
-            KAGE_Graphics_ImageBase *image)
+        static SpriteTexture* GetSpriteTexture(
+            KAGE_Graphics_ImageBase* image)
         {
             if (!image)
                 return nullptr;
@@ -142,11 +126,11 @@ namespace ViewPoint
             if (found != g_SpriteTextures.end())
                 return &found->second;
 
-            const int width = static_cast<int>(
-                image->GetWidth());
+            const int width =
+                static_cast<int>(image->GetWidth());
 
-            const int height = static_cast<int>(
-                image->GetHeight());
+            const int height =
+                static_cast<int>(image->GetHeight());
 
             if (width <= 0 || height <= 0)
                 return nullptr;
@@ -158,10 +142,8 @@ namespace ViewPoint
             if (pixelCount > 64u * 1024u * 1024u)
                 return nullptr;
 
-            std::vector<unsigned char> pixels(
-                pixelCount * 4u);
+            std::vector<unsigned char> pixels(pixelCount * 4u);
 
-            // REPENTOGON returns raw RGBA pixels.
             image->GetTexelRegion(
                 0,
                 0,
@@ -169,25 +151,23 @@ namespace ViewPoint
                 static_cast<unsigned int>(height),
                 pixels.data());
 
-            SpriteTexture result;
+            // Do not let an old OpenGL error invalidate this upload.
+            while (glGetError() != GL_NO_ERROR)
+            {
+            }
 
-            result.width = width;
-            result.height = height;
+            SpriteTexture texture{};
+            texture.width = width;
+            texture.height = height;
 
-            glGenTextures(
-                1,
-                &result.texture);
+            glGenTextures(1, &texture.id);
 
-            if (!result.texture)
+            if (!texture.id)
                 return nullptr;
 
-            glBindTexture(
-                GL_TEXTURE_2D,
-                result.texture);
+            glBindTexture(GL_TEXTURE_2D, texture.id);
 
-            glPixelStorei(
-                GL_UNPACK_ALIGNMENT,
-                1);
+            glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
             glTexParameteri(
                 GL_TEXTURE_2D,
@@ -222,92 +202,121 @@ namespace ViewPoint
 
             if (glGetError() != GL_NO_ERROR)
             {
-                glDeleteTextures(
-                    1,
-                    &result.texture);
-
+                glDeleteTextures(1, &texture.id);
                 return nullptr;
             }
 
-            auto inserted = g_SpriteTextures.emplace(
-                image,
-                result);
+            auto inserted =
+                g_SpriteTextures.emplace(image, texture);
 
             return &inserted.first->second;
         }
 
-        // --------------------------------------------------
-        // SPRITE LAYER RENDERING
-        // --------------------------------------------------
+        // ------------------------------------------------------------
+        // SPRITE COLOR
+        // ------------------------------------------------------------
 
-        static void RenderSpriteLayer(
-            Entity *entity,
-            ANM2 *sprite,
-            AnimationState *animationState,
-            AnimationLayer *animationLayer,
-            LayerState *layerState,
-            Room *room,
-            float cameraRightX,
-            float cameraRightZ)
+        static void GetSpriteColor(
+            const ANM2* sprite,
+            const LayerState* layer,
+            const AnimationFrame* frame,
+            float& red,
+            float& green,
+            float& blue,
+            float& alpha)
         {
-            if (!entity ||
-                !sprite ||
-                !animationState ||
-                !animationLayer ||
-                !layerState ||
-                !room)
+            red = 1.0f;
+            green = 1.0f;
+            blue = 1.0f;
+            alpha = 1.0f;
+
+            if (sprite)
             {
-                return;
+                red *= sprite->_color._tint[0];
+                green *= sprite->_color._tint[1];
+                blue *= sprite->_color._tint[2];
+                alpha *= sprite->_color._tint[3];
             }
 
-            if (!animationState->_layerFrames)
+            if (layer)
+            {
+                red *= layer->_color._tint[0];
+                green *= layer->_color._tint[1];
+                blue *= layer->_color._tint[2];
+                alpha *= layer->_color._tint[3];
+            }
+
+            if (frame)
+            {
+                red *= frame->color._tint[0];
+                green *= frame->color._tint[1];
+                blue *= frame->color._tint[2];
+                alpha *= frame->color._tint[3];
+            }
+
+            red = std::max(0.0f, std::min(1.0f, red));
+            green = std::max(0.0f, std::min(1.0f, green));
+            blue = std::max(0.0f, std::min(1.0f, blue));
+            alpha = std::max(0.0f, std::min(1.0f, alpha));
+        }
+
+        // ------------------------------------------------------------
+        // SPRITE QUAD GENERATION
+        // ------------------------------------------------------------
+
+        static void RotateSpritePoint(
+            float& x,
+            float& y,
+            float radians)
+        {
+            if (std::fabs(radians) < 0.0001f)
                 return;
 
-            if (!layerState->IsVisible())
-                return;
+            const float cosine = std::cos(radians);
+            const float sine = std::sin(radians);
 
-            const int layerID =
-                animationLayer->_layerID;
+            const float oldX = x;
+            const float oldY = y;
 
-            if (layerID < 0 || layerID >= 64)
-                return;
+            x = oldX * cosine - oldY * sine;
+            y = oldX * sine + oldY * cosine;
+        }
 
-            const int frameIndex =
-                animationState->_layerFrames[layerID];
-
-            if (frameIndex < 0)
-                return;
-
-            AnimationFrame *frame =
-                animationLayer->GetFrame(frameIndex);
-
-            if (!frame || !frame->visible)
-                return;
+        static bool BuildSpriteQuad(
+            Entity* entity,
+            Room* room,
+            ANM2* sprite,
+            LayerState* layer,
+            AnimationFrame* frame,
+            SpriteTexture* texture,
+            float cameraRightX,
+            float cameraRightZ,
+            SpriteVertex (&vertices)[4])
+        {
+            if (!entity || !room || !sprite ||
+                !layer || !frame || !texture)
+            {
+                return false;
+            }
 
             if (frame->width <= 0.0f ||
                 frame->height <= 0.0f)
             {
-                return;
+                return false;
             }
 
-            // Obtain the actual REPENTOGON spritesheet.
-            KAGE_SmartPointer_ImageBase sheet =
-                layerState->GetSpriteSheet();
+            const Vector* entityPosition =
+                entity->GetPosition();
 
-            if (!sheet.image)
-                return;
+            if (!entityPosition)
+                return false;
 
-            SpriteTexture *texture =
-                GetSpriteTexture(sheet.image);
+            const WorldPoint base =
+                IsaacToWorld(*entityPosition, room);
 
-            if (!texture || !texture->texture)
-                return;
-
-            // AnimationFrame crop coordinates refer to the
-            // original spritesheet.
+            // Atlas rectangle.
             const float cropX = frame->crop.x;
             const float cropY = frame->crop.y;
-
             const float cropWidth = frame->width;
             const float cropHeight = frame->height;
 
@@ -316,7 +325,7 @@ namespace ViewPoint
                 cropX + cropWidth > texture->width ||
                 cropY + cropHeight > texture->height)
             {
-                return;
+                return false;
             }
 
             float u0 =
@@ -326,150 +335,251 @@ namespace ViewPoint
                 (cropX + cropWidth) /
                 static_cast<float>(texture->width);
 
-            // GetTexelRegion uses image coordinates;
-            // OpenGL texture coordinates have their origin
-            // at the bottom-left.
             float v0 =
                 1.0f -
                 (cropY + cropHeight) /
-                    static_cast<float>(texture->height);
+                static_cast<float>(texture->height);
 
             float v1 =
                 1.0f -
                 cropY /
-                    static_cast<float>(texture->height);
+                static_cast<float>(texture->height);
 
-            if (layerState->_flipX || sprite->_flipX)
+            if (layer->_flipX != sprite->_flipX)
                 std::swap(u0, u1);
 
-            if (layerState->_flipY || sprite->_flipY)
+            if (layer->_flipY != sprite->_flipY)
                 std::swap(v0, v1);
 
-            // Frame dimensions and offsets are in Isaac pixels.
-            float width =
-                cropWidth *
-                std::fabs(frame->scale.x) /
-                ISAAC_PIXELS_PER_TILE;
+            // Combine the frame, ANM2 and layer scales.
+            const float scaleX =
+                frame->scale.x * sprite->_scale.x;
 
-            float height =
-                cropHeight *
-                std::fabs(frame->scale.y) /
-                ISAAC_PIXELS_PER_TILE;
+            const float scaleY =
+                frame->scale.y * sprite->_scale.y;
 
-            if (width <= 0.0f || height <= 0.0f)
+            const float width =
+                cropWidth * std::fabs(scaleX);
+
+            const float height =
+                cropHeight * std::fabs(scaleY);
+
+            if (width <= 0.001f || height <= 0.001f)
+                return false;
+
+            // The frame pivot is the local origin.
+            // Positive local Y points down in Isaac's 2D space.
+            const float left =
+                frame->pos.x +
+                layer->_pos.x +
+                sprite->_offset.x -
+                frame->pivot.x;
+
+            const float top =
+                frame->pos.y +
+                layer->_pos.y +
+                sprite->_offset.y -
+                frame->pivot.y;
+
+            // Apply the sprite's local rotation.
+            const float rotation =
+                (frame->rotation +
+                 layer->_rotation +
+                 sprite->_rotation) *
+                PI / 180.0f;
+
+            float localX[4] =
+            {
+                left,
+                left + width,
+                left + width,
+                left
+            };
+
+            float localY[4] =
+            {
+                top,
+                top,
+                top + height,
+                top + height
+            };
+
+            for (int i = 0; i < 4; ++i)
+            {
+                RotateSpritePoint(
+                    localX[i],
+                    localY[i],
+                    rotation);
+            }
+
+            const float u[4] = { u0, u1, u1, u0 };
+            const float v[4] = { v1, v1, v0, v0 };
+
+            for (int i = 0; i < 4; ++i)
+            {
+                const float horizontal =
+                    localX[i] / PIXELS_PER_TILE;
+
+                const float vertical =
+                    localY[i] / PIXELS_PER_TILE;
+
+                vertices[i].x =
+                    base.x +
+                    cameraRightX * horizontal;
+
+                vertices[i].y =
+                    base.y - vertical;
+
+                vertices[i].z =
+                    base.z +
+                    cameraRightZ * horizontal;
+
+                vertices[i].u = u[i];
+                vertices[i].v = v[i];
+            }
+
+            // A negative scale mirrors the geometry as well as
+            // the atlas coordinates.
+            if (scaleX < 0.0f)
+            {
+                std::swap(vertices[0], vertices[1]);
+                std::swap(vertices[3], vertices[2]);
+            }
+
+            if (scaleY < 0.0f)
+            {
+                std::swap(vertices[0], vertices[3]);
+                std::swap(vertices[1], vertices[2]);
+            }
+
+            return true;
+        }
+
+        // ------------------------------------------------------------
+        // ONE ANIMATION LAYER
+        // ------------------------------------------------------------
+
+        static void RenderSpriteLayer(
+            Entity* entity,
+            Room* room,
+            ANM2* sprite,
+            AnimationState* animationState,
+            AnimationLayer* animationLayer,
+            float cameraRightX,
+            float cameraRightZ)
+        {
+            if (!entity || !room || !sprite ||
+                !animationState || !animationLayer)
+            {
+                return;
+            }
+
+            if (!animationLayer->IsVisible())
                 return;
 
-            const Vector *entityPosition =
-                entity->GetPosition();
+            const int layerID =
+                animationLayer->_layerID;
 
-            if (!entityPosition)
+            if (layerID < 0 || layerID >= 64)
                 return;
 
-            const Vector worldPosition =
-                IsaacPositionToWorld(
-                    *entityPosition,
-                    room);
+            if (!animationState->_layerFrames)
+                return;
 
-            const float offsetX =
-                (frame->pos.x + layerState->_pos.x) /
-                ISAAC_PIXELS_PER_TILE;
+            const int frameIndex =
+                animationState->_layerFrames[layerID];
 
-            const float offsetZ =
-                -(frame->pos.y + layerState->_pos.y) /
-                ISAAC_PIXELS_PER_TILE;
+            AnimationFrame* frame =
+                animationLayer->GetFrame(frameIndex);
 
-            const float centerX =
-                worldPosition.x +
-                offsetX;
+            if (!frame || !frame->visible)
+                return;
 
-            const float centerZ =
-                worldPosition.y +
-                offsetZ;
+            // GetLayer(int) retrieves the ANM2 layer state by ID.
+            LayerState* layer =
+                sprite->GetLayer(layerID);
 
-            // Keep the sprite upright and face it toward
-            // the camera horizontally.
-            const float halfWidth = width * 0.5f;
-            const float halfHeight = height * 0.5f;
+            if (!layer || !layer->_visible)
+                return;
 
-            const float rightX =
-                cameraRightX * halfWidth;
+            if (!layer->_spriteSheetLoaded)
+                return;
 
-            const float rightZ =
-                cameraRightZ * halfWidth;
+            KAGE_SmartPointer_ImageBase sheet =
+                layer->GetSpriteSheet();
 
-            const float bottomY =
-                ROOM_FLOOR_Y;
+            if (!sheet.image)
+                return;
 
-            const float topY =
-                bottomY + height;
+            SpriteTexture* texture =
+                GetSpriteTexture(sheet.image);
 
-            const float leftX =
-                centerX - rightX;
+            if (!texture || !texture->id)
+                return;
 
-            const float leftZ =
-                centerZ - rightZ;
+            SpriteVertex vertices[4]{};
 
-            const float rightSideX =
-                centerX + rightX;
+            if (!BuildSpriteQuad(
+                    entity,
+                    room,
+                    sprite,
+                    layer,
+                    frame,
+                    texture,
+                    cameraRightX,
+                    cameraRightZ,
+                    vertices))
+            {
+                return;
+            }
 
-            const float rightSideZ =
-                centerZ + rightZ;
+            float red;
+            float green;
+            float blue;
+            float alpha;
+
+            GetSpriteColor(
+                sprite,
+                layer,
+                frame,
+                red,
+                green,
+                blue,
+                alpha);
+
+            if (alpha <= 0.001f)
+                return;
 
             glBindTexture(
                 GL_TEXTURE_2D,
-                texture->texture);
+                texture->id);
 
-            glColor4f(
-                1.0f,
-                1.0f,
-                1.0f,
-                1.0f);
-
-            glNormal3f(
-                0.0f,
-                0.0f,
-                1.0f);
+            glColor4f(red, green, blue, alpha);
 
             glBegin(GL_QUADS);
 
-            // Bottom-left
-            glTexCoord2f(u0, v0);
-            glVertex3f(
-                leftX,
-                bottomY,
-                leftZ);
+            for (int i = 0; i < 4; ++i)
+            {
+                glTexCoord2f(
+                    vertices[i].u,
+                    vertices[i].v);
 
-            // Bottom-right
-            glTexCoord2f(u1, v0);
-            glVertex3f(
-                rightSideX,
-                bottomY,
-                rightSideZ);
-
-            // Top-right
-            glTexCoord2f(u1, v1);
-            glVertex3f(
-                rightSideX,
-                topY,
-                rightSideZ);
-
-            // Top-left
-            glTexCoord2f(u0, v1);
-            glVertex3f(
-                leftX,
-                topY,
-                leftZ);
+                glVertex3f(
+                    vertices[i].x,
+                    vertices[i].y,
+                    vertices[i].z);
+            }
 
             glEnd();
         }
 
-        // --------------------------------------------------
-        // ENTITY SPRITE RENDERING
-        // --------------------------------------------------
+        // ------------------------------------------------------------
+        // ENTITY SPRITE
+        // ------------------------------------------------------------
 
         static void RenderEntitySprite(
-            Entity *entity,
-            Room *room,
+            Entity* entity,
+            Room* room,
             float cameraRightX,
             float cameraRightZ)
         {
@@ -483,17 +593,16 @@ namespace ViewPoint
                 return;
             }
 
-            ANM2 *sprite =
-                &entity->_sprite;
+            ANM2* sprite = &entity->_sprite;
 
             if (!sprite->_loaded ||
                 !sprite->_layerState ||
-                sprite->_layerCount <= 0)
+                sprite->_layerCount == 0)
             {
                 return;
             }
 
-            AnimationState *animationState =
+            AnimationState* animationState =
                 sprite->GetAnimationState();
 
             if (!animationState ||
@@ -502,7 +611,7 @@ namespace ViewPoint
                 return;
             }
 
-            AnimationData *animationData =
+            AnimationData* animationData =
                 animationState->_animData;
 
             if (!animationData->_animLayers ||
@@ -511,36 +620,32 @@ namespace ViewPoint
                 return;
             }
 
-            const int layerCount = std::min(
-                animationData->_layerCount,
-                static_cast<int>(sprite->_layerCount));
-
-            for (int i = 0; i < layerCount; ++i)
+            // AnimationData's order is the draw order.
+            // The ANM2 layer state is retrieved separately by ID.
+            for (int i = 0;
+                 i < animationData->_layerCount;
+                 ++i)
             {
-                AnimationLayer *animationLayer =
+                AnimationLayer* animationLayer =
                     animationData->GetLayerByOrder(i);
 
-                LayerState *layerState =
-                    &sprite->_layerState[i];
-
-                if (!animationLayer || !layerState)
+                if (!animationLayer)
                     continue;
 
                 RenderSpriteLayer(
                     entity,
+                    room,
                     sprite,
                     animationState,
                     animationLayer,
-                    layerState,
-                    room,
                     cameraRightX,
                     cameraRightZ);
             }
         }
 
-        // --------------------------------------------------
-        // CAPSULE RENDERING
-        // --------------------------------------------------
+        // ------------------------------------------------------------
+        // COLLISION CAPSULE
+        // ------------------------------------------------------------
 
         static void RenderCapsuleCircle(
             float centerX,
@@ -556,67 +661,45 @@ namespace ViewPoint
                     static_cast<float>(i) /
                     static_cast<float>(CAPSULE_SEGMENTS);
 
-                const float x =
-                    centerX + std::cos(angle) * radius;
-
-                const float z =
-                    centerZ + std::sin(angle) * radius;
-
                 glVertex3f(
-                    x,
-                    ROOM_FLOOR_Y + CAPSULE_HEIGHT_OFFSET,
-                    z);
+                    centerX + std::cos(angle) * radius,
+                    FLOOR_Y + COLLISION_Y_OFFSET,
+                    centerZ + std::sin(angle) * radius);
             }
 
             glEnd();
         }
 
         static void RenderCollisionCapsule(
-            Entity *entity,
-            Room *room)
+            Entity* entity,
+            Room* room)
         {
             if (!entity || !room)
                 return;
 
-            if (!entity->_exists ||
-                entity->_dead ||
-                !entity->_visible)
-            {
+            if (!entity->_exists || entity->_dead)
                 return;
-            }
 
             Vector offset(0.0f, 0.0f);
 
-            // GetCollisionCapsule returns a Capsule by value.
-            Capsule capsule =
+            const Capsule capsule =
                 entity->GetCollisionCapsule(&offset);
 
-            // The REPENTOGON Capsule getters expose:
-            // _vec2 = start point
-            // _vec3 = end point
-            // _unkFloat1 = size
-            const Vector start =
-                IsaacPositionToWorld(
-                    capsule._vec2,
-                    room);
+            const WorldPoint start =
+                IsaacToWorld(capsule._vec2, room);
 
-            const Vector end =
-                IsaacPositionToWorld(
-                    capsule._vec3,
-                    room);
+            const WorldPoint end =
+                IsaacToWorld(capsule._vec3, room);
 
             const float radius =
                 std::fabs(capsule._unkFloat1) /
-                ISAAC_PIXELS_PER_TILE;
+                PIXELS_PER_TILE;
 
             if (radius <= 0.001f)
                 return;
 
-            const float dx =
-                end.x - start.x;
-
-            const float dz =
-                end.y - start.y;
+            const float dx = end.x - start.x;
+            const float dz = end.z - start.z;
 
             const float length =
                 std::sqrt(dx * dx + dz * dz);
@@ -629,120 +712,118 @@ namespace ViewPoint
 
             glLineWidth(1.5f);
 
-            // A capsule is two endpoint circles joined
-            // by two parallel tangent lines.
             if (length <= 0.001f)
             {
                 RenderCapsuleCircle(
                     start.x,
-                    start.y,
+                    start.z,
                     radius);
 
                 return;
             }
 
-            const float normalX =
-                -dz / length;
+            const float normalX = -dz / length;
+            const float normalZ = dx / length;
 
-            const float normalZ =
-                dx / length;
-
-            const float offsetX =
-                normalX * radius;
-
-            const float offsetZ =
-                normalZ * radius;
+            const float offsetX = normalX * radius;
+            const float offsetZ = normalZ * radius;
 
             const float y =
-                ROOM_FLOOR_Y +
-                CAPSULE_HEIGHT_OFFSET;
+                FLOOR_Y + COLLISION_Y_OFFSET;
 
             glBegin(GL_LINES);
 
-            // First tangent.
             glVertex3f(
                 start.x + offsetX,
                 y,
-                start.y + offsetZ);
+                start.z + offsetZ);
 
             glVertex3f(
                 end.x + offsetX,
                 y,
-                end.y + offsetZ);
+                end.z + offsetZ);
 
-            // Second tangent.
             glVertex3f(
                 start.x - offsetX,
                 y,
-                start.y - offsetZ);
+                start.z - offsetZ);
 
             glVertex3f(
                 end.x - offsetX,
                 y,
-                end.y - offsetZ);
+                end.z - offsetZ);
 
             glEnd();
 
             RenderCapsuleCircle(
                 start.x,
-                start.y,
+                start.z,
                 radius);
 
             RenderCapsuleCircle(
                 end.x,
-                end.y,
+                end.z,
                 radius);
         }
 
-        // --------------------------------------------------
-        // RENDER STATE AND PROJECTION
-        // --------------------------------------------------
+        // ------------------------------------------------------------
+        // RENDER STATE
+        // ------------------------------------------------------------
 
-        static bool BeginEntityRendering(
-            GLint &oldProgram,
-            GLint &oldMatrixMode,
-            GLint &oldActiveTexture)
+        struct RenderState
+        {
+            GLint program = 0;
+            GLint matrixMode = GL_MODELVIEW;
+            GLint activeTexture = GL_TEXTURE0;
+            bool matricesPushed = false;
+            bool attributesPushed = false;
+        };
+
+        static bool BeginEntityRendering(RenderState& state)
         {
             GLint viewport[4] = {};
 
-            glGetIntegerv(
-                GL_VIEWPORT,
-                viewport);
+            glGetIntegerv(GL_VIEWPORT, viewport);
 
-            if (viewport[2] <= 0 ||
-                viewport[3] <= 0)
-            {
+            if (viewport[2] <= 0 || viewport[3] <= 0)
                 return false;
-            }
 
             GLint depthBits = 0;
 
-            glGetIntegerv(
-                GL_DEPTH_BITS,
-                &depthBits);
+            glGetIntegerv(GL_DEPTH_BITS, &depthBits);
 
             if (depthBits <= 0)
                 return false;
 
             glGetIntegerv(
                 GL_CURRENT_PROGRAM,
-                &oldProgram);
+                &state.program);
 
             glGetIntegerv(
                 GL_MATRIX_MODE,
-                &oldMatrixMode);
+                &state.matrixMode);
 
             glGetIntegerv(
                 GL_ACTIVE_TEXTURE,
-                &oldActiveTexture);
+                &state.activeTexture);
 
             glPushAttrib(GL_ALL_ATTRIB_BITS);
+            state.attributesPushed = true;
 
             glMatrixMode(GL_PROJECTION);
             glPushMatrix();
 
             glMatrixMode(GL_MODELVIEW);
             glPushMatrix();
+
+            state.matricesPushed = true;
+
+            // The entity renderer uses the compatibility pipeline.
+            if (g_UseProgram)
+                g_UseProgram(0);
+
+            if (g_ActiveTexture)
+                g_ActiveTexture(GL_TEXTURE0);
 
             glDisable(GL_CULL_FACE);
             glDisable(GL_LIGHTING);
@@ -776,7 +857,7 @@ namespace ViewPoint
                 g_Camera.farPlane;
 
             const double halfFov =
-                g_Camera.fieldOfView *
+                static_cast<double>(g_Camera.fieldOfView) *
                 PI / 360.0;
 
             const double halfHeight =
@@ -819,58 +900,58 @@ namespace ViewPoint
             return true;
         }
 
-        static void EndEntityRendering(
-            GLint oldProgram,
-            GLint oldMatrixMode,
-            GLint oldActiveTexture)
+        static void EndEntityRendering(const RenderState& state)
         {
-            glMatrixMode(GL_MODELVIEW);
-            glPopMatrix();
+            if (state.matricesPushed)
+            {
+                glMatrixMode(GL_MODELVIEW);
+                glPopMatrix();
 
-            glMatrixMode(GL_PROJECTION);
-            glPopMatrix();
+                glMatrixMode(GL_PROJECTION);
+                glPopMatrix();
+            }
 
-            glPopAttrib();
+            if (state.attributesPushed)
+                glPopAttrib();
 
-            g_UseProgram(
-                static_cast<GLuint>(oldProgram));
+            if (g_UseProgram)
+            {
+                g_UseProgram(
+                    static_cast<GLuint>(state.program));
+            }
 
             if (g_ActiveTexture)
             {
                 g_ActiveTexture(
-                    static_cast<GLenum>(oldActiveTexture));
+                    static_cast<GLenum>(state.activeTexture));
             }
 
             glMatrixMode(
-                static_cast<GLenum>(oldMatrixMode));
+                static_cast<GLenum>(state.matrixMode));
         }
     }
 
-    // ==================================================
-    // PUBLIC ENTITY RENDERER
-    // ==================================================
+    // ================================================================
+    // PUBLIC ENTRY POINT
+    // ================================================================
 
     void RenderEntities()
     {
-        if (!g_Camera.enabled)
+        if (!g_Camera.enabled || !g_Game)
             return;
 
-        if (!g_Game)
-            return;
-
-        Room *room =
-            g_Game->GetCurrentRoom();
+        Room* room = g_Game->GetCurrentRoom();
 
         if (!room)
             return;
 
-        EntityList *entityList =
+        EntityList* entityList =
             room->GetEntityList();
 
         if (!entityList)
             return;
 
-        EntityList_EL *renderList =
+        EntityList_EL* renderList =
             entityList->GetRenderEL();
 
         if (!renderList ||
@@ -880,33 +961,23 @@ namespace ViewPoint
             return;
         }
 
-        // OpenGL texture objects belong to a context.
-        // Discard cached IDs if the context changes.
         const HGLRC currentContext =
             wglGetCurrentContext();
 
         if (!currentContext)
             return;
 
-        if (currentContext != g_EntityTextureContext)
+        if (currentContext != g_TextureContext)
         {
+            // Texture IDs from a previous context cannot be reused.
             g_SpriteTextures.clear();
-
-            g_EntityTextureContext =
-                currentContext;
+            g_TextureContext = currentContext;
         }
 
-        GLint oldProgram = 0;
-        GLint oldMatrixMode = GL_MODELVIEW;
-        GLint oldActiveTexture = GL_TEXTURE0;
+        RenderState state{};
 
-        if (!BeginEntityRendering(
-                oldProgram,
-                oldMatrixMode,
-                oldActiveTexture))
-        {
+        if (!BeginEntityRendering(state))
             return;
-        }
 
         const float yawRadians =
             g_Camera.yaw * PI / 180.0f;
@@ -917,43 +988,18 @@ namespace ViewPoint
         const float cameraRightZ =
             -std::sin(yawRadians);
 
-        // --------------------------------------------------
-        // SPRITES
-        // --------------------------------------------------
+        // ------------------------------------------------------------
+        // ENTITY SPRITES
+        // ------------------------------------------------------------
 
-        g_UseProgram(g_ShaderProgram);
-
-        g_Uniform1i(
-            g_UniformTexture,
-            0);
-
-        g_Uniform1i(
-            g_UniformUseTexture,
-            1);
-
-        g_Uniform3f(
-            g_UniformLightDirection,
-            0.0f,
-            0.0f,
-            1.0f);
-
-        g_Uniform1f(
-            g_UniformAmbient,
-            1.0f);
-
-        g_Uniform1f(
-            g_UniformDiffuse,
-            0.0f);
-
-        if (g_ActiveTexture)
-            g_ActiveTexture(GL_TEXTURE0);
+        glEnable(GL_TEXTURE_2D);
+        glEnable(GL_BLEND);
 
         for (unsigned int i = 0;
              i < renderList->_size;
              ++i)
         {
-            Entity *entity =
-                renderList->_data[i];
+            Entity* entity = renderList->_data[i];
 
             if (!entity)
                 continue;
@@ -965,22 +1011,21 @@ namespace ViewPoint
                 cameraRightZ);
         }
 
-        // --------------------------------------------------
-        // COLLISION CAPSULES
-        // --------------------------------------------------
-
-        // Use the fixed-function pipeline for the wireframes.
-        g_UseProgram(0);
+        // ------------------------------------------------------------
+        // COLLISION OUTLINES
+        // ------------------------------------------------------------
 
         glDisable(GL_TEXTURE_2D);
         glDisable(GL_BLEND);
+
+        if (g_UseProgram)
+            g_UseProgram(0);
 
         for (unsigned int i = 0;
              i < renderList->_size;
              ++i)
         {
-            Entity *entity =
-                renderList->_data[i];
+            Entity* entity = renderList->_data[i];
 
             if (!entity)
                 continue;
@@ -990,9 +1035,6 @@ namespace ViewPoint
                 room);
         }
 
-        EndEntityRendering(
-            oldProgram,
-            oldMatrixMode,
-            oldActiveTexture);
+        EndEntityRendering(state);
     }
 }
