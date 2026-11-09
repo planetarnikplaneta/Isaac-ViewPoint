@@ -80,24 +80,16 @@ namespace ViewPoint
             if (!playerPosition)
                 return false;
 
-            // RoomExtractor excludes the outer grid border.
-            // Its rendered room dimensions are (grid size - 2).
-            const float roomCenterX =
-                static_cast<float>(room->_gridWidth - 2) *
-                ISAAC_PIXELS_PER_TILE * 0.5f;
+            // Isaac's room-local coordinate origin.
+            constexpr float ROOM_CENTER_X = 320.0f;
+            constexpr float ROOM_CENTER_Y = 280.0f;
 
-            const float roomCenterY =
-                static_cast<float>(room->_gridHeight - 2) *
-                ISAAC_PIXELS_PER_TILE * 0.5f;
-
-            // Convert Isaac room coordinates into
-            // ViewPoint's centered room coordinates.
             g_Camera.position.x =
-                (playerPosition->x - roomCenterX) /
+                (playerPosition->x - ROOM_CENTER_X) /
                 ISAAC_PIXELS_PER_TILE;
 
             g_Camera.position.z =
-                (roomCenterY - playerPosition->y) /
+                (ROOM_CENTER_Y - playerPosition->y) /
                 ISAAC_PIXELS_PER_TILE;
 
             g_Camera.position.y =
