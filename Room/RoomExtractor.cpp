@@ -136,7 +136,7 @@ namespace ViewPoint
                 return false;
 
             constexpr int PIXELS_PER_TILE = 26;
-            constexpr int FLOOR_INSET_TILES = 2;
+            constexpr int FLOOR_INSET_TILES = 1;
 
             const int gridWidth = room->_gridWidth;
             const int gridHeight = room->_gridHeight;
