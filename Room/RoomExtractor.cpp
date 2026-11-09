@@ -43,8 +43,6 @@ namespace ViewPoint
         constexpr float TILE_SIZE = 1.0f;
         constexpr int FLOOR_SOURCE_X = 52;
         constexpr int FLOOR_SOURCE_Y = 52;
-        constexpr int FLOOR_SOURCE_WIDTH = 338;
-        constexpr int FLOOR_SOURCE_HEIGHT = 182;
 
         constexpr float FLOOR_PIXELS_PER_TILE = 52.0f;
 
@@ -132,31 +130,60 @@ namespace ViewPoint
         }
 
         bool ExtractFloorTexture(
+            Room *room,
             KAGE_Graphics_ImageBase *image,
             int &outWidth,
             int &outHeight,
             std::vector<unsigned char> &outPixels)
         {
-            if (!image)
+            if (!room || !image)
                 return false;
+
+            const int roomWidth = room->_gridWidth;
+            const int roomHeight = room->_gridHeight;
+
+            if (roomWidth <= 2 || roomHeight <= 2)
+                return false;
+
+            // Exclude the one-tile border around the room.
+            const int sourceX = FLOOR_SOURCE_X;
+            const int sourceY = FLOOR_SOURCE_Y;
+
+            const int sourceWidth =
+                static_cast<int>(
+                    (roomWidth - 2) * FLOOR_PIXELS_PER_TILE);
+
+            const int sourceHeight =
+                static_cast<int>(
+                    (roomHeight - 2) * FLOOR_PIXELS_PER_TILE);
 
             const int imageWidth = image->GetWidth();
             const int imageHeight = image->GetHeight();
 
-            if (imageWidth < FLOOR_SOURCE_X + FLOOR_SOURCE_WIDTH ||
-                imageHeight < FLOOR_SOURCE_Y + FLOOR_SOURCE_HEIGHT)
-                return false;
+            if (sourceX + sourceWidth > imageWidth ||
+                sourceY + sourceHeight > imageHeight)
+            {
+                LogMessage(
+                    "RoomExtractor: Floor crop exceeds source image.");
 
-            outWidth = FLOOR_SOURCE_WIDTH;
-            outHeight = FLOOR_SOURCE_HEIGHT;
+                LogNumber("RoomExtractor: Required crop width", sourceWidth);
+                LogNumber("RoomExtractor: Required crop height", sourceHeight);
+                LogNumber("RoomExtractor: Source image width", imageWidth);
+                LogNumber("RoomExtractor: Source image height", imageHeight);
+
+                return false;
+            }
+
+            outWidth = sourceWidth;
+            outHeight = sourceHeight;
 
             outPixels.resize(
                 static_cast<size_t>(outWidth) *
-                outHeight * 4);
+                static_cast<size_t>(outHeight) * 4);
 
             image->GetTexelRegion(
-                FLOOR_SOURCE_X,
-                FLOOR_SOURCE_Y,
+                sourceX,
+                sourceY,
                 static_cast<unsigned int>(outWidth),
                 static_cast<unsigned int>(outHeight),
                 outPixels.data());
@@ -198,6 +225,7 @@ namespace ViewPoint
             int height = 0;
 
             if (!ExtractFloorTexture(
+                    room,
                     image,
                     width,
                     height,
@@ -240,6 +268,7 @@ namespace ViewPoint
             int height = 0;
 
             if (!ExtractFloorTexture(
+                    room,
                     backdrop->floorBuffer.image,
                     width,
                     height,
@@ -898,21 +927,16 @@ namespace ViewPoint
                 static_cast<float>(height) * TILE_SIZE * 0.5f;
 
             const float leftX =
-                -static_cast<float>(width) * TILE_SIZE * 0.5f +
-                static_cast<float>(FLOOR_SOURCE_X) / FLOOR_PIXELS_PER_TILE;
+                -halfWidth + 1.0f;
 
             const float rightX =
-                leftX +
-                static_cast<float>(FLOOR_SOURCE_WIDTH*2.0f) / FLOOR_PIXELS_PER_TILE;
+                halfWidth - 1.0f;
 
             const float topZ =
-                static_cast<float>(height) * TILE_SIZE * 0.5f -
-                static_cast<float>(FLOOR_SOURCE_Y) / FLOOR_PIXELS_PER_TILE;
+                halfHeight - 1.0f;
 
             const float bottomZ =
-                topZ -
-                static_cast<float>(FLOOR_SOURCE_HEIGHT*2.0f) / FLOOR_PIXELS_PER_TILE;
-
+                -halfHeight + 1.0f;
             AddTexturedFloorQuad(
                 model,
                 MAT_FLOOR,
