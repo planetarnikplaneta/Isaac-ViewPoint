@@ -28,43 +28,79 @@ namespace OpenGL
 {
     bool __stdcall wglSwapBuffers(HDC hdc);
 }
-// INPUT ACTION DIAGNOSTICS
+// CAMERA-RELATIVE PLAYER MOVEMENT
 HOOK_METHOD(
     InputManager,
     GetActionValue,
     (int action, int controllerid, int unk) -> float)
 {
-    const float value = super(action, controllerid, unk);
-
-    static float lastValues[256] = {};
-    static bool initialized[256] = {};
-
-    if (action >= 0 && action < 256)
+    // Leave all non-movement inputs unchanged.
+    if (action < 0 || action > 3)
     {
-        const int index = action;
-
-        if (!initialized[index] ||
-            std::fabs(value - lastValues[index]) > 0.001f)
-        {
-            initialized[index] = true;
-            lastValues[index] = value;
-
-            char message[128];
-
-            std::snprintf(
-                message,
-                sizeof(message),
-                "Input action: %d, value: %.3f, controller: %d",
-                action,
-                value,
-                controllerid
-            );
-
-            ViewPoint::LogMessage(message);
-        }
+        return super(action, controllerid, unk);
     }
 
-    return value;
+    // Only transform movement while ViewPoint follow mode is active.
+    if (!ViewPoint::g_Camera.enabled ||
+        !ViewPoint::g_Camera.followPlayer)
+    {
+        return super(action, controllerid, unk);
+    }
+
+    // Read the original directional inputs.
+    // Calling super bypasses this hook.
+    const float left =
+        super(0, controllerid, unk);
+
+    const float right =
+        super(1, controllerid, unk);
+
+    const float up =
+        super(2, controllerid, unk);
+
+    const float down =
+        super(3, controllerid, unk);
+
+    // Camera-relative input axes.
+    const float strafe = right - left;
+    const float forward = up - down;
+
+    // Camera orientation.
+    constexpr float PI = 3.14159265358979323846f;
+
+    const float yawRadians =
+        ViewPoint::g_Camera.yaw * PI / 180.0f;
+
+    const float sinYaw = std::sin(yawRadians);
+    const float cosYaw = std::cos(yawRadians);
+
+    // Transform camera-relative movement into world directions.
+    const float worldX =
+        strafe * cosYaw -
+        forward * sinYaw;
+
+    const float worldZ =
+        -strafe * sinYaw -
+        forward * cosYaw;
+
+    // Convert the transformed vector back into Isaac's
+    // four directional actions.
+    switch (action)
+    {
+        case 0: // LEFT
+            return worldX < 0.0f ? -worldX : 0.0f;
+
+        case 1: // RIGHT
+            return worldX > 0.0f ? worldX : 0.0f;
+
+        case 2: // UP
+            return worldZ > 0.0f ? worldZ : 0.0f;
+
+        case 3: // DOWN
+            return worldZ < 0.0f ? -worldZ : 0.0f;
+    }
+
+    return 0.0f;
 }
 // REPENTOGON HOOK
 
