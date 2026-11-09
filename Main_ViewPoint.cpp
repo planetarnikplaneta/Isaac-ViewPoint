@@ -4,6 +4,7 @@
 
 #include <Windows.h>
 #include <gl/GL.h>
+#include <cmath>
 
 #include "libzhl.h"
 #include "HookSystem.h"
@@ -59,7 +60,48 @@ HOOK_GLOBAL(
 
     return super(hdc);
 }
+// INPUT ACTION DIAGNOSTICS
 
+HOOK_METHOD(
+    InputManager,
+    GetActionValue,
+    (int action, int controllerid, int unk)->float)
+{
+    const float value = super(action, controllerid, unk);
+
+    static int lastValues[16][512] = {};
+
+    if (action >= 0 && action < 512 &&
+        controllerid >= 0 && controllerid < 16)
+    {
+        const int scaledValue =
+            static_cast<int>(std::lround(value * 1000.0f));
+
+        int &lastValue = lastValues[controllerid][action];
+
+        if (scaledValue != lastValue)
+        {
+            if (scaledValue != 0 || lastValue != 0)
+            {
+                ViewPoint::LogNumber(
+                    "Input action ID",
+                    static_cast<unsigned long long>(action));
+
+                ViewPoint::LogNumber(
+                    "Input controller ID",
+                    static_cast<unsigned long long>(controllerid));
+
+                ViewPoint::LogNumber(
+                    "Input value x1000",
+                    static_cast<unsigned long long>(scaledValue));
+            }
+
+            lastValue = scaledValue;
+        }
+    }
+
+    return value;
+}
 // DLL ENTRY POINT
 
 BOOL WINAPI DllMain(

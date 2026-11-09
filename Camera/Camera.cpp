@@ -30,33 +30,6 @@ namespace ViewPoint
             return (GetAsyncKeyState(key) & 0x8000) != 0;
         }
 
-        float DirectionToYaw(int direction)
-        {
-            // REPENTOGON Direction:
-            // LEFT  = 0
-            // UP    = 1
-            // RIGHT = 2
-            // DOWN  = 3
-
-            switch (direction)
-            {
-            case 0: // LEFT
-                return 90.0f;
-
-            case 1: // UP
-                return 0.0f;
-
-            case 2: // RIGHT
-                return -90.0f;
-
-            case 3: // DOWN
-                return 180.0f;
-
-            default:
-                return -10000.0f;
-            }
-        }
-
         bool UpdatePlayerCamera()
         {
             if (!g_Game)
@@ -95,17 +68,6 @@ namespace ViewPoint
             g_Camera.position.y =
                 ROOM_FLOOR_Y + PLAYER_EYE_HEIGHT;
 
-            const float playerYaw =
-                DirectionToYaw(player->_headDirection);
-
-            if (playerYaw > -1000.0f)
-            {
-                g_Camera.playerBaseYaw = playerYaw;
-            }
-
-            g_Camera.yaw =
-                g_Camera.playerBaseYaw +
-                g_Camera.playerYawOffset;
             static unsigned int debugCounter = 0;
 
             if (++debugCounter >= 60)
@@ -309,12 +271,7 @@ namespace ViewPoint
 
             if (g_Camera.followPlayer)
             {
-                // Mouse yaw is relative to player facing.
-                g_Camera.playerYawOffset -= yawChange;
-
-                g_Camera.yaw =
-                    g_Camera.playerBaseYaw +
-                    g_Camera.playerYawOffset;
+                g_Camera.yaw -= yawChange;
             }
             else
             {
