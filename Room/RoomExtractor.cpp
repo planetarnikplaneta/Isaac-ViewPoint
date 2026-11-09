@@ -124,101 +124,82 @@ namespace ViewPoint
             LogNumber("Image content max Y", maxY);
             LogNumber("Image content pixels", static_cast<double>(count));
         }
+
         bool ExtractFloorTexture(
+            Room *room,
             KAGE_Graphics_ImageBase *image,
             int &outWidth,
             int &outHeight,
             std::vector<unsigned char> &outPixels)
         {
-            if (!image)
+            if (!room || !image)
                 return false;
 
-            const int width = image->GetWidth();
-            const int height = image->GetHeight();
+            constexpr int PIXELS_PER_TILE = 26;
+            constexpr int FLOOR_INSET_TILES = 2;
 
-            if (width <= 0 || height <= 0)
+            const int gridWidth = room->_gridWidth;
+            const int gridHeight = room->_gridHeight;
+
+            const int imageWidth = image->GetWidth();
+            const int imageHeight = image->GetHeight();
+
+            if (gridWidth <= FLOOR_INSET_TILES * 2 ||
+                gridHeight <= FLOOR_INSET_TILES * 2 ||
+                imageWidth <= 0 ||
+                imageHeight <= 0)
                 return false;
 
-            const size_t w = static_cast<size_t>(width);
-            const size_t h = static_cast<size_t>(height);
+            const int cropX = FLOOR_INSET_TILES * PIXELS_PER_TILE;
+            const int cropY = FLOOR_INSET_TILES * PIXELS_PER_TILE;
 
-            if (w > std::numeric_limits<size_t>::max() / h ||
-                w * h > std::numeric_limits<size_t>::max() / 4)
+            const int cropWidth =
+                (gridWidth - FLOOR_INSET_TILES * 2) *
+                PIXELS_PER_TILE;
+
+            const int cropHeight =
+                (gridHeight - FLOOR_INSET_TILES * 2) *
+                PIXELS_PER_TILE;
+
+            if (cropX < 0 ||
+                cropY < 0 ||
+                cropWidth <= 0 ||
+                cropHeight <= 0 ||
+                cropX + cropWidth > imageWidth ||
+                cropY + cropHeight > imageHeight)
+            {
+                LogMessage(
+                    "RoomExtractor: Fixed floor crop exceeds image bounds.");
+
+                LogNumber("Floor image width", imageWidth);
+                LogNumber("Floor image height", imageHeight);
+                LogNumber("Floor crop X", cropX);
+                LogNumber("Floor crop Y", cropY);
+                LogNumber("Floor crop width", cropWidth);
+                LogNumber("Floor crop height", cropHeight);
+
                 return false;
+            }
 
-            std::vector<unsigned char> source(w * h * 4);
+            const size_t outputSize =
+                static_cast<size_t>(cropWidth) *
+                static_cast<size_t>(cropHeight) * 4;
+
+            outPixels.resize(outputSize);
 
             image->GetTexelRegion(
-                0,
-                0,
-                static_cast<unsigned int>(width),
-                static_cast<unsigned int>(height),
-                source.data());
+                cropX,
+                cropY,
+                static_cast<unsigned int>(cropWidth),
+                static_cast<unsigned int>(cropHeight),
+                outPixels.data());
 
-            int minX = width;
-            int minY = height;
-            int maxX = -1;
-            int maxY = -1;
-
-            for (int y = 0; y < height; ++y)
-            {
-                for (int x = 0; x < width; ++x)
-                {
-                    const size_t i =
-                        (static_cast<size_t>(y) * width + x) * 4;
-
-                    if (source[i] == 0 &&
-                        source[i + 1] == 0 &&
-                        source[i + 2] == 0 &&
-                        source[i + 3] == 0)
-                        continue;
-
-                    if (x < minX)
-                        minX = x;
-                    if (y < minY)
-                        minY = y;
-                    if (x > maxX)
-                        maxX = x;
-                    if (y > maxY)
-                        maxY = y;
-                }
-            }
-
-            if (maxX < minX || maxY < minY)
-                return false;
-
-            outWidth = maxX - minX + 1;
-            outHeight = maxY - minY + 1;
-
-            outPixels.resize(
-                static_cast<size_t>(outWidth) * outHeight * 4);
-
-            for (int y = 0; y < outHeight; ++y)
-            {
-                for (int x = 0; x < outWidth; ++x)
-                {
-                    const size_t sourceIndex =
-                        (static_cast<size_t>(y + minY) * width +
-                         (x + minX)) *
-                        4;
-
-                    const size_t destinationIndex =
-                        (static_cast<size_t>(y) * outWidth + x) * 4;
-
-                    outPixels[destinationIndex] = source[sourceIndex];
-                    outPixels[destinationIndex + 1] = source[sourceIndex + 1];
-                    outPixels[destinationIndex + 2] = source[sourceIndex + 2];
-                    outPixels[destinationIndex + 3] = source[sourceIndex + 3];
-                }
-            }
-
-            LogNumber("Floor crop X", minX);
-            LogNumber("Floor crop Y", minY);
-            LogNumber("Floor crop width", outWidth);
-            LogNumber("Floor crop height", outHeight);
+            outWidth = cropWidth;
+            outHeight = cropHeight;
 
             return true;
         }
+
         bool CopyIsaacFloorTexture(
             Room *room,
             Material &material)
@@ -245,14 +226,13 @@ namespace ViewPoint
                 return false;
             }
 
-            LogNumber("FloorBuffer width", image->GetWidth());
-            LogNumber("FloorBuffer height", image->GetHeight());
-
             std::vector<unsigned char> pixels;
+
             int width = 0;
             int height = 0;
 
             if (!ExtractFloorTexture(
+                    room,
                     image,
                     width,
                     height,
@@ -271,13 +251,14 @@ namespace ViewPoint
             material.diffuseTexturePath.clear();
 
             LogMessage(
-                "RoomExtractor: Copied cropped Isaac floor texture.");
+                "RoomExtractor: Copied fixed-region Isaac floor texture.");
 
             LogNumber("RoomExtractor: Floor texture width", width);
             LogNumber("RoomExtractor: Floor texture height", height);
 
             return true;
         }
+
         void RefreshIsaacFloorTexture(
             Room *room,
             Material &material)
@@ -291,10 +272,12 @@ namespace ViewPoint
                 return;
 
             std::vector<unsigned char> pixels;
+
             int width = 0;
             int height = 0;
 
             if (!ExtractFloorTexture(
+                    room,
                     backdrop->floorBuffer.image,
                     width,
                     height,
@@ -307,6 +290,7 @@ namespace ViewPoint
                 height,
                 std::move(pixels));
         }
+
         void AddTriangle(
             Model &model,
             int materialIndex,
@@ -947,10 +931,12 @@ namespace ViewPoint
             model.materials.push_back(std::move(fireMaterial));
 
             const float halfWidth =
-                static_cast<float>(width) * TILE_SIZE * 0.5f;
+                (static_cast<float>(width) - 2.0f) *
+                TILE_SIZE * 0.5f;
 
             const float halfHeight =
-                static_cast<float>(height) * TILE_SIZE * 0.5f;
+                (static_cast<float>(height) - 2.0f) *
+                TILE_SIZE * 0.5f;
 
             AddTexturedFloorQuad(
                 model,
