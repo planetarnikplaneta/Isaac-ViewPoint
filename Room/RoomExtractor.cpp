@@ -41,10 +41,6 @@ namespace ViewPoint
         constexpr float FLOOR_Y = -1.5f;
         constexpr float WALL_TOP_Y = 1.5f;
         constexpr float TILE_SIZE = 1.0f;
-        constexpr int FLOOR_SOURCE_X = 52;
-        constexpr int FLOOR_SOURCE_Y = 52;
-
-        constexpr float FLOOR_PIXELS_PER_TILE = 52.0f;
 
         // Material indices.
         constexpr int MAT_FLOOR = 0;
@@ -128,69 +124,101 @@ namespace ViewPoint
             LogNumber("Image content max Y", maxY);
             LogNumber("Image content pixels", static_cast<double>(count));
         }
-
         bool ExtractFloorTexture(
-            Room *room,
             KAGE_Graphics_ImageBase *image,
             int &outWidth,
             int &outHeight,
             std::vector<unsigned char> &outPixels)
         {
-            if (!room || !image)
+            if (!image)
                 return false;
 
-            const int roomWidth = room->_gridWidth;
-            const int roomHeight = room->_gridHeight;
+            const int width = image->GetWidth();
+            const int height = image->GetHeight();
 
-            if (roomWidth <= 2 || roomHeight <= 2)
+            if (width <= 0 || height <= 0)
                 return false;
 
-            // Exclude the one-tile border around the room.
-            const int sourceX = FLOOR_SOURCE_X;
-            const int sourceY = FLOOR_SOURCE_Y;
+            const size_t w = static_cast<size_t>(width);
+            const size_t h = static_cast<size_t>(height);
 
-            const int sourceWidth =
-                static_cast<int>(
-                    (roomWidth - 2) * FLOOR_PIXELS_PER_TILE);
-
-            const int sourceHeight =
-                static_cast<int>(
-                    (roomHeight - 2) * FLOOR_PIXELS_PER_TILE);
-
-            const int imageWidth = image->GetWidth();
-            const int imageHeight = image->GetHeight();
-
-            if (sourceX + sourceWidth > imageWidth ||
-                sourceY + sourceHeight > imageHeight)
-            {
-                LogMessage(
-                    "RoomExtractor: Floor crop exceeds source image.");
-
-                LogNumber("RoomExtractor: Required crop width", sourceWidth);
-                LogNumber("RoomExtractor: Required crop height", sourceHeight);
-                LogNumber("RoomExtractor: Source image width", imageWidth);
-                LogNumber("RoomExtractor: Source image height", imageHeight);
-
+            if (w > std::numeric_limits<size_t>::max() / h ||
+                w * h > std::numeric_limits<size_t>::max() / 4)
                 return false;
-            }
 
-            outWidth = sourceWidth;
-            outHeight = sourceHeight;
-
-            outPixels.resize(
-                static_cast<size_t>(outWidth) *
-                static_cast<size_t>(outHeight) * 4);
+            std::vector<unsigned char> source(w * h * 4);
 
             image->GetTexelRegion(
-                sourceX,
-                sourceY,
-                static_cast<unsigned int>(outWidth),
-                static_cast<unsigned int>(outHeight),
-                outPixels.data());
+                0,
+                0,
+                static_cast<unsigned int>(width),
+                static_cast<unsigned int>(height),
+                source.data());
+
+            int minX = width;
+            int minY = height;
+            int maxX = -1;
+            int maxY = -1;
+
+            for (int y = 0; y < height; ++y)
+            {
+                for (int x = 0; x < width; ++x)
+                {
+                    const size_t i =
+                        (static_cast<size_t>(y) * width + x) * 4;
+
+                    if (source[i] == 0 &&
+                        source[i + 1] == 0 &&
+                        source[i + 2] == 0 &&
+                        source[i + 3] == 0)
+                        continue;
+
+                    if (x < minX)
+                        minX = x;
+                    if (y < minY)
+                        minY = y;
+                    if (x > maxX)
+                        maxX = x;
+                    if (y > maxY)
+                        maxY = y;
+                }
+            }
+
+            if (maxX < minX || maxY < minY)
+                return false;
+
+            outWidth = maxX - minX + 1;
+            outHeight = maxY - minY + 1;
+
+            outPixels.resize(
+                static_cast<size_t>(outWidth) * outHeight * 4);
+
+            for (int y = 0; y < outHeight; ++y)
+            {
+                for (int x = 0; x < outWidth; ++x)
+                {
+                    const size_t sourceIndex =
+                        (static_cast<size_t>(y + minY) * width +
+                         (x + minX)) *
+                        4;
+
+                    const size_t destinationIndex =
+                        (static_cast<size_t>(y) * outWidth + x) * 4;
+
+                    outPixels[destinationIndex] = source[sourceIndex];
+                    outPixels[destinationIndex + 1] = source[sourceIndex + 1];
+                    outPixels[destinationIndex + 2] = source[sourceIndex + 2];
+                    outPixels[destinationIndex + 3] = source[sourceIndex + 3];
+                }
+            }
+
+            LogNumber("Floor crop X", minX);
+            LogNumber("Floor crop Y", minY);
+            LogNumber("Floor crop width", outWidth);
+            LogNumber("Floor crop height", outHeight);
 
             return true;
         }
-
         bool CopyIsaacFloorTexture(
             Room *room,
             Material &material)
@@ -225,7 +253,6 @@ namespace ViewPoint
             int height = 0;
 
             if (!ExtractFloorTexture(
-                    room,
                     image,
                     width,
                     height,
@@ -268,7 +295,6 @@ namespace ViewPoint
             int height = 0;
 
             if (!ExtractFloorTexture(
-                    room,
                     backdrop->floorBuffer.image,
                     width,
                     height,
@@ -926,24 +952,13 @@ namespace ViewPoint
             const float halfHeight =
                 static_cast<float>(height) * TILE_SIZE * 0.5f;
 
-            const float leftX =
-                -halfWidth + 1.0f;
-
-            const float rightX =
-                halfWidth - 1.0f;
-
-            const float topZ =
-                halfHeight - 1.0f;
-
-            const float bottomZ =
-                -halfHeight + 1.0f;
             AddTexturedFloorQuad(
                 model,
                 MAT_FLOOR,
-                {leftX, FLOOR_Y, topZ},
-                {rightX, FLOOR_Y, topZ},
-                {rightX, FLOOR_Y, bottomZ},
-                {leftX, FLOOR_Y, bottomZ});
+                {-halfWidth, FLOOR_Y, -halfHeight},
+                {halfWidth, FLOOR_Y, -halfHeight},
+                {halfWidth, FLOOR_Y, halfHeight},
+                {-halfWidth, FLOOR_Y, halfHeight});
 
             unsigned int wallCount = 0;
             unsigned int doorCount = 0;
