@@ -62,35 +62,35 @@ namespace ViewPoint
             if (!g_Game)
                 return false;
 
-            Entity_Player* player =
+            Entity_Player *player =
                 g_Game->GetPlayer(0);
 
             if (!player)
                 return false;
 
-            Room* room =
+            Room *room =
                 g_Game->GetCurrentRoom();
 
             if (!room)
                 return false;
 
-            const Vector* playerPosition =
+            const Vector *playerPosition =
                 player->GetPosition();
 
             if (!playerPosition)
                 return false;
 
-            // Isaac's room-local coordinate origin.
-            constexpr float ROOM_CENTER_X = 320.0f;
-            constexpr float ROOM_CENTER_Y = 280.0f;
+            const float roomCenterX =
+                320.0f + (static_cast<float>(room->_gridWidth) - 15.0f) * 20.0f;
+
+            const float roomCenterY =
+                280.0f + (static_cast<float>(room->_gridHeight) - 9.0f) * 20.0f;
 
             g_Camera.position.x =
-                (playerPosition->x - ROOM_CENTER_X) /
-                ISAAC_PIXELS_PER_TILE;
+                (playerPosition->x - roomCenterX) / ISAAC_PIXELS_PER_TILE;
 
             g_Camera.position.z =
-                (ROOM_CENTER_Y - playerPosition->y) /
-                ISAAC_PIXELS_PER_TILE;
+                (roomCenterY - playerPosition->y) / ISAAC_PIXELS_PER_TILE;
 
             g_Camera.position.y =
                 ROOM_FLOOR_Y + PLAYER_EYE_HEIGHT;
@@ -248,16 +248,14 @@ namespace ViewPoint
             return;
 
         POINT topLeft =
-        {
-            clientRect.left,
-            clientRect.top
-        };
+            {
+                clientRect.left,
+                clientRect.top};
 
         POINT bottomRight =
-        {
-            clientRect.right,
-            clientRect.bottom
-        };
+            {
+                clientRect.right,
+                clientRect.bottom};
 
         if (!ClientToScreen(window, &topLeft) ||
             !ClientToScreen(window, &bottomRight))
@@ -266,12 +264,11 @@ namespace ViewPoint
         }
 
         RECT screenRect =
-        {
-            topLeft.x,
-            topLeft.y,
-            bottomRight.x,
-            bottomRight.y
-        };
+            {
+                topLeft.x,
+                topLeft.y,
+                bottomRight.x,
+                bottomRight.y};
 
         const int centerX =
             (topLeft.x + bottomRight.x) / 2;
@@ -327,9 +324,8 @@ namespace ViewPoint
             g_Camera.pitch -= pitchChange;
 
             g_Camera.pitch =
-                (std::max)(
-                    -89.0f,
-                    (std::min)(89.0f, g_Camera.pitch));
+                (std::max)(-89.0f,
+                           (std::min)(89.0f, g_Camera.pitch));
         }
 
         SetCursorPos(centerX, centerY);
@@ -401,11 +397,13 @@ namespace ViewPoint
 
         g_Camera.position.x +=
             (forwardX * forwardInput +
-             rightX * rightInput) * movement;
+             rightX * rightInput) *
+            movement;
 
         g_Camera.position.z +=
             (forwardZ * forwardInput +
-             rightZ * rightInput) * movement;
+             rightZ * rightInput) *
+            movement;
 
         g_Camera.position.y +=
             verticalInput * movement;
