@@ -95,9 +95,9 @@ namespace ViewPoint
 
         // Keyed by the actual REPENTOGON image pointer.
         std::unordered_map<
-            KAGE_Graphics_ImageBase*,
-            SpriteTexture
-        > g_SpriteTextures;
+            KAGE_Graphics_ImageBase *,
+            SpriteTexture>
+            g_SpriteTextures;
 
         HGLRC g_EntityTextureContext = nullptr;
 
@@ -106,8 +106,8 @@ namespace ViewPoint
         // --------------------------------------------------
 
         static Vector IsaacPositionToWorld(
-            const Vector& position,
-            Room* room)
+            const Vector &position,
+            Room *room)
         {
             const float roomCenterX =
                 320.0f +
@@ -124,16 +124,15 @@ namespace ViewPoint
                     ISAAC_PIXELS_PER_TILE,
 
                 (roomCenterY - position.y) /
-                    ISAAC_PIXELS_PER_TILE
-            );
+                    ISAAC_PIXELS_PER_TILE);
         }
 
         // --------------------------------------------------
         // SPRITE TEXTURE CACHE
         // --------------------------------------------------
 
-        static SpriteTexture* GetSpriteTexture(
-            KAGE_Graphics_ImageBase* image)
+        static SpriteTexture *GetSpriteTexture(
+            KAGE_Graphics_ImageBase *image)
         {
             if (!image)
                 return nullptr;
@@ -242,12 +241,12 @@ namespace ViewPoint
         // --------------------------------------------------
 
         static void RenderSpriteLayer(
-            Entity* entity,
-            ANM2* sprite,
-            AnimationState* animationState,
-            AnimationLayer* animationLayer,
-            LayerState* layerState,
-            Room* room,
+            Entity *entity,
+            ANM2 *sprite,
+            AnimationState *animationState,
+            AnimationLayer *animationLayer,
+            LayerState *layerState,
+            Room *room,
             float cameraRightX,
             float cameraRightZ)
         {
@@ -279,7 +278,7 @@ namespace ViewPoint
             if (frameIndex < 0)
                 return;
 
-            AnimationFrame* frame =
+            AnimationFrame *frame =
                 animationLayer->GetFrame(frameIndex);
 
             if (!frame || !frame->visible)
@@ -298,7 +297,7 @@ namespace ViewPoint
             if (!sheet.image)
                 return;
 
-            SpriteTexture* texture =
+            SpriteTexture *texture =
                 GetSpriteTexture(sheet.image);
 
             if (!texture || !texture->texture)
@@ -360,7 +359,7 @@ namespace ViewPoint
             if (width <= 0.0f || height <= 0.0f)
                 return;
 
-            const Vector* entityPosition =
+            const Vector *entityPosition =
                 entity->GetPosition();
 
             if (!entityPosition)
@@ -469,8 +468,8 @@ namespace ViewPoint
         // --------------------------------------------------
 
         static void RenderEntitySprite(
-            Entity* entity,
-            Room* room,
+            Entity *entity,
+            Room *room,
             float cameraRightX,
             float cameraRightZ)
         {
@@ -484,7 +483,7 @@ namespace ViewPoint
                 return;
             }
 
-            ANM2* sprite =
+            ANM2 *sprite =
                 &entity->_sprite;
 
             if (!sprite->_loaded ||
@@ -494,7 +493,7 @@ namespace ViewPoint
                 return;
             }
 
-            AnimationState* animationState =
+            AnimationState *animationState =
                 sprite->GetAnimationState();
 
             if (!animationState ||
@@ -503,7 +502,7 @@ namespace ViewPoint
                 return;
             }
 
-            AnimationData* animationData =
+            AnimationData *animationData =
                 animationState->_animData;
 
             if (!animationData->_animLayers ||
@@ -512,17 +511,16 @@ namespace ViewPoint
                 return;
             }
 
-            const int layerCount =
-                (std::min)(
-                    animationData->_layerCount,
-                    sprite->_layerCount);
+            const int layerCount = std::min(
+                animationData->_layerCount,
+                static_cast<int>(sprite->_layerCount));
 
             for (int i = 0; i < layerCount; ++i)
             {
-                AnimationLayer* animationLayer =
+                AnimationLayer *animationLayer =
                     animationData->GetLayerByOrder(i);
 
-                LayerState* layerState =
+                LayerState *layerState =
                     &sprite->_layerState[i];
 
                 if (!animationLayer || !layerState)
@@ -574,8 +572,8 @@ namespace ViewPoint
         }
 
         static void RenderCollisionCapsule(
-            Entity* entity,
-            Room* room)
+            Entity *entity,
+            Room *room)
         {
             if (!entity || !room)
                 return;
@@ -701,9 +699,9 @@ namespace ViewPoint
         // --------------------------------------------------
 
         static bool BeginEntityRendering(
-            GLint& oldProgram,
-            GLint& oldMatrixMode,
-            GLint& oldActiveTexture)
+            GLint &oldProgram,
+            GLint &oldMatrixMode,
+            GLint &oldActiveTexture)
         {
             GLint viewport[4] = {};
 
@@ -860,19 +858,19 @@ namespace ViewPoint
         if (!g_Game)
             return;
 
-        Room* room =
+        Room *room =
             g_Game->GetCurrentRoom();
 
         if (!room)
             return;
 
-        EntityList* entityList =
+        EntityList *entityList =
             room->GetEntityList();
 
         if (!entityList)
             return;
 
-        EntityList_EL* renderList =
+        EntityList_EL *renderList =
             entityList->GetRenderEL();
 
         if (!renderList ||
@@ -954,7 +952,7 @@ namespace ViewPoint
              i < renderList->_size;
              ++i)
         {
-            Entity* entity =
+            Entity *entity =
                 renderList->_data[i];
 
             if (!entity)
@@ -981,7 +979,7 @@ namespace ViewPoint
              i < renderList->_size;
              ++i)
         {
-            Entity* entity =
+            Entity *entity =
                 renderList->_data[i];
 
             if (!entity)
