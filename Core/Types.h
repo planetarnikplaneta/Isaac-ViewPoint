@@ -134,7 +134,13 @@ namespace ViewPoint
 
         bool enabled = false;
         bool previousF1State = false;
+        // Player-follow camera.
+        bool followPlayer = true;
+        bool previousF2State = false;
 
+        float playerBaseYaw = 0.0f;
+        float playerYawOffset = 0.0f;
+        
         ULONGLONG lastUpdateTime = 0;
     };
 }

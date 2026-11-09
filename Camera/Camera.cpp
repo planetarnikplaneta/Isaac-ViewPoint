@@ -1,9 +1,9 @@
 
 #include "Camera.h"
 
+#include "../IsaacRepentance.h"
 #include "../Core/State.h"
 #include "../Core/Logger.h"
-#include "../IsaacRepentance.h"
 
 #include <algorithm>
 #include <cmath>
@@ -12,106 +12,108 @@ namespace ViewPoint
 {
     namespace
     {
+        constexpr float PI =
+            3.14159265358979323846f;
+
+        // Isaac grid coordinates use 40 pixels per tile.
+        // ViewPoint uses one world unit per tile.
         constexpr float ISAAC_PIXELS_PER_TILE = 40.0f;
 
         // RoomExtractor uses FLOOR_Y = -1.5f.
-        // Place the camera 1.15 units above the floor.
-        constexpr float CAMERA_EYE_HEIGHT = -0.35f;
+        constexpr float ROOM_FLOOR_Y = -1.5f;
 
-        bool g_FreeFlyMode = false;
-
-        Entity_Player* g_LastPlayer = nullptr;
-        int g_LastHeadDirection = -1;
-
-        float DirectionToYaw(int direction)
-        {
-            switch (direction)
-            {
-            case LEFT:
-                return 90.0f;
-
-            case UP:
-                return 0.0f;
-
-            case RIGHT:
-                return -90.0f;
-
-            case DOWN:
-                return 180.0f;
-
-            default:
-                return 0.0f;
-            }
-        }
+        // Camera height above the room floor.
+        constexpr float PLAYER_EYE_HEIGHT = 1.15f;
 
         bool KeyDown(int key)
         {
             return (GetAsyncKeyState(key) & 0x8000) != 0;
         }
 
-        void UpdatePlayerCamera()
+        float DirectionToYaw(int direction)
+        {
+            // REPENTOGON Direction:
+            // LEFT  = 0
+            // UP    = 1
+            // RIGHT = 2
+            // DOWN  = 3
+
+            switch (direction)
+            {
+            case 0: // LEFT
+                return 90.0f;
+
+            case 1: // UP
+                return 0.0f;
+
+            case 2: // RIGHT
+                return -90.0f;
+
+            case 3: // DOWN
+                return 180.0f;
+
+            default:
+                return -10000.0f;
+            }
+        }
+
+        bool UpdatePlayerCamera()
         {
             if (!g_Game)
-                return;
+                return false;
 
-            Entity_Player* player = g_Game->GetPlayer(0);
+            Entity_Player* player =
+                g_Game->GetPlayer(0);
 
             if (!player)
-            {
-                g_LastPlayer = nullptr;
-                g_LastHeadDirection = -1;
-                return;
-            }
+                return false;
 
-            Room* room = g_Game->GetCurrentRoom();
+            Room* room =
+                g_Game->GetCurrentRoom();
 
             if (!room)
-                return;
+                return false;
 
-            const Vector* playerPosition = player->GetPosition();
+            const Vector* playerPosition =
+                player->GetPosition();
 
             if (!playerPosition)
-                return;
+                return false;
 
-            const unsigned int roomWidth = room->_gridWidth;
-            const unsigned int roomHeight = room->_gridHeight;
+            const float roomCenterX =
+                static_cast<float>(room->_gridWidth) *
+                ISAAC_PIXELS_PER_TILE * 0.5f;
 
-            if (roomWidth <= 2 || roomHeight <= 2)
-                return;
+            const float roomCenterY =
+                static_cast<float>(room->_gridHeight) *
+                ISAAC_PIXELS_PER_TILE * 0.5f;
 
-            // Isaac coordinates are pixels.
-            // ViewPoint coordinates are centered room tiles.
+            // Convert Isaac room coordinates into
+            // ViewPoint's centered room coordinates.
             g_Camera.position.x =
-                playerPosition->x / ISAAC_PIXELS_PER_TILE -
-                static_cast<float>(roomWidth) * 0.5f;
+                (playerPosition->x - roomCenterX) /
+                ISAAC_PIXELS_PER_TILE;
 
             g_Camera.position.z =
-                static_cast<float>(roomHeight) * 0.5f -
-                playerPosition->y / ISAAC_PIXELS_PER_TILE;
+                (roomCenterY - playerPosition->y) /
+                ISAAC_PIXELS_PER_TILE;
 
-            g_Camera.position.y = CAMERA_EYE_HEIGHT;
+            g_Camera.position.y =
+                ROOM_FLOOR_Y + PLAYER_EYE_HEIGHT;
 
-            const int headDirection = player->_headDirection;
+            const float playerYaw =
+                DirectionToYaw(player->_headDirection);
 
-            // Initialize facing when the player changes.
-            if (player != g_LastPlayer)
+            if (playerYaw > -1000.0f)
             {
-                g_LastPlayer = player;
-                g_LastHeadDirection = headDirection;
-
-                if (headDirection != NO_DIRECTION)
-                    g_Camera.yaw = DirectionToYaw(headDirection);
-
-                g_Camera.pitch = 0.0f;
+                g_Camera.playerBaseYaw = playerYaw;
             }
-            // Update facing when Isaac changes cardinal direction.
-            else if (headDirection != g_LastHeadDirection)
-            {
-                g_LastHeadDirection = headDirection;
 
-                if (headDirection != NO_DIRECTION)
-                    g_Camera.yaw = DirectionToYaw(headDirection);
-            }
+            g_Camera.yaw =
+                g_Camera.playerBaseYaw +
+                g_Camera.playerYawOffset;
+
+            return true;
         }
     }
 
@@ -123,7 +125,8 @@ namespace ViewPoint
 
     void UpdateCamera(HWND window)
     {
-        const ULONGLONG currentTime = GetTickCount64();
+        const ULONGLONG currentTime =
+            GetTickCount64();
 
         float deltaTime = 0.0f;
 
@@ -139,9 +142,9 @@ namespace ViewPoint
 
         deltaTime = (std::min)(deltaTime, 0.05f);
 
-        // --------------------------------------------------
-        // F1: Enable or disable ViewPoint camera.
-        // --------------------------------------------------
+        // -------------------------------------------------
+        // F1: Enable / disable camera
+        // -------------------------------------------------
 
         const bool f1Down = KeyDown(VK_F1);
 
@@ -153,19 +156,15 @@ namespace ViewPoint
             {
                 ReleaseCameraCursor();
 
-                g_LastPlayer = nullptr;
-                g_LastHeadDirection = -1;
-
-                LogMessage("First-person camera disabled.");
+                ViewPoint::LogMessage(
+                    "First-person camera disabled.");
             }
             else
             {
                 g_CursorCaptured = false;
 
-                g_LastPlayer = nullptr;
-                g_LastHeadDirection = -1;
-
-                LogMessage("First-person camera enabled.");
+                ViewPoint::LogMessage(
+                    "First-person camera enabled.");
             }
         }
 
@@ -179,45 +178,47 @@ namespace ViewPoint
             return;
         }
 
-        // --------------------------------------------------
-        // F2: Toggle player-follow / free-fly mode.
-        // --------------------------------------------------
-
-        static bool previousF2State = false;
+        // -------------------------------------------------
+        // F2: Toggle player-follow / free-fly
+        // -------------------------------------------------
 
         const bool f2Down = KeyDown(VK_F2);
 
-        if (f2Down && !previousF2State)
+        if (f2Down && !g_Camera.previousF2State)
         {
-            g_FreeFlyMode = !g_FreeFlyMode;
+            g_Camera.followPlayer =
+                !g_Camera.followPlayer;
 
-            if (g_FreeFlyMode)
+            if (g_Camera.followPlayer)
             {
-                LogMessage(
-                    "Camera mode: Free-fly debugging.");
+                g_Camera.playerYawOffset = 0.0f;
+
+                UpdatePlayerCamera();
+
+                ViewPoint::LogMessage(
+                    "Player-follow camera enabled.");
             }
             else
             {
-                g_LastPlayer = nullptr;
-                g_LastHeadDirection = -1;
-
-                LogMessage(
-                    "Camera mode: Player follow.");
+                ViewPoint::LogMessage(
+                    "Free-fly debug camera enabled.");
             }
         }
 
-        previousF2State = f2Down;
+        g_Camera.previousF2State = f2Down;
 
-        // --------------------------------------------------
-        // Player position and facing.
-        // --------------------------------------------------
+        // -------------------------------------------------
+        // Synchronize with Isaac player
+        // -------------------------------------------------
 
-        if (!g_FreeFlyMode)
+        if (g_Camera.followPlayer)
+        {
             UpdatePlayerCamera();
+        }
 
-        // --------------------------------------------------
-        // Window coordinates.
-        // --------------------------------------------------
+        // -------------------------------------------------
+        // Window coordinates
+        // -------------------------------------------------
 
         RECT clientRect{};
 
@@ -265,13 +266,14 @@ namespace ViewPoint
         const int centerY =
             (topLeft.y + bottomRight.y) / 2;
 
-        // --------------------------------------------------
-        // Mouse capture.
-        // --------------------------------------------------
+        // -------------------------------------------------
+        // Mouse capture
+        // -------------------------------------------------
 
         if (!g_CursorCaptured)
         {
             ClipCursor(&screenRect);
+
             SetCursorPos(centerX, centerY);
 
             g_CursorCaptured = true;
@@ -287,13 +289,29 @@ namespace ViewPoint
             const int mouseDeltaY =
                 mousePosition.y - centerY;
 
-            g_Camera.yaw -=
+            const float yawChange =
                 static_cast<float>(mouseDeltaX) *
                 g_Camera.mouseSensitivity;
 
-            g_Camera.pitch -=
+            const float pitchChange =
                 static_cast<float>(mouseDeltaY) *
                 g_Camera.mouseSensitivity;
+
+            if (g_Camera.followPlayer)
+            {
+                // Mouse yaw is relative to player facing.
+                g_Camera.playerYawOffset -= yawChange;
+
+                g_Camera.yaw =
+                    g_Camera.playerBaseYaw +
+                    g_Camera.playerYawOffset;
+            }
+            else
+            {
+                g_Camera.yaw -= yawChange;
+            }
+
+            g_Camera.pitch -= pitchChange;
 
             g_Camera.pitch =
                 (std::max)(
@@ -303,12 +321,11 @@ namespace ViewPoint
 
         SetCursorPos(centerX, centerY);
 
-        // --------------------------------------------------
-        // Free-fly movement.
-        // Only active in debugging mode.
-        // --------------------------------------------------
+        // -------------------------------------------------
+        // Free-fly movement
+        // -------------------------------------------------
 
-        if (!g_FreeFlyMode)
+        if (g_Camera.followPlayer)
             return;
 
         float forwardInput = 0.0f;
@@ -345,22 +362,29 @@ namespace ViewPoint
         }
 
         const float yawRadians =
-            g_Camera.yaw *
-            3.14159265358979323846f /
-            180.0f;
+            g_Camera.yaw * PI / 180.0f;
 
-        const float forwardX = -std::sin(yawRadians);
-        const float forwardZ = -std::cos(yawRadians);
+        const float forwardX =
+            -std::sin(yawRadians);
 
-        const float rightX = std::cos(yawRadians);
-        const float rightZ = -std::sin(yawRadians);
+        const float forwardZ =
+            -std::cos(yawRadians);
+
+        const float rightX =
+            std::cos(yawRadians);
+
+        const float rightZ =
+            -std::sin(yawRadians);
 
         float speed = g_Camera.movementSpeed;
 
         if (KeyDown(VK_SHIFT))
+        {
             speed *= g_Camera.sprintMultiplier;
+        }
 
-        const float movement = speed * deltaTime;
+        const float movement =
+            speed * deltaTime;
 
         g_Camera.position.x +=
             (forwardX * forwardInput +
