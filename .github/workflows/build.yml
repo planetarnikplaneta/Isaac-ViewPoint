@@ -95,6 +95,7 @@ jobs:
             Scene\Scene.cpp ^
             Graphics\Renderer.cpp ^
             Room\RoomExtractor.cpp ^
+            Entities\EntityRenderer.cpp ^
             ViewPointResources.res ^
             libzhl.lib ^
             /link /OUT:zhlMain_ViewPoint.dll

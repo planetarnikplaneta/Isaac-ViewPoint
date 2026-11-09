@@ -12,6 +12,7 @@
 #include "../Camera/Camera.h"
 #include "../Scene/Scene.h"
 #include "../Room/RoomExtractor.h"
+#include "../Entities/EntityRenderer.h"
 
 #include <Windows.h>
 #include <gl/GL.h>
@@ -1094,5 +1095,7 @@ namespace ViewPoint
         {
             RenderModel(*roomModel);
         }
+        // Render native Isaac entities on top of the room geometry.
+        RenderEntities();
     }
 }
