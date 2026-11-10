@@ -1,3 +1,4 @@
+
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
@@ -16,6 +17,7 @@
 #include "Room/RoomExtractor.h"
 
 #include "IsaacRepentance.h"
+
 #include <cstdio>
 #include <cmath>
 #include <algorithm>
@@ -29,15 +31,65 @@ namespace OpenGL
 {
     bool __stdcall wglSwapBuffers(HDC hdc);
 }
-// Isaac input actions:
-// 0 = Left
-// 1 = Right
-// 2 = Up
-// 3 = Down
-// 4 = Shoot Left
-// 5 = Shoot Right
-// 6 = Shoot Up
-// 7 = Shoot Down
+
+// ------------------------------------------------------------
+// INPUT HELPERS
+// ------------------------------------------------------------
+
+namespace ViewPoint
+{
+    constexpr float VIEWPOINT_PI = 3.14159265358979323846f;
+
+    bool IsMouseAiming()
+    {
+        return g_Camera.enabled &&
+               g_Camera.followPlayer &&
+               (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
+    }
+
+    float GetMouseAimActionValue(int action)
+    {
+        const float yawRadians =
+            g_Camera.yaw * VIEWPOINT_PI / 180.0f;
+
+        const float forwardX = -std::sin(yawRadians);
+        const float forwardZ = -std::cos(yawRadians);
+
+        float value = 0.0f;
+
+        switch (action)
+        {
+            // Shoot left
+            case 4:
+                value = -forwardX;
+                break;
+
+            // Shoot right
+            case 5:
+                value = forwardX;
+                break;
+
+            // Shoot up
+            case 6:
+                value = forwardZ;
+                break;
+
+            // Shoot down
+            case 7:
+                value = -forwardZ;
+                break;
+
+            default:
+                return 0.0f;
+        }
+
+        return std::clamp(value, 0.0f, 1.0f);
+    }
+}
+
+// ------------------------------------------------------------
+// GET ACTION VALUE
+// ------------------------------------------------------------
 
 HOOK_METHOD(
     InputManager,
@@ -49,48 +101,14 @@ HOOK_METHOD(
     if (!ViewPoint::g_Camera.enabled)
         return super(action, controllerid, unk);
 
-    // ------------------------------------------------------------
-    // CAMERA-AIMED MOUSE SHOOTING
-    // ------------------------------------------------------------
-
-    const bool mouseFiring =
-        (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
-
+    // Camera-aimed mouse shooting
     if (action >= 4 && action <= 7 &&
-        ViewPoint::g_Camera.followPlayer &&
-        mouseFiring)
+        ViewPoint::IsMouseAiming())
     {
-        const float yawRadians =
-            ViewPoint::g_Camera.yaw * PI / 180.0f;
-
-        const float forwardX = -std::sin(yawRadians);
-        const float forwardZ = -std::cos(yawRadians);
-
-        float value = 0.0f;
-
-        switch (action)
-        {
-        case 4:
-            value = -forwardX;
-            break;
-        case 5:
-            value = forwardX;
-            break;
-        case 6:
-            value = forwardZ;
-            break;
-        case 7:
-            value = -forwardZ;
-            break;
-        }
-
-        return std::clamp(value, -1.0f, 1.0f);
+        return ViewPoint::GetMouseAimActionValue(action);
     }
 
-    // ------------------------------------------------------------
-    // CAMERA-RELATIVE PLAYER MOVEMENT
-    // ------------------------------------------------------------
-
+    // Camera-relative player movement
     if (action < 0 || action > 3)
         return super(action, controllerid, unk);
 
@@ -126,23 +144,68 @@ HOOK_METHOD(
 
     switch (action)
     {
-    case 0:
-        return worldX < 0.0f ? -worldX : 0.0f;
+        case 0:
+            return worldX < 0.0f ? -worldX : 0.0f;
 
-    case 1:
-        return worldX > 0.0f ? worldX : 0.0f;
+        case 1:
+            return worldX > 0.0f ? worldX : 0.0f;
 
-    case 2:
-        return worldZ > 0.0f ? worldZ : 0.0f;
+        case 2:
+            return worldZ > 0.0f ? worldZ : 0.0f;
 
-    case 3:
-        return worldZ < 0.0f ? -worldZ : 0.0f;
+        case 3:
+            return worldZ < 0.0f ? -worldZ : 0.0f;
     }
 
     return 0.0f;
 }
 
-// REPENTOGON HOOK
+// ------------------------------------------------------------
+// IS ACTION PRESSED
+// ------------------------------------------------------------
+
+HOOK_METHOD(
+    InputManager,
+    IsActionPressed,
+    (int btn, int controllerid, int unk)->bool)
+{
+    if (btn >= 4 && btn <= 7 &&
+        ViewPoint::IsMouseAiming())
+    {
+        return ViewPoint::GetMouseAimActionValue(btn) > 0.25f;
+    }
+
+    if (btn >= 0 && btn <= 3 &&
+        ViewPoint::g_Camera.enabled &&
+        ViewPoint::g_Camera.followPlayer)
+    {
+        return GetActionValue(btn, controllerid, unk) > 0.25f;
+    }
+
+    return super(btn, controllerid, unk);
+}
+
+// ------------------------------------------------------------
+// IS ACTION TRIGGERED
+// ------------------------------------------------------------
+
+HOOK_METHOD(
+    InputManager,
+    IsActionTriggered,
+    (int btnaction, int controllerid, int unk)->bool)
+{
+    if (btnaction >= 4 && btnaction <= 7 &&
+        ViewPoint::IsMouseAiming())
+    {
+        return ViewPoint::GetMouseAimActionValue(btnaction) > 0.25f;
+    }
+
+    return super(btnaction, controllerid, unk);
+}
+
+// ------------------------------------------------------------
+// REPENTOGON OPENGL HOOK
+// ------------------------------------------------------------
 
 HOOK_GLOBAL(
     OpenGL::wglSwapBuffers,
@@ -165,6 +228,7 @@ HOOK_GLOBAL(
         ViewPoint::UpdateRoomExtractor();
 
         glPushAttrib(GL_DEPTH_BUFFER_BIT | GL_ENABLE_BIT);
+
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LEQUAL);
         glDepthMask(GL_TRUE);
@@ -177,7 +241,9 @@ HOOK_GLOBAL(
     return super(hdc);
 }
 
+// ------------------------------------------------------------
 // DLL ENTRY POINT
+// ------------------------------------------------------------
 
 BOOL WINAPI DllMain(
     HINSTANCE instance,
@@ -194,7 +260,9 @@ BOOL WINAPI DllMain(
     return TRUE;
 }
 
+// ------------------------------------------------------------
 // MOD INITIALIZATION
+// ------------------------------------------------------------
 
 extern "C" __declspec(dllexport) int ModInit()
 {
