@@ -86,7 +86,43 @@ namespace ViewPoint
         return std::clamp(value, 0.0f, 1.0f);
     }
 }
+// ------------------------------------------------------
+// VANILLA WEAPON FIRE - CAMERA AIM
+// ------------------------------------------------------
 
+HOOK_METHOD(
+    Weapon,
+    Fire,
+    (const Vector& dir, bool isShooting, bool isInterpolated)->void)
+{
+    if (ViewPoint::IsMouseAiming() && g_Game)
+    {
+        Entity_Player* player = g_Game->GetPlayer(0);
+
+        if (player && GetOwner() == player)
+        {
+            constexpr float PI = 3.14159265358979323846f;
+
+            const float yawRadians =
+                ViewPoint::g_Camera.yaw * PI / 180.0f;
+
+            const float forwardX = -std::sin(yawRadians);
+            const float forwardZ = -std::cos(yawRadians);
+
+            // Convert ViewPoint world coordinates to Isaac's
+            // 2D coordinates. Isaac's positive Y points downward.
+            const Vector cameraAim(
+                forwardX,
+                -forwardZ
+            );
+
+            super(cameraAim, isShooting, isInterpolated);
+            return;
+        }
+    }
+
+    super(dir, isShooting, isInterpolated);
+}
 // ------------------------------------------------------------
 // GET ACTION VALUE
 // ------------------------------------------------------------
