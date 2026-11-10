@@ -28,27 +28,70 @@ namespace OpenGL
 {
     bool __stdcall wglSwapBuffers(HDC hdc);
 }
-// CAMERA-RELATIVE PLAYER MOVEMENT
+// Isaac input actions:
+// 0 = Left
+// 1 = Right
+// 2 = Up
+// 3 = Down
+// 4 = Shoot Left
+// 5 = Shoot Right
+// 6 = Shoot Up
+// 7 = Shoot Down
+
 HOOK_METHOD(
     InputManager,
     GetActionValue,
     (int action, int controllerid, int unk) -> float)
 {
-    // Leave all non-movement inputs unchanged.
+    if (!ViewPoint::g_Camera.enabled)
+        return super(action, controllerid, unk);
+
+    // ------------------------------------------------------------
+    // CAMERA-AIMED MOUSE SHOOTING
+    // ------------------------------------------------------------
+
+    if (action >= 4 && action <= 7)
+    {
+        if (!(GetAsyncKeyState(VK_LBUTTON) & 0x8000))
+            return super(action, controllerid, unk);
+
+        constexpr float PI =
+            3.14159265358979323846f;
+
+        const float yaw =
+            ViewPoint::g_Camera.yaw * PI / 180.0f;
+
+        const float forwardX = -std::sin(yaw);
+        const float forwardZ = -std::cos(yaw);
+
+        int shootingAction = 6;
+
+        if (std::fabs(forwardX) > std::fabs(forwardZ))
+        {
+            // Camera points horizontally.
+            shootingAction =
+                forwardX < 0.0f ? 4 : 5;
+        }
+        else
+        {
+            // Camera points vertically.
+            shootingAction =
+                forwardZ > 0.0f ? 6 : 7;
+        }
+
+        return action == shootingAction ? 1.0f : 0.0f;
+    }
+
+    // ------------------------------------------------------------
+    // CAMERA-RELATIVE PLAYER MOVEMENT
+    // ------------------------------------------------------------
+
     if (action < 0 || action > 3)
-    {
         return super(action, controllerid, unk);
-    }
 
-    // Only transform movement while ViewPoint follow mode is active.
-    if (!ViewPoint::g_Camera.enabled ||
-        !ViewPoint::g_Camera.followPlayer)
-    {
+    if (!ViewPoint::g_Camera.followPlayer)
         return super(action, controllerid, unk);
-    }
 
-    // Read the original directional inputs.
-    // Calling super bypasses this hook.
     const float left =
         super(0, controllerid, unk);
 
@@ -61,47 +104,39 @@ HOOK_METHOD(
     const float down =
         super(3, controllerid, unk);
 
-    // Camera-relative input axes.
     const float strafe = right - left;
     const float forward = up - down;
 
-    // Camera orientation.
-    constexpr float PI = 3.14159265358979323846f;
-
-    const float yawRadians =
+    const float yaw =
         ViewPoint::g_Camera.yaw * PI / 180.0f;
 
-    const float sinYaw = std::sin(yawRadians);
-    const float cosYaw = std::cos(yawRadians);
+    const float sinYaw = std::sin(yaw);
+    const float cosYaw = std::cos(yaw);
 
-    // Transform camera-relative movement into world directions.
     const float worldX =
-        strafe * cosYaw -
-        forward * sinYaw;
+        strafe * cosYaw - forward * sinYaw;
 
     const float worldZ =
-        -strafe * sinYaw -
-        forward * cosYaw;
+        -strafe * sinYaw - forward * cosYaw;
 
-    // Convert the transformed vector back into Isaac's
-    // four directional actions.
     switch (action)
     {
-        case 0: // LEFT
+        case 0:
             return worldX < 0.0f ? -worldX : 0.0f;
 
-        case 1: // RIGHT
+        case 1:
             return worldX > 0.0f ? worldX : 0.0f;
 
-        case 2: // UP
+        case 2:
             return worldZ > 0.0f ? worldZ : 0.0f;
 
-        case 3: // DOWN
+        case 3:
             return worldZ < 0.0f ? -worldZ : 0.0f;
     }
 
     return 0.0f;
 }
+
 // REPENTOGON HOOK
 
 HOOK_GLOBAL(

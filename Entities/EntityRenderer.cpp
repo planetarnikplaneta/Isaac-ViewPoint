@@ -189,16 +189,6 @@ namespace ViewPoint
                 GL_TEXTURE_WRAP_T,
                 GL_CLAMP_TO_EDGE);
 
-            glTexParameteri(
-                GL_TEXTURE_2D,
-                GL_TEXTURE_BASE_LEVEL,
-                0);
-
-            glTexParameteri(
-                GL_TEXTURE_2D,
-                GL_TEXTURE_MAX_LEVEL,
-                0);
-                
             glTexImage2D(
                 GL_TEXTURE_2D,
                 0,
@@ -460,119 +450,113 @@ namespace ViewPoint
         // ONE ANIMATION LAYER
         // ------------------------------------------------------------
 
-        static void RenderSpriteLayer(
-            Entity *entity,
-            Room *room,
-            ANM2 *sprite,
-            AnimationState *animationState,
-            AnimationLayer *animationLayer,
-            float cameraRightX,
-            float cameraRightZ)
-        {
-            if (!entity || !room || !sprite ||
-                !animationState || !animationLayer)
-            {
-                return;
-            }
 
-            if (!animationLayer->IsVisible())
-                return;
+static void RenderSpriteLayer(
+    Entity* entity,
+    Room* room,
+    ANM2* sprite,
+    AnimationState* animationState,
+    AnimationLayer* animationLayer,
+    float cameraRightX,
+    float cameraRightZ)
+{
+    if (!entity || !room || !sprite ||
+        !animationState || !animationLayer)
+        return;
 
-            const int layerID =
-                animationLayer->_layerID;
+    if (!animationState->_layerFrames ||
+        !animationState->_animData)
+        return;
 
-            if (layerID < 0 || layerID >= 64)
-                return;
+    const int layerID = animationLayer->_layerID;
 
-            if (!animationState->_layerFrames)
-                return;
+    if (layerID < 0 || layerID >= 64)
+        return;
 
-            const int frameIndex =
-                animationState->_layerFrames[layerID];
+    // Animation frame storage is indexed by layer ID,
+    // not by animation draw order.
+    const int frameIndex =
+        animationState->_layerFrames[layerID];
 
-            AnimationFrame *frame =
-                animationLayer->GetFrame(frameIndex);
+    if (frameIndex < 0)
+        return;
 
-            if (!frame || !frame->visible)
-                return;
+    AnimationFrame* frame =
+        animationLayer->GetFrame(frameIndex);
 
-            // GetLayer(int) retrieves the ANM2 layer state by ID.
-            LayerState *layer =
-                sprite->GetLayer(layerID);
+    if (!frame)
+        return;
 
-            if (!layer || !layer->_visible)
-                return;
+    if (!animationLayer->IsVisible() ||
+        !frame->visible)
+        return;
 
-            if (!layer->_spriteSheetLoaded)
-                return;
+    // Get the corresponding ANM2 layer state.
+    LayerState* layer =
+        sprite->GetLayer(layerID);
 
-            KAGE_SmartPointer_ImageBase sheet =
-                layer->GetSpriteSheet();
+    if (!layer || !layer->_visible)
+        return;
 
-            if (!sheet.image)
-                return;
+    if (!layer->_spriteSheetLoaded)
+        return;
 
-            SpriteTexture *texture =
-                GetSpriteTexture(sheet.image);
+    KAGE_SmartPointer_ImageBase sheet =
+        layer->GetSpriteSheet();
 
-            if (!texture || !texture->id)
-                return;
+    if (!sheet.image)
+        return;
 
-            SpriteVertex vertices[4]{};
+    SpriteTexture* texture =
+        GetSpriteTexture(sheet.image);
 
-            if (!BuildSpriteQuad(
-                    entity,
-                    room,
-                    sprite,
-                    layer,
-                    frame,
-                    texture,
-                    cameraRightX,
-                    cameraRightZ,
-                    vertices))
-            {
-                return;
-            }
+    if (!texture || !texture->id)
+        return;
 
-            float red;
-            float green;
-            float blue;
-            float alpha;
+    SpriteVertex vertices[4]{};
 
-            GetSpriteColor(
-                sprite,
-                layer,
-                frame,
-                red,
-                green,
-                blue,
-                alpha);
+    if (!BuildSpriteQuad(
+            entity,
+            room,
+            sprite,
+            layer,
+            frame,
+            texture,
+            cameraRightX,
+            cameraRightZ,
+            vertices))
+        return;
 
-            if (alpha <= 0.001f)
-                return;
+    float red;
+    float green;
+    float blue;
+    float alpha;
 
-            glBindTexture(
-                GL_TEXTURE_2D,
-                texture->id);
+    GetSpriteColor(
+        sprite,
+        layer,
+        frame,
+        red,
+        green,
+        blue,
+        alpha);
 
-            glColor4f(red, green, blue, alpha);
+    if (alpha <= 0.001f)
+        return;
 
-            glBegin(GL_QUADS);
+    glBindTexture(GL_TEXTURE_2D, texture->id);
+    glColor4f(red, green, blue, alpha);
 
-            for (int i = 0; i < 4; ++i)
-            {
-                glTexCoord2f(
-                    vertices[i].u,
-                    vertices[i].v);
+    glBegin(GL_QUADS);
 
-                glVertex3f(
-                    vertices[i].x,
-                    vertices[i].y,
-                    vertices[i].z);
-            }
+    for (int i = 0; i < 4; ++i)
+    {
+        glTexCoord2f(vertices[i].u, vertices[i].v);
+        glVertex3f(vertices[i].x, vertices[i].y, vertices[i].z);
+    }
 
-            glEnd();
-        }
+    glEnd();
+}
 
         // ------------------------------------------------------------
         // ENTITY SPRITE
@@ -623,25 +607,23 @@ namespace ViewPoint
 
             // AnimationData's order is the draw order.
             // The ANM2 layer state is retrieved separately by ID.
-            for (int i = 0;
-                 i < animationData->_layerCount;
-                 ++i)
-            {
-                AnimationLayer *animationLayer =
-                    animationData->GetLayerByOrder(i);
+for (int i = 0; i < animationData->_layerCount; ++i)
+{
+    AnimationLayer* animationLayer =
+        animationData->GetLayerByOrder(i);
 
-                if (!animationLayer)
-                    continue;
+    if (!animationLayer)
+        continue;
 
-                RenderSpriteLayer(
-                    entity,
-                    room,
-                    sprite,
-                    animationState,
-                    animationLayer,
-                    cameraRightX,
-                    cameraRightZ);
-            }
+    RenderSpriteLayer(
+        entity,
+        room,
+        sprite,
+        animationState,
+        animationLayer,
+        cameraRightX,
+        cameraRightZ);
+}
         }
 
         // ------------------------------------------------------------

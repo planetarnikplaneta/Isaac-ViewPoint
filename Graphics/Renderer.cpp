@@ -1048,6 +1048,16 @@ namespace ViewPoint
 
         UpdateCamera(window);
 
+        // Do not render ViewPoint until F1 is pressed.
+        if (!g_Camera.enabled)
+            return;
+
+        // Set the background to black and clear the previous frame.
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+
+        // Clear both color and depth buffers.
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
         // Detect configuration changes.
         CheckConfigurationReload();
 
@@ -1066,16 +1076,12 @@ namespace ViewPoint
         if (g_Models.empty() && !GetRoomModel())
             return;
 
-        // Clear the depth buffer once for the whole scene.
-        // Preserve the game's depth/scissor state.
-        glPushAttrib(
-            GL_DEPTH_BUFFER_BIT |
-            GL_SCISSOR_BIT);
-
-        glDisable(GL_SCISSOR_TEST);
-        glDepthMask(GL_TRUE);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClearDepth(1.0);
-        glClear(GL_DEPTH_BUFFER_BIT);
+
+        glClear(
+            GL_COLOR_BUFFER_BIT |
+            GL_DEPTH_BUFFER_BIT);
 
         glPopAttrib();
 
