@@ -57,7 +57,7 @@ namespace ViewPoint
             int height = 0;
         };
 
-        std::unordered_map<KAGE_Graphics_ImageBase*, SpriteTexture>
+        std::unordered_map<KAGE_Graphics_ImageBase *, SpriteTexture>
             g_SpriteTextures;
 
         HGLRC g_TextureContext = nullptr;
@@ -83,18 +83,18 @@ namespace ViewPoint
         // ------------------------------------------------------------
 
         static WorldPoint IsaacToWorld(
-            const Vector& position,
-            Room* room)
+            const Vector &position,
+            Room *room)
         {
             const float roomCenterX =
                 320.0f +
                 (static_cast<float>(room->_gridWidth) - 15.0f) *
-                20.0f;
+                    20.0f;
 
             const float roomCenterY =
                 280.0f +
                 (static_cast<float>(room->_gridHeight) - 9.0f) *
-                20.0f;
+                    20.0f;
 
             WorldPoint result{};
 
@@ -115,8 +115,8 @@ namespace ViewPoint
         // SPRITESHEET TEXTURE CACHE
         // ------------------------------------------------------------
 
-        static SpriteTexture* GetSpriteTexture(
-            KAGE_Graphics_ImageBase* image)
+        static SpriteTexture *GetSpriteTexture(
+            KAGE_Graphics_ImageBase *image)
         {
             if (!image)
                 return nullptr;
@@ -217,13 +217,13 @@ namespace ViewPoint
         // ------------------------------------------------------------
 
         static void GetSpriteColor(
-            const ANM2* sprite,
-            const LayerState* layer,
-            const AnimationFrame* frame,
-            float& red,
-            float& green,
-            float& blue,
-            float& alpha)
+            const ANM2 *sprite,
+            const LayerState *layer,
+            const AnimationFrame *frame,
+            float &red,
+            float &green,
+            float &blue,
+            float &alpha)
         {
             red = 1.0f;
             green = 1.0f;
@@ -265,8 +265,8 @@ namespace ViewPoint
         // ------------------------------------------------------------
 
         static void RotateSpritePoint(
-            float& x,
-            float& y,
+            float &x,
+            float &y,
             float radians)
         {
             if (std::fabs(radians) < 0.0001f)
@@ -283,12 +283,12 @@ namespace ViewPoint
         }
 
         static bool BuildSpriteQuad(
-            Entity* entity,
-            Room* room,
-            ANM2* sprite,
-            LayerState* layer,
-            AnimationFrame* frame,
-            SpriteTexture* texture,
+            Entity *entity,
+            Room *room,
+            ANM2 *sprite,
+            LayerState *layer,
+            AnimationFrame *frame,
+            SpriteTexture *texture,
             float cameraRightX,
             float cameraRightZ,
             SpriteVertex (&vertices)[4])
@@ -305,7 +305,7 @@ namespace ViewPoint
                 return false;
             }
 
-            const Vector* entityPosition =
+            const Vector *entityPosition =
                 entity->GetPosition();
 
             if (!entityPosition)
@@ -328,22 +328,15 @@ namespace ViewPoint
                 return false;
             }
 
-            float u0 =
-                cropX / static_cast<float>(texture->width);
+            // GetTexelRegion returns image pixels in top-to-bottom order.
+            // OpenGL places the first uploaded row at the bottom of the texture.
+            float u0 = cropX / static_cast<float>(texture->width);
+            float u1 = (cropX + cropWidth) /
+                       static_cast<float>(texture->width);
 
-            float u1 =
-                (cropX + cropWidth) /
-                static_cast<float>(texture->width);
-
-            float v0 =
-                1.0f -
-                (cropY + cropHeight) /
-                static_cast<float>(texture->height);
-
-            float v1 =
-                1.0f -
-                cropY /
-                static_cast<float>(texture->height);
+            float v0 = cropY / static_cast<float>(texture->height);
+            float v1 = (cropY + cropHeight) /
+                       static_cast<float>(texture->height);
 
             if (layer->_flipX != sprite->_flipX)
                 std::swap(u0, u1);
@@ -389,20 +382,18 @@ namespace ViewPoint
                 PI / 180.0f;
 
             float localX[4] =
-            {
-                left,
-                left + width,
-                left + width,
-                left
-            };
+                {
+                    left,
+                    left + width,
+                    left + width,
+                    left};
 
             float localY[4] =
-            {
-                top,
-                top,
-                top + height,
-                top + height
-            };
+                {
+                    top,
+                    top,
+                    top + height,
+                    top + height};
 
             for (int i = 0; i < 4; ++i)
             {
@@ -412,8 +403,8 @@ namespace ViewPoint
                     rotation);
             }
 
-            const float u[4] = { u0, u1, u1, u0 };
-            const float v[4] = { v1, v1, v0, v0 };
+            const float u[4] = {u0, u1, u1, u0};
+            const float v[4] = {v0, v0, v1, v1};
 
             for (int i = 0; i < 4; ++i)
             {
@@ -460,11 +451,11 @@ namespace ViewPoint
         // ------------------------------------------------------------
 
         static void RenderSpriteLayer(
-            Entity* entity,
-            Room* room,
-            ANM2* sprite,
-            AnimationState* animationState,
-            AnimationLayer* animationLayer,
+            Entity *entity,
+            Room *room,
+            ANM2 *sprite,
+            AnimationState *animationState,
+            AnimationLayer *animationLayer,
             float cameraRightX,
             float cameraRightZ)
         {
@@ -489,14 +480,14 @@ namespace ViewPoint
             const int frameIndex =
                 animationState->_layerFrames[layerID];
 
-            AnimationFrame* frame =
+            AnimationFrame *frame =
                 animationLayer->GetFrame(frameIndex);
 
             if (!frame || !frame->visible)
                 return;
 
             // GetLayer(int) retrieves the ANM2 layer state by ID.
-            LayerState* layer =
+            LayerState *layer =
                 sprite->GetLayer(layerID);
 
             if (!layer || !layer->_visible)
@@ -511,7 +502,7 @@ namespace ViewPoint
             if (!sheet.image)
                 return;
 
-            SpriteTexture* texture =
+            SpriteTexture *texture =
                 GetSpriteTexture(sheet.image);
 
             if (!texture || !texture->id)
@@ -578,8 +569,8 @@ namespace ViewPoint
         // ------------------------------------------------------------
 
         static void RenderEntitySprite(
-            Entity* entity,
-            Room* room,
+            Entity *entity,
+            Room *room,
             float cameraRightX,
             float cameraRightZ)
         {
@@ -593,7 +584,7 @@ namespace ViewPoint
                 return;
             }
 
-            ANM2* sprite = &entity->_sprite;
+            ANM2 *sprite = &entity->_sprite;
 
             if (!sprite->_loaded ||
                 !sprite->_layerState ||
@@ -602,7 +593,7 @@ namespace ViewPoint
                 return;
             }
 
-            AnimationState* animationState =
+            AnimationState *animationState =
                 sprite->GetAnimationState();
 
             if (!animationState ||
@@ -611,7 +602,7 @@ namespace ViewPoint
                 return;
             }
 
-            AnimationData* animationData =
+            AnimationData *animationData =
                 animationState->_animData;
 
             if (!animationData->_animLayers ||
@@ -626,7 +617,7 @@ namespace ViewPoint
                  i < animationData->_layerCount;
                  ++i)
             {
-                AnimationLayer* animationLayer =
+                AnimationLayer *animationLayer =
                     animationData->GetLayerByOrder(i);
 
                 if (!animationLayer)
@@ -671,8 +662,8 @@ namespace ViewPoint
         }
 
         static void RenderCollisionCapsule(
-            Entity* entity,
-            Room* room)
+            Entity *entity,
+            Room *room)
         {
             if (!entity || !room)
                 return;
@@ -779,7 +770,7 @@ namespace ViewPoint
             bool attributesPushed = false;
         };
 
-        static bool BeginEntityRendering(RenderState& state)
+        static bool BeginEntityRendering(RenderState &state)
         {
             GLint viewport[4] = {};
 
@@ -900,7 +891,7 @@ namespace ViewPoint
             return true;
         }
 
-        static void EndEntityRendering(const RenderState& state)
+        static void EndEntityRendering(const RenderState &state)
         {
             if (state.matricesPushed)
             {
@@ -940,18 +931,18 @@ namespace ViewPoint
         if (!g_Camera.enabled || !g_Game)
             return;
 
-        Room* room = g_Game->GetCurrentRoom();
+        Room *room = g_Game->GetCurrentRoom();
 
         if (!room)
             return;
 
-        EntityList* entityList =
+        EntityList *entityList =
             room->GetEntityList();
 
         if (!entityList)
             return;
 
-        EntityList_EL* renderList =
+        EntityList_EL *renderList =
             entityList->GetRenderEL();
 
         if (!renderList ||
@@ -999,7 +990,7 @@ namespace ViewPoint
              i < renderList->_size;
              ++i)
         {
-            Entity* entity = renderList->_data[i];
+            Entity *entity = renderList->_data[i];
 
             if (!entity)
                 continue;
@@ -1025,7 +1016,7 @@ namespace ViewPoint
              i < renderList->_size;
              ++i)
         {
-            Entity* entity = renderList->_data[i];
+            Entity *entity = renderList->_data[i];
 
             if (!entity)
                 continue;
