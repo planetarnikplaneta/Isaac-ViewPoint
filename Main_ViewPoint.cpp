@@ -41,8 +41,10 @@ namespace OpenGL
 HOOK_METHOD(
     InputManager,
     GetActionValue,
-    (int action, int controllerid, int unk) -> float)
+    (int action, int controllerid, int unk)->float)
 {
+    constexpr float PI = 3.14159265358979323846f;
+
     if (!ViewPoint::g_Camera.enabled)
         return super(action, controllerid, unk);
 
@@ -54,9 +56,6 @@ HOOK_METHOD(
     {
         if (!(GetAsyncKeyState(VK_LBUTTON) & 0x8000))
             return super(action, controllerid, unk);
-
-        constexpr float PI =
-            3.14159265358979323846f;
 
         const float yaw =
             ViewPoint::g_Camera.yaw * PI / 180.0f;
@@ -121,17 +120,17 @@ HOOK_METHOD(
 
     switch (action)
     {
-        case 0:
-            return worldX < 0.0f ? -worldX : 0.0f;
+    case 0:
+        return worldX < 0.0f ? -worldX : 0.0f;
 
-        case 1:
-            return worldX > 0.0f ? worldX : 0.0f;
+    case 1:
+        return worldX > 0.0f ? worldX : 0.0f;
 
-        case 2:
-            return worldZ > 0.0f ? worldZ : 0.0f;
+    case 2:
+        return worldZ > 0.0f ? worldZ : 0.0f;
 
-        case 3:
-            return worldZ < 0.0f ? -worldZ : 0.0f;
+    case 3:
+        return worldZ < 0.0f ? -worldZ : 0.0f;
     }
 
     return 0.0f;
