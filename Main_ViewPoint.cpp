@@ -52,34 +52,29 @@ HOOK_METHOD(
     // CAMERA-AIMED MOUSE SHOOTING
     // ------------------------------------------------------------
 
-    if (action >= 4 && action <= 7)
+    if (action >= 4 && action <= 7 &&
+    ViewPoint::g_Camera.enabled &&
+    ViewPoint::g_Camera.followPlayer &&
+    ViewPoint::g_Camera.mouseFiring)
+{
+    constexpr float PI = 3.14159265358979323846f;
+    const float yawRadians = ViewPoint::g_Camera.yaw * PI / 180.0f;
+
+    const float forwardX = -std::sin(yawRadians);
+    const float forwardZ = -std::cos(yawRadians);
+
+    float value = 0.0f;
+
+    switch (action)
     {
-        if (!(GetAsyncKeyState(VK_LBUTTON) & 0x8000))
-            return super(action, controllerid, unk);
-
-        const float yaw =
-            ViewPoint::g_Camera.yaw * PI / 180.0f;
-
-        const float forwardX = -std::sin(yaw);
-        const float forwardZ = -std::cos(yaw);
-
-        int shootingAction = 6;
-
-        if (std::fabs(forwardX) > std::fabs(forwardZ))
-        {
-            // Camera points horizontally.
-            shootingAction =
-                forwardX < 0.0f ? 4 : 5;
-        }
-        else
-        {
-            // Camera points vertically.
-            shootingAction =
-                forwardZ > 0.0f ? 6 : 7;
-        }
-
-        return action == shootingAction ? 1.0f : 0.0f;
+        case 4: value = -forwardX; break;
+        case 5: value =  forwardX; break;
+        case 6: value =  forwardZ; break;
+        case 7: value = -forwardZ; break;
     }
+
+    return std::clamp(value, -1.0f, 1.0f);
+}
 
     // ------------------------------------------------------------
     // CAMERA-RELATIVE PLAYER MOVEMENT
