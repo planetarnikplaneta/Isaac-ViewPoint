@@ -18,6 +18,7 @@
 #include "IsaacRepentance.h"
 #include <cstdio>
 #include <cmath>
+#include <algorithm>
 
 using namespace ViewPoint;
 
@@ -52,29 +53,39 @@ HOOK_METHOD(
     // CAMERA-AIMED MOUSE SHOOTING
     // ------------------------------------------------------------
 
+    const bool mouseFiring =
+        (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
+
     if (action >= 4 && action <= 7 &&
-    ViewPoint::g_Camera.enabled &&
-    ViewPoint::g_Camera.followPlayer &&
-    ViewPoint::g_Camera.mouseFiring)
-{
-    constexpr float PI = 3.14159265358979323846f;
-    const float yawRadians = ViewPoint::g_Camera.yaw * PI / 180.0f;
-
-    const float forwardX = -std::sin(yawRadians);
-    const float forwardZ = -std::cos(yawRadians);
-
-    float value = 0.0f;
-
-    switch (action)
+        ViewPoint::g_Camera.followPlayer &&
+        mouseFiring)
     {
-        case 4: value = -forwardX; break;
-        case 5: value =  forwardX; break;
-        case 6: value =  forwardZ; break;
-        case 7: value = -forwardZ; break;
-    }
+        const float yawRadians =
+            ViewPoint::g_Camera.yaw * PI / 180.0f;
 
-    return std::clamp(value, -1.0f, 1.0f);
-}
+        const float forwardX = -std::sin(yawRadians);
+        const float forwardZ = -std::cos(yawRadians);
+
+        float value = 0.0f;
+
+        switch (action)
+        {
+        case 4:
+            value = -forwardX;
+            break;
+        case 5:
+            value = forwardX;
+            break;
+        case 6:
+            value = forwardZ;
+            break;
+        case 7:
+            value = -forwardZ;
+            break;
+        }
+
+        return std::clamp(value, -1.0f, 1.0f);
+    }
 
     // ------------------------------------------------------------
     // CAMERA-RELATIVE PLAYER MOVEMENT
