@@ -58,7 +58,7 @@ namespace
         return old;
     }
 
-    void RestoreUnpackState(const UnpackState& old)
+    void RestoreUnpackState(const UnpackState &old)
     {
         glPixelStorei(GL_UNPACK_ALIGNMENT, old.alignment);
         glPixelStorei(GL_UNPACK_ROW_LENGTH, old.rowLength);
@@ -66,7 +66,7 @@ namespace
         glPixelStorei(GL_UNPACK_SKIP_PIXELS, old.skipPixels);
     }
 
-    void LoadMaterialTexture(ViewPoint::Material& material)
+    void LoadMaterialTexture(ViewPoint::Material &material)
     {
         if (material.textureAttempted)
             return;
@@ -82,7 +82,8 @@ namespace
         {
             ViewPoint::LogMessage(
                 ("Cannot load texture: " +
-                 material.diffuseTexturePath).c_str());
+                 material.diffuseTexturePath)
+                    .c_str());
             return;
         }
 
@@ -96,7 +97,7 @@ namespace
 
         stbi_set_flip_vertically_on_load(1);
 
-        unsigned char* decoded = stbi_load_from_memory(
+        unsigned char *decoded = stbi_load_from_memory(
             bytes.data(),
             static_cast<int>(bytes.size()),
             &material.width,
@@ -108,7 +109,8 @@ namespace
         {
             ViewPoint::LogMessage(
                 ("PNG decoding failed: " +
-                 material.diffuseTexturePath).c_str());
+                 material.diffuseTexturePath)
+                    .c_str());
             return;
         }
 
@@ -138,7 +140,7 @@ namespace
         GLuint textureId,
         int width,
         int height,
-        const unsigned char* pixels,
+        const unsigned char *pixels,
         bool recreate)
     {
         if (!textureId || width <= 0 || height <= 0 || !pixels)
@@ -206,7 +208,7 @@ namespace
 
 namespace ViewPoint
 {
-    bool UploadMaterialTexture(Material& material)
+    bool UploadMaterialTexture(Material &material)
     {
         LoadMaterialTexture(material);
 
@@ -223,25 +225,25 @@ namespace ViewPoint
 
         glBindTexture(GL_TEXTURE_2D, material.textureId);
 
-glTexParameteri(
-    GL_TEXTURE_2D,
-    GL_TEXTURE_MIN_FILTER,
-    GL_NEAREST);
+        glTexParameteri(
+            GL_TEXTURE_2D,
+            GL_TEXTURE_MIN_FILTER,
+            GL_NEAREST);
 
-glTexParameteri(
-    GL_TEXTURE_2D,
-    GL_TEXTURE_MAG_FILTER,
-    GL_NEAREST);
+        glTexParameteri(
+            GL_TEXTURE_2D,
+            GL_TEXTURE_MAG_FILTER,
+            GL_NEAREST);
 
         glTexParameteri(
             GL_TEXTURE_2D,
             GL_TEXTURE_WRAP_S,
-            GL_CLAMP_TO_EDGE);
+            GL_REPEAT);
 
         glTexParameteri(
             GL_TEXTURE_2D,
             GL_TEXTURE_WRAP_T,
-            GL_CLAMP_TO_EDGE);
+            GL_REPEAT);
 
         if (!UploadPixels(
                 material.textureId,
@@ -259,10 +261,10 @@ glTexParameteri(
     }
 
     bool UpdateMaterialTexture(
-        Material& material,
+        Material &material,
         int width,
         int height,
-        std::vector<unsigned char>&& pixels)
+        std::vector<unsigned char> &&pixels)
     {
         if (width <= 0 || height <= 0)
             return false;
@@ -298,12 +300,12 @@ glTexParameteri(
             dimensionsChanged);
     }
 
-    void ReleaseModelTextures(Model& model)
+    void ReleaseModelTextures(Model &model)
     {
         if (!wglGetCurrentContext())
             return;
 
-        for (Material& material : model.materials)
+        for (Material &material : model.materials)
         {
             if (material.textureId != 0)
             {
