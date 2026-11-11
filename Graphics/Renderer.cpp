@@ -83,12 +83,12 @@ namespace ViewPoint
         constexpr float OBJECT_TILT = -12.0f;
         constexpr float OBJECT_FOV = 45.0f;
 
-        constexpr float LIGHT_X = -0.35f;
-        constexpr float LIGHT_Y = 0.55f;
-        constexpr float LIGHT_Z = -0.76f;
+        constexpr float LIGHT_X = -0.42f;
+        constexpr float LIGHT_Y = 0.80f;
+        constexpr float LIGHT_Z = -0.62f;
 
-        constexpr float AMBIENT_LIGHT = 0.40f;
-        constexpr float DIFFUSE_LIGHT = 0.60f;
+        constexpr float AMBIENT_LIGHT = 0.58f;
+        constexpr float DIFFUSE_LIGHT = 0.92f;
         // LIGHTING
 
         static float CalculateBrightness(

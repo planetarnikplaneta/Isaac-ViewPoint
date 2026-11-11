@@ -84,7 +84,8 @@ namespace ViewPoint
 
         static WorldPoint IsaacToWorld(
             const Vector &position,
-            Room *room)
+            Room *room,
+            const Entity *entity = nullptr)
         {
             const float roomCenterX =
                 320.0f +
@@ -102,7 +103,10 @@ namespace ViewPoint
                 (position.x - roomCenterX) /
                 PIXELS_PER_TILE;
 
-            result.y = FLOOR_Y;
+            const float heightOffset =
+                entity ? (entity->_depthOffset / PIXELS_PER_TILE) : 0.0f;
+
+            result.y = FLOOR_Y + heightOffset;
 
             result.z =
                 (roomCenterY - position.y) /
@@ -291,6 +295,7 @@ namespace ViewPoint
             SpriteTexture *texture,
             float cameraRightX,
             float cameraRightZ,
+            float layerDepthBias,
             SpriteVertex (&vertices)[4])
         {
             if (!entity || !room || !sprite ||
@@ -312,7 +317,7 @@ namespace ViewPoint
                 return false;
 
             const WorldPoint base =
-                IsaacToWorld(*entityPosition, room);
+                IsaacToWorld(*entityPosition, room, entity);
 
             // Atlas rectangle.
             const float cropX = frame->crop.x;
@@ -423,7 +428,8 @@ namespace ViewPoint
 
                 vertices[i].z =
                     base.z +
-                    cameraRightZ * horizontal;
+                    cameraRightZ * horizontal +
+                    layerDepthBias;
 
                 vertices[i].u = u[i];
                 vertices[i].v = v[i];
@@ -472,6 +478,9 @@ static void RenderSpriteLayer(
 
     if (layerID < 0 || layerID >= 64)
         return;
+
+    const float layerDepthBias =
+        static_cast<float>(layerID) * 0.00075f;
 
     // Animation frame storage is indexed by layer ID,
     // not by animation draw order.
@@ -524,6 +533,7 @@ static void RenderSpriteLayer(
             texture,
             cameraRightX,
             cameraRightZ,
+            layerDepthBias,
             vertices))
         return;
 
@@ -607,23 +617,23 @@ static void RenderSpriteLayer(
 
             // AnimationData's order is the draw order.
             // The ANM2 layer state is retrieved separately by ID.
-for (int i = 0; i < animationData->_layerCount; ++i)
-{
-    AnimationLayer* animationLayer =
-        animationData->GetLayerByOrder(i);
+            for (int i = 0; i < animationData->_layerCount; ++i)
+            {
+                AnimationLayer* animationLayer =
+                    animationData->GetLayerByOrder(i);
 
-    if (!animationLayer)
-        continue;
+                if (!animationLayer)
+                    continue;
 
-    RenderSpriteLayer(
-        entity,
-        room,
-        sprite,
-        animationState,
-        animationLayer,
-        cameraRightX,
-        cameraRightZ);
-}
+                RenderSpriteLayer(
+                    entity,
+                    room,
+                    sprite,
+                    animationState,
+                    animationLayer,
+                    cameraRightX,
+                    cameraRightZ);
+            }
         }
 
         // ------------------------------------------------------------
@@ -819,6 +829,7 @@ for (int i = 0; i < animationData->_layerCount; ++i)
             glDepthMask(GL_TRUE);
 
             glEnable(GL_BLEND);
+            glDepthMask(GL_FALSE);
 
             glBlendFunc(
                 GL_SRC_ALPHA,
@@ -978,21 +989,47 @@ for (int i = 0; i < animationData->_layerCount; ++i)
         glEnable(GL_TEXTURE_2D);
         glEnable(GL_BLEND);
 
+        std::vector<std::pair<float, Entity *>> sortedEntities;
+        sortedEntities.reserve(renderList->_size);
+
         for (unsigned int i = 0;
              i < renderList->_size;
              ++i)
         {
             Entity *entity = renderList->_data[i];
 
-            if (!entity)
+            if (!entity || !entity->_exists || entity->_dead || !entity->_visible)
                 continue;
 
+            const Vector *pos = entity->GetPosition();
+            if (!pos)
+                continue;
+
+            const WorldPoint world =
+                IsaacToWorld(*pos, room, entity);
+
+            sortedEntities.emplace_back(world.z, entity);
+        }
+
+        std::sort(
+            sortedEntities.begin(),
+            sortedEntities.end(),
+            [](const std::pair<float, Entity *> &left,
+               const std::pair<float, Entity *> &right)
+            {
+                return left.first < right.first;
+            });
+
+        for (const auto &entry : sortedEntities)
+        {
             RenderEntitySprite(
-                entity,
+                entry.second,
                 room,
                 cameraRightX,
                 cameraRightZ);
         }
+
+        glDepthMask(GL_TRUE);
 
         // ------------------------------------------------------------
         // COLLISION OUTLINES
