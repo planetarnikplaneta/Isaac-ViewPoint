@@ -23,7 +23,7 @@ namespace ViewPoint
         constexpr float ROOM_FLOOR_Y = -1.0f;
 
         // Camera height above the room floor.
-        constexpr float PLAYER_EYE_HEIGHT = 1.15f;
+        constexpr float PLAYER_EYE_HEIGHT = 0.95f;
 
         bool KeyDown(int key)
         {

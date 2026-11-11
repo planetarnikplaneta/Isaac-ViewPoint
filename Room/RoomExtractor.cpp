@@ -40,12 +40,7 @@ namespace ViewPoint
 
         constexpr float FLOOR_Y = -1.5f;
         constexpr float WALL_TOP_Y = 1.5f;
-
-        // Room meshes are intentionally larger than the raw grid units so
-        // the generated rooms feel closer to Isaac's original proportions.
-        // This is a visual-only adjustment; collision data remains untouched.
-        constexpr float ROOM_VISUAL_SCALE = 1.6f;
-        constexpr float TILE_SIZE = 1.0f * ROOM_VISUAL_SCALE;
+        constexpr float TILE_SIZE = 1.0f;
 
         // Material indices.
         constexpr int MAT_FLOOR = 0;
