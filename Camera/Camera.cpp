@@ -19,8 +19,8 @@ namespace ViewPoint
         // ViewPoint uses one world unit per tile.
         constexpr float ISAAC_PIXELS_PER_TILE = 40.0f;
 
-        // RoomExtractor uses FLOOR_Y = -1.5f.
-        constexpr float ROOM_FLOOR_Y = -1.5f;
+        // RoomExtractor uses FLOOR_Y = -1.0f.
+        constexpr float ROOM_FLOOR_Y = -1.0f;
 
         // Camera height above the room floor.
         constexpr float PLAYER_EYE_HEIGHT = 1.15f;
