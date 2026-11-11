@@ -103,8 +103,27 @@ namespace ViewPoint
                 (position.x - roomCenterX) /
                 PIXELS_PER_TILE;
 
-            const float heightOffset =
-                entity ? (entity->_depthOffset / PIXELS_PER_TILE) : 0.0f;
+            float heightOffset = 0.0f;
+
+            if (entity)
+            {
+                if (entity->_type == ENTITY_TEAR)
+                {
+                    Entity_Tear *tear =
+                        reinterpret_cast<Entity_Tear *>(
+                            const_cast<Entity *>(entity));
+
+                    heightOffset =
+                        tear->GetRenderHeight() /
+                        PIXELS_PER_TILE;
+                }
+                else
+                {
+                    heightOffset =
+                        entity->_depthOffset /
+                        PIXELS_PER_TILE;
+                }
+            }
 
             result.y = FLOOR_Y + heightOffset;
 
@@ -554,6 +573,9 @@ static void RenderSpriteLayer(
     if (alpha <= 0.001f)
         return;
 
+    const bool fullyOpaque = alpha >= 0.99f;
+
+    glDepthMask(fullyOpaque ? GL_TRUE : GL_FALSE);
     glBindTexture(GL_TEXTURE_2D, texture->id);
     glColor4f(red, green, blue, alpha);
 
@@ -566,6 +588,7 @@ static void RenderSpriteLayer(
     }
 
     glEnd();
+    glDepthMask(GL_TRUE);
 }
 
         // ------------------------------------------------------------
@@ -829,8 +852,6 @@ static void RenderSpriteLayer(
             glDepthMask(GL_TRUE);
 
             glEnable(GL_BLEND);
-            glDepthMask(GL_FALSE);
-
             glBlendFunc(
                 GL_SRC_ALPHA,
                 GL_ONE_MINUS_SRC_ALPHA);
@@ -1017,7 +1038,7 @@ static void RenderSpriteLayer(
             [](const std::pair<float, Entity *> &left,
                const std::pair<float, Entity *> &right)
             {
-                return left.first < right.first;
+                return left.first > right.first;
             });
 
         for (const auto &entry : sortedEntities)
