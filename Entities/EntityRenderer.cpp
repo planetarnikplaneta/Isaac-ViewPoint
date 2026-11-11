@@ -84,8 +84,7 @@ namespace ViewPoint
 
         static WorldPoint IsaacToWorld(
             const Vector &position,
-            Room *room,
-            const Entity *entity = nullptr)
+            Room *room)
         {
             const float roomCenterX =
                 320.0f +
@@ -103,29 +102,7 @@ namespace ViewPoint
                 (position.x - roomCenterX) /
                 PIXELS_PER_TILE;
 
-            float heightOffset = 0.0f;
-
-            if (entity)
-            {
-                if (entity->_type == ENTITY_TEAR)
-                {
-                    Entity_Tear *tear =
-                        reinterpret_cast<Entity_Tear *>(
-                            const_cast<Entity *>(entity));
-
-                    heightOffset =
-                        tear->GetRenderHeight() /
-                        PIXELS_PER_TILE;
-                }
-                else
-                {
-                    heightOffset =
-                        entity->_depthOffset /
-                        PIXELS_PER_TILE;
-                }
-            }
-
-            result.y = FLOOR_Y + heightOffset;
+            result.y = FLOOR_Y;
 
             result.z =
                 (roomCenterY - position.y) /
@@ -314,7 +291,6 @@ namespace ViewPoint
             SpriteTexture *texture,
             float cameraRightX,
             float cameraRightZ,
-            float layerDepthBias,
             SpriteVertex (&vertices)[4])
         {
             if (!entity || !room || !sprite ||
@@ -336,7 +312,10 @@ namespace ViewPoint
                 return false;
 
             const WorldPoint base =
-                IsaacToWorld(*entityPosition, room, entity);
+                IsaacToWorld(*entityPosition, room);
+
+            const float entityHeightOffset =
+                entity->_depthOffset / PIXELS_PER_TILE;
 
             // Atlas rectangle.
             const float cropX = frame->crop.x;
@@ -443,12 +422,11 @@ namespace ViewPoint
                     cameraRightX * horizontal;
 
                 vertices[i].y =
-                    base.y - vertical;
+                    base.y + entityHeightOffset - vertical;
 
                 vertices[i].z =
                     base.z +
-                    cameraRightZ * horizontal +
-                    layerDepthBias;
+                    cameraRightZ * horizontal;
 
                 vertices[i].u = u[i];
                 vertices[i].v = v[i];
@@ -497,9 +475,6 @@ static void RenderSpriteLayer(
 
     if (layerID < 0 || layerID >= 64)
         return;
-
-    const float layerDepthBias =
-        static_cast<float>(layerID) * 0.00075f;
 
     // Animation frame storage is indexed by layer ID,
     // not by animation draw order.
@@ -552,7 +527,6 @@ static void RenderSpriteLayer(
             texture,
             cameraRightX,
             cameraRightZ,
-            layerDepthBias,
             vertices))
         return;
 
@@ -573,9 +547,6 @@ static void RenderSpriteLayer(
     if (alpha <= 0.001f)
         return;
 
-    const bool fullyOpaque = alpha >= 0.99f;
-
-    glDepthMask(fullyOpaque ? GL_TRUE : GL_FALSE);
     glBindTexture(GL_TEXTURE_2D, texture->id);
     glColor4f(red, green, blue, alpha);
 
@@ -588,7 +559,6 @@ static void RenderSpriteLayer(
     }
 
     glEnd();
-    glDepthMask(GL_TRUE);
 }
 
         // ------------------------------------------------------------
@@ -852,6 +822,8 @@ static void RenderSpriteLayer(
             glDepthMask(GL_TRUE);
 
             glEnable(GL_BLEND);
+            glDepthMask(GL_FALSE);
+
             glBlendFunc(
                 GL_SRC_ALPHA,
                 GL_ONE_MINUS_SRC_ALPHA);
@@ -1010,41 +982,17 @@ static void RenderSpriteLayer(
         glEnable(GL_TEXTURE_2D);
         glEnable(GL_BLEND);
 
-        std::vector<std::pair<float, Entity *>> sortedEntities;
-        sortedEntities.reserve(renderList->_size);
-
         for (unsigned int i = 0;
              i < renderList->_size;
              ++i)
         {
             Entity *entity = renderList->_data[i];
 
-            if (!entity || !entity->_exists || entity->_dead || !entity->_visible)
+            if (!entity)
                 continue;
 
-            const Vector *pos = entity->GetPosition();
-            if (!pos)
-                continue;
-
-            const WorldPoint world =
-                IsaacToWorld(*pos, room, entity);
-
-            sortedEntities.emplace_back(world.z, entity);
-        }
-
-        std::sort(
-            sortedEntities.begin(),
-            sortedEntities.end(),
-            [](const std::pair<float, Entity *> &left,
-               const std::pair<float, Entity *> &right)
-            {
-                return left.first > right.first;
-            });
-
-        for (const auto &entry : sortedEntities)
-        {
             RenderEntitySprite(
-                entry.second,
+                entity,
                 room,
                 cameraRightX,
                 cameraRightZ);
