@@ -379,21 +379,25 @@ namespace ViewPoint
             second.corners[2].texcoord = texcoordBase + 3;
         }
 
-        void AddTexturedQuad(
+        void AddTexturedQuadUV(
             Model &model,
             int materialIndex,
             const Vertex3 &a,
             const Vertex3 &b,
             const Vertex3 &c,
-            const Vertex3 &d)
+            const Vertex3 &d,
+            const Vertex2 &uvA,
+            const Vertex2 &uvB,
+            const Vertex2 &uvC,
+            const Vertex2 &uvD)
         {
             const int texcoordBase =
                 static_cast<int>(model.texcoords.size());
 
-            model.texcoords.push_back({0.0f, 0.0f});
-            model.texcoords.push_back({1.0f, 0.0f});
-            model.texcoords.push_back({1.0f, 1.0f});
-            model.texcoords.push_back({0.0f, 1.0f});
+            model.texcoords.push_back(uvA);
+            model.texcoords.push_back(uvB);
+            model.texcoords.push_back(uvC);
+            model.texcoords.push_back(uvD);
 
             AddQuad(
                 model,
@@ -418,6 +422,27 @@ namespace ViewPoint
             second.corners[2].texcoord = texcoordBase + 3;
         }
 
+        void AddTexturedQuad(
+            Model &model,
+            int materialIndex,
+            const Vertex3 &a,
+            const Vertex3 &b,
+            const Vertex3 &c,
+            const Vertex3 &d)
+        {
+            AddTexturedQuadUV(
+                model,
+                materialIndex,
+                a,
+                b,
+                c,
+                d,
+                {0.0f, 0.0f},
+                {1.0f, 0.0f},
+                {1.0f, 1.0f},
+                {0.0f, 1.0f});
+        }
+
         void AddBox(
             Model &model,
             int materialIndex,
@@ -434,47 +459,71 @@ namespace ViewPoint
             const float front = centerZ - halfDepth;
             const float back = centerZ + halfDepth;
 
-            AddTexturedQuad(
+            AddTexturedQuadUV(
                 model, materialIndex,
                 {left, bottom, front},
                 {right, bottom, front},
                 {right, top, front},
-                {left, top, front});
+                {left, top, front},
+                {0.0f, 0.0f},
+                {1.0f, 0.0f},
+                {1.0f, 1.0f},
+                {0.0f, 1.0f});
 
-            AddTexturedQuad(
+            AddTexturedQuadUV(
                 model, materialIndex,
                 {right, bottom, back},
                 {left, bottom, back},
                 {left, top, back},
-                {right, top, back});
+                {right, top, back},
+                {1.0f, 0.0f},
+                {0.0f, 0.0f},
+                {0.0f, 1.0f},
+                {1.0f, 1.0f});
 
-            AddTexturedQuad(
+            AddTexturedQuadUV(
                 model, materialIndex,
                 {left, bottom, back},
                 {left, bottom, front},
                 {left, top, front},
-                {left, top, back});
+                {left, top, back},
+                {0.0f, 0.0f},
+                {1.0f, 0.0f},
+                {1.0f, 1.0f},
+                {0.0f, 1.0f});
 
-            AddTexturedQuad(
+            AddTexturedQuadUV(
                 model, materialIndex,
                 {right, bottom, front},
                 {right, bottom, back},
                 {right, top, back},
-                {right, top, front});
+                {right, top, front},
+                {1.0f, 0.0f},
+                {0.0f, 0.0f},
+                {0.0f, 1.0f},
+                {1.0f, 1.0f});
 
-            AddTexturedQuad(
+            AddTexturedQuadUV(
                 model, materialIndex,
                 {left, top, front},
                 {right, top, front},
                 {right, top, back},
-                {left, top, back});
+                {left, top, back},
+                {0.0f, 0.0f},
+                {1.0f, 0.0f},
+                {1.0f, 1.0f},
+                {0.0f, 1.0f});
 
-            AddTexturedQuad(
+            AddTexturedQuadUV(
                 model, materialIndex,
                 {left, bottom, back},
                 {right, bottom, back},
                 {right, bottom, front},
-                {left, bottom, front});
+                {left, bottom, front},
+                {0.0f, 0.0f},
+                {1.0f, 0.0f},
+                {1.0f, 1.0f},
+                {0.0f, 1.0f});
         }
 
         void AddPyramid(

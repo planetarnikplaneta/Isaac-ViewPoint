@@ -111,6 +111,25 @@ namespace ViewPoint
             return result;
         }
 
+        static float GetEntityRenderHeightOffset(
+            Entity *entity)
+        {
+            if (!entity)
+                return 0.0f;
+
+            float offset = entity->_depthOffset;
+
+            if (entity->_type == ENTITY_TEAR)
+            {
+                Entity_Tear *tear =
+                    static_cast<Entity_Tear *>(entity);
+
+                offset = tear->GetRenderHeight();
+            }
+
+            return offset / PIXELS_PER_TILE;
+        }
+
         // ------------------------------------------------------------
         // SPRITESHEET TEXTURE CACHE
         // ------------------------------------------------------------
@@ -315,7 +334,7 @@ namespace ViewPoint
                 IsaacToWorld(*entityPosition, room);
 
             const float entityHeightOffset =
-                entity->_depthOffset / PIXELS_PER_TILE;
+                GetEntityRenderHeightOffset(entity);
 
             // Atlas rectangle.
             const float cropX = frame->crop.x;
@@ -982,15 +1001,67 @@ static void RenderSpriteLayer(
         glEnable(GL_TEXTURE_2D);
         glEnable(GL_BLEND);
 
+        std::vector<Entity *> orderedEntities;
+        orderedEntities.reserve(renderList->_size);
+
         for (unsigned int i = 0;
              i < renderList->_size;
              ++i)
         {
             Entity *entity = renderList->_data[i];
 
-            if (!entity)
+            if (!entity ||
+                !entity->_exists ||
+                entity->_dead ||
+                !entity->_visible)
+            {
+                continue;
+            }
+
+            const Vector *entityPosition = entity->GetPosition();
+
+            if (!entityPosition)
                 continue;
 
+            orderedEntities.push_back(entity);
+        }
+
+        std::sort(
+            orderedEntities.begin(),
+            orderedEntities.end(),
+            [room](Entity *left, Entity *right)
+            {
+                const Vector *leftPos = left ? left->GetPosition() : nullptr;
+                const Vector *rightPos = right ? right->GetPosition() : nullptr;
+
+                if (!leftPos && !rightPos)
+                    return false;
+                if (!leftPos)
+                    return false;
+                if (!rightPos)
+                    return true;
+
+                const WorldPoint leftWorld = IsaacToWorld(*leftPos, room);
+                const WorldPoint rightWorld = IsaacToWorld(*rightPos, room);
+
+                const float leftDx = leftWorld.x - g_Camera.position.x;
+                const float leftDz = leftWorld.z - g_Camera.position.z;
+                const float leftDy = (leftWorld.y + GetEntityRenderHeightOffset(left)) - g_Camera.position.y;
+
+                const float rightDx = rightWorld.x - g_Camera.position.x;
+                const float rightDz = rightWorld.z - g_Camera.position.z;
+                const float rightDy = (rightWorld.y + GetEntityRenderHeightOffset(right)) - g_Camera.position.y;
+
+                const float leftDistance =
+                    leftDx * leftDx + leftDy * leftDy + leftDz * leftDz;
+                const float rightDistance =
+                    rightDx * rightDx + rightDy * rightDy + rightDz * rightDz;
+
+                return leftDistance > rightDistance;
+            });
+
+        for (Entity *entity : orderedEntities)
+        {
             RenderEntitySprite(
                 entity,
                 room,
