@@ -17,7 +17,7 @@ namespace ViewPoint
 
         // Isaac grid coordinates use 40 pixels per tile.
         // ViewPoint uses one world unit per tile.
-        constexpr float ISAAC_PIXELS_PER_TILE = 40.0f;
+        constexpr float ISAAC_PIXELS_PER_TILE = 300.0f;
 
         // RoomExtractor uses FLOOR_Y = -1.0f.
         constexpr float ROOM_FLOOR_Y = -1.0f;
