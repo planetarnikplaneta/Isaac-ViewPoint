@@ -748,8 +748,7 @@ namespace ViewPoint
                 GL_SRC_ALPHA,
                 GL_ONE_MINUS_SRC_ALPHA);
 
-            glEnable(GL_ALPHA_TEST);
-            glAlphaFunc(GL_GREATER, 0.01f);
+            glDisable(GL_ALPHA_TEST);
 
             // ----------------------------------------------
             // Projection
