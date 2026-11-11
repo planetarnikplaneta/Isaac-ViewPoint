@@ -124,7 +124,16 @@ namespace ViewPoint
                 Entity_Tear *tear =
                     static_cast<Entity_Tear *>(entity);
 
-                offset = tear->GetRenderHeight();
+                const float tearHeight =
+                    tear->_height;
+
+                const float tearRenderHeight =
+                    tear->GetRenderHeight();
+
+                if (tearHeight > 0.0f)
+                    offset = tearHeight;
+                else if (tearRenderHeight > 0.0f)
+                    offset = tearRenderHeight;
             }
 
             return offset / PIXELS_PER_TILE;
