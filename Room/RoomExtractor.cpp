@@ -41,6 +41,16 @@ namespace ViewPoint
         constexpr float FLOOR_Y = -1.5f;
         constexpr float WALL_TOP_Y = 1.5f;
         constexpr float TILE_SIZE = 1.0f;
+
+        // Material indices.
+        constexpr int MAT_FLOOR = 0;
+        constexpr int MAT_WALL = 1;
+        constexpr int MAT_ROCK = 2;
+        constexpr int MAT_PIT = 3;
+        constexpr int MAT_SPIKES = 4;
+        constexpr int MAT_WEB = 5;
+        constexpr int MAT_OBJECT = 6;
+        constexpr int MAT_POOP = 7;
         constexpr int MAT_FIRE = 8;
 
         Room *g_LastRoom = nullptr;
@@ -563,20 +573,113 @@ namespace ViewPoint
                 MAT_WALL,
                 centerX,
                 centerZ,
-                WallBlock(
+                TILE_SIZE * 0.5f,
+                FLOOR_Y,
+                WALL_TOP_Y,
+                TILE_SIZE * 0.5f);
+        }
+
+        void AddRock(
             Model &model,
             float centerX,
             float centerZ)
         {
-            AddBox(
+            const float bottom = FLOOR_Y + 0.03f;
+            const float middle = FLOOR_Y + 0.43f;
+            const float top = FLOOR_Y + 0.85f;
+
+            const int base =
+                static_cast<int>(model.vertices.size());
+
+            model.vertices.push_back(
+                {centerX - 0.43f, middle, centerZ - 0.38f});
+
+            model.vertices.push_back(
+                {centerX + 0.39f, middle, centerZ - 0.42f});
+
+            model.vertices.push_back(
+                {centerX + 0.44f, middle, centerZ + 0.36f});
+
+            model.vertices.push_back(
+                {centerX - 0.38f, middle, centerZ + 0.43f});
+
+            model.vertices.push_back(
+                {centerX - 0.12f, top, centerZ - 0.10f});
+
+            model.vertices.push_back(
+                {centerX + 0.08f, bottom, centerZ + 0.05f});
+
+            AddTriangle(model, MAT_ROCK, base, base + 1, base + 4);
+            AddTriangle(model, MAT_ROCK, base + 1, base + 2, base + 4);
+            AddTriangle(model, MAT_ROCK, base + 2, base + 3, base + 4);
+            AddTriangle(model, MAT_ROCK, base + 3, base, base + 4);
+
+            AddTriangle(model, MAT_ROCK, base + 1, base, base + 5);
+            AddTriangle(model, MAT_ROCK, base + 2, base + 1, base + 5);
+            AddTriangle(model, MAT_ROCK, base + 3, base + 2, base + 5);
+            AddTriangle(model, MAT_ROCK, base, base + 3, base + 5);
+        }
+
+        void AddPit(
+            Model &model,
+            float centerX,
+            float centerZ)
+        {
+            const float half = TILE_SIZE * 0.46f;
+            const float pitY = FLOOR_Y + 0.015f;
+
+            AddQuad(
                 model,
-                MAT_WALL,
-                centerX,
-                centerZ,
-                TILE_SIZE * 0.5f,
-                FLOOR_Y,
-                WALL_TOP_Y,
-                TILE_SIZE * 0.5f
+                MAT_PIT,
+                {centerX - half, pitY, centerZ - half},
+                {centerX + half, pitY, centerZ - half},
+                {centerX + half, pitY, centerZ + half},
+                {centerX - half, pitY, centerZ + half});
+        }
+
+        void AddSpikes(
+            Model &model,
+            float centerX,
+            float centerZ)
+        {
+            const float base = FLOOR_Y + 0.03f;
+            const float top = FLOOR_Y + 0.48f;
+
+            const float offset = 0.23f;
+            const float halfSize = 0.17f;
+
+            AddPyramid(
+                model, MAT_SPIKES,
+                centerX - offset, centerZ - offset,
+                halfSize, base, top, halfSize);
+
+            AddPyramid(
+                model, MAT_SPIKES,
+                centerX + offset, centerZ - offset,
+                halfSize, base, top, halfSize);
+
+            AddPyramid(
+                model, MAT_SPIKES,
+                centerX - offset, centerZ + offset,
+                halfSize, base, top, halfSize);
+
+            AddPyramid(
+                model, MAT_SPIKES,
+                centerX + offset, centerZ + offset,
+                halfSize, base, top, halfSize);
+        }
+
+        void AddWeb(
+            Model &model,
+            float centerX,
+            float centerZ)
+        {
+            const float y = FLOOR_Y + 0.025f;
+            const float half = 0.43f;
+            const float thickness = 0.025f;
+
+            // Diagonal strip one.
+            AddQuad(
                 model,
                 MAT_WEB,
                 {centerX - half, y, centerZ - half + thickness},

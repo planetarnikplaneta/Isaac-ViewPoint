@@ -238,12 +238,12 @@ namespace ViewPoint
         glTexParameteri(
             GL_TEXTURE_2D,
             GL_TEXTURE_WRAP_S,
-            GL_CLAMP_TO_EDGE);
+            GL_REPEAT);
 
         glTexParameteri(
             GL_TEXTURE_2D,
             GL_TEXTURE_WRAP_T,
-            GL_CLAMP_TO_EDGETO_EDGE);
+            GL_REPEAT);
 
         if (!UploadPixels(
                 material.textureId,
