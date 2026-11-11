@@ -1083,7 +1083,9 @@ namespace ViewPoint
             GL_COLOR_BUFFER_BIT |
             GL_DEPTH_BUFFER_BIT);
 
-        glPopAttrib();
+        // Do not pop a state stack here: there is no matching push for
+        // this attribute block, and it causes GL_STACK_UNDERFLOW (0x504)
+        // as the renderer repeatedly uploads textures.
 
         // Render every model using the same depth buffer.
         for (Model &model : g_Models)
