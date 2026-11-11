@@ -42,13 +42,15 @@ namespace ViewPoint
         constexpr float WALL_TOP_Y = 1.5f;
         constexpr float TILE_SIZE = 1.0f;
 
-        // Wall textures are authored as a long strip and should keep
-        // their original proportion instead of being stretched across
-        // each wall block.
+        // The wall image is a narrow strip (182x33), so we keep its
+        // native aspect ratio on each wall tile instead of mapping the full
+        // texture into a 1x3 wall face and stretching it.
         constexpr float WALL_TEXTURE_WIDTH = 182.0f;
         constexpr float WALL_TEXTURE_HEIGHT = 33.0f;
-        constexpr float WALL_TEXTURE_ASPECT =
-            WALL_TEXTURE_WIDTH / WALL_TEXTURE_HEIGHT;
+        constexpr float WALL_UV_SCALE_X =
+            (TILE_SIZE / (WALL_TOP_Y - FLOOR_Y)) *
+            (WALL_TEXTURE_HEIGHT / WALL_TEXTURE_WIDTH);
+        constexpr float WALL_UV_SCALE_Y = 1.0f;
 
         // Material indices.
         constexpr int MAT_FLOOR = 0;
@@ -571,93 +573,113 @@ namespace ViewPoint
             AddTriangle(model, materialIndex, base + 3, base + 4, base);
         }
 
+        void AddBoxWithTextureAspect(
+            Model &model,
+            int materialIndex,
+            float centerX,
+            float centerZ,
+            float halfWidth,
+            float bottom,
+            float top,
+            float halfDepth,
+            float uvScaleX,
+            float uvScaleY)
+        {
+            const float left = centerX - halfWidth;
+            const float right = centerX + halfWidth;
+
+            const float front = centerZ - halfDepth;
+            const float back = centerZ + halfDepth;
+
+            AddTexturedQuadUV(
+                model,
+                materialIndex,
+                {left, bottom, front},
+                {right, bottom, front},
+                {right, top, front},
+                {left, top, front},
+                {0.0f, 0.0f},
+                {uvScaleX, 0.0f},
+                {uvScaleX, uvScaleY},
+                {0.0f, uvScaleY});
+
+            AddTexturedQuadUV(
+                model,
+                materialIndex,
+                {right, bottom, back},
+                {left, bottom, back},
+                {left, top, back},
+                {right, top, back},
+                {uvScaleX, 0.0f},
+                {0.0f, 0.0f},
+                {0.0f, uvScaleY},
+                {uvScaleX, uvScaleY});
+
+            AddTexturedQuadUV(
+                model,
+                materialIndex,
+                {left, bottom, back},
+                {left, bottom, front},
+                {left, top, front},
+                {left, top, back},
+                {0.0f, 0.0f},
+                {uvScaleX, 0.0f},
+                {uvScaleX, uvScaleY},
+                {0.0f, uvScaleY});
+
+            AddTexturedQuadUV(
+                model,
+                materialIndex,
+                {right, bottom, front},
+                {right, bottom, back},
+                {right, top, back},
+                {right, top, front},
+                {uvScaleX, 0.0f},
+                {0.0f, 0.0f},
+                {0.0f, uvScaleY},
+                {uvScaleX, uvScaleY});
+
+            AddTexturedQuadUV(
+                model,
+                materialIndex,
+                {left, top, front},
+                {right, top, front},
+                {right, top, back},
+                {left, top, back},
+                {0.0f, 0.0f},
+                {uvScaleX, 0.0f},
+                {uvScaleX, uvScaleY},
+                {0.0f, uvScaleY});
+
+            AddTexturedQuadUV(
+                model,
+                materialIndex,
+                {left, bottom, back},
+                {right, bottom, back},
+                {right, bottom, front},
+                {left, bottom, front},
+                {0.0f, 0.0f},
+                {uvScaleX, 0.0f},
+                {uvScaleX, uvScaleY},
+                {0.0f, uvScaleY});
+        }
+
         void AddWallBlock(
             Model &model,
             float centerX,
             float centerZ)
         {
-            const float left = centerX - TILE_SIZE * 0.5f;
-            const float right = centerX + TILE_SIZE * 0.5f;
-
-            const float front = centerZ - TILE_SIZE * 0.5f;
-            const float back = centerZ + TILE_SIZE * 0.5f;
-
-            const float faceWidth = right - left;
-            const float faceHeight = WALL_TOP_Y - FLOOR_Y;
-            const float wallUScale =
-                (faceWidth / faceHeight) * WALL_TEXTURE_ASPECT;
-
-            AddTexturedQuadUV(
+            AddBoxWithTextureAspect(
                 model,
                 MAT_WALL,
-                {left, FLOOR_Y, front},
-                {right, FLOOR_Y, front},
-                {right, WALL_TOP_Y, front},
-                {left, WALL_TOP_Y, front},
-                {0.0f, 0.0f},
-                {wallUScale, 0.0f},
-                {wallUScale, 1.0f},
-                {0.0f, 1.0f});
-
-            AddTexturedQuadUV(
-                model,
-                MAT_WALL,
-                {right, FLOOR_Y, back},
-                {left, FLOOR_Y, back},
-                {left, WALL_TOP_Y, back},
-                {right, WALL_TOP_Y, back},
-                {0.0f, 0.0f},
-                {wallUScale, 0.0f},
-                {wallUScale, 1.0f},
-                {0.0f, 1.0f});
-
-            AddTexturedQuadUV(
-                model,
-                MAT_WALL,
-                {left, FLOOR_Y, back},
-                {left, FLOOR_Y, front},
-                {left, WALL_TOP_Y, front},
-                {left, WALL_TOP_Y, back},
-                {0.0f, 0.0f},
-                {wallUScale, 0.0f},
-                {wallUScale, 1.0f},
-                {0.0f, 1.0f});
-
-            AddTexturedQuadUV(
-                model,
-                MAT_WALL,
-                {right, FLOOR_Y, front},
-                {right, FLOOR_Y, back},
-                {right, WALL_TOP_Y, back},
-                {right, WALL_TOP_Y, front},
-                {0.0f, 0.0f},
-                {wallUScale, 0.0f},
-                {wallUScale, 1.0f},
-                {0.0f, 1.0f});
-
-            AddTexturedQuadUV(
-                model,
-                MAT_WALL,
-                {left, WALL_TOP_Y, front},
-                {right, WALL_TOP_Y, front},
-                {right, WALL_TOP_Y, back},
-                {left, WALL_TOP_Y, back},
-                {0.0f, 0.0f},
-                {wallUScale, 0.0f},
-                {wallUScale, 1.0f},
-                {0.0f, 1.0f});
-
-            AddTexturedQuadUV(
-                model,
-                MAT_WALL,
-                {left, FLOOR_Y, back},
-                {right, FLOOR_Y, back},
-                {right, FLOOR_Y, front},
-                {left, FLOOR_Y, front},
-                {0.0f, 0.0f},
-                {wallUScale, 0.0f},
-                {wallUScale, 1.0f},
-                {0.0f, 1.0f});
+                centerX,
+                centerZ,
+                TILE_SIZE * 0.5f,
+                FLOOR_Y,
+                WALL_TOP_Y,
+                TILE_SIZE * 0.5f,
+                WALL_UV_SCALE_X,
+                WALL_UV_SCALE_Y);
         }
 
         void AddRock(
