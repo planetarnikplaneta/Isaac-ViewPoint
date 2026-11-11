@@ -143,6 +143,23 @@ namespace ViewPoint
         // SPRITESHEET TEXTURE CACHE
         // ------------------------------------------------------------
 
+        static void ClearSpriteTextureCache()
+        {
+            for (auto &[image, texture] : g_SpriteTextures)
+            {
+                if (texture.id != 0)
+                {
+                    glDeleteTextures(1, &texture.id);
+                    texture.id = 0;
+                }
+
+                texture.width = 0;
+                texture.height = 0;
+            }
+
+            g_SpriteTextures.clear();
+        }
+
         static SpriteTexture *GetSpriteTexture(
             KAGE_Graphics_ImageBase *image)
         {
@@ -984,9 +1001,15 @@ static void RenderSpriteLayer(
         if (currentContext != g_TextureContext)
         {
             // Texture IDs from a previous context cannot be reused.
-            g_SpriteTextures.clear();
+            ClearSpriteTextureCache();
             g_TextureContext = currentContext;
         }
+
+        // Sprite-sheet pointers are reused by the game engine and can be recycled
+        // while the old OpenGL texture is still cached. Clearing the atlas cache
+        // each render pass prevents stale sprite IDs from being reused for a new
+        // entity's sheet, which caused tears to draw with enemy sprites.
+        ClearSpriteTextureCache();
 
         RenderState state{};
 
