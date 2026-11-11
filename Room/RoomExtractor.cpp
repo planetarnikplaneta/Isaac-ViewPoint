@@ -379,6 +379,45 @@ namespace ViewPoint
             second.corners[2].texcoord = texcoordBase + 3;
         }
 
+        void AddTexturedQuad(
+            Model &model,
+            int materialIndex,
+            const Vertex3 &a,
+            const Vertex3 &b,
+            const Vertex3 &c,
+            const Vertex3 &d)
+        {
+            const int texcoordBase =
+                static_cast<int>(model.texcoords.size());
+
+            model.texcoords.push_back({0.0f, 0.0f});
+            model.texcoords.push_back({1.0f, 0.0f});
+            model.texcoords.push_back({1.0f, 1.0f});
+            model.texcoords.push_back({0.0f, 1.0f});
+
+            AddQuad(
+                model,
+                materialIndex,
+                a,
+                b,
+                c,
+                d);
+
+            const size_t triangleBase =
+                model.triangles.size() - 2;
+
+            Triangle &first = model.triangles[triangleBase];
+            Triangle &second = model.triangles[triangleBase + 1];
+
+            first.corners[0].texcoord = texcoordBase;
+            first.corners[1].texcoord = texcoordBase + 1;
+            first.corners[2].texcoord = texcoordBase + 2;
+
+            second.corners[0].texcoord = texcoordBase;
+            second.corners[1].texcoord = texcoordBase + 2;
+            second.corners[2].texcoord = texcoordBase + 3;
+        }
+
         void AddBox(
             Model &model,
             int materialIndex,
@@ -395,42 +434,42 @@ namespace ViewPoint
             const float front = centerZ - halfDepth;
             const float back = centerZ + halfDepth;
 
-            AddQuad(
+            AddTexturedQuad(
                 model, materialIndex,
                 {left, bottom, front},
                 {right, bottom, front},
                 {right, top, front},
                 {left, top, front});
 
-            AddQuad(
+            AddTexturedQuad(
                 model, materialIndex,
                 {right, bottom, back},
                 {left, bottom, back},
                 {left, top, back},
                 {right, top, back});
 
-            AddQuad(
+            AddTexturedQuad(
                 model, materialIndex,
                 {left, bottom, back},
                 {left, bottom, front},
                 {left, top, front},
                 {left, top, back});
 
-            AddQuad(
+            AddTexturedQuad(
                 model, materialIndex,
                 {right, bottom, front},
                 {right, bottom, back},
                 {right, top, back},
                 {right, top, front});
 
-            AddQuad(
+            AddTexturedQuad(
                 model, materialIndex,
                 {left, top, front},
                 {right, top, front},
                 {right, top, back},
                 {left, top, back});
 
-            AddQuad(
+            AddTexturedQuad(
                 model, materialIndex,
                 {left, bottom, back},
                 {right, bottom, back},
@@ -874,9 +913,10 @@ namespace ViewPoint
 
             Material wallMaterial;
             wallMaterial.name = "RoomWalls";
-            wallMaterial.diffuse[0] = 0.62f;
-            wallMaterial.diffuse[1] = 0.60f;
-            wallMaterial.diffuse[2] = 0.57f;
+            wallMaterial.diffuseTexturePath = "textures/wall_basement.png";
+            wallMaterial.diffuse[0] = 1.0f;
+            wallMaterial.diffuse[1] = 1.0f;
+            wallMaterial.diffuse[2] = 1.0f;
 
             Material rockMaterial;
             rockMaterial.name = "GridRocks";
