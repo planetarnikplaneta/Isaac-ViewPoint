@@ -330,23 +330,30 @@ namespace ViewPoint
             rightInput /= movementLength;
         }
 
-        // Use the same inverse-yaw convention as the OpenGL camera transform.
-        // The renderer rotates the world by -yaw, so movement must be derived
-        // from the matching inverse basis to stay consistent at all headings.
+        // Match the project’s own Isaac/world yaw convention used by the input
+        // hooks. This is the transform the game expects for movement relative to
+        // the current camera yaw, and it keeps left/right and forward/back aligned
+        // in all four cardinal headings.
         const float yawRadians =
-            -g_Camera.yaw * PI / 180.0f;
+            g_Camera.yaw * PI / 180.0f;
 
         const float forwardX =
-            std::sin(yawRadians);
+            -std::sin(yawRadians);
 
         const float forwardZ =
-            std::cos(yawRadians);
+            -std::cos(yawRadians);
 
         const float rightX =
             std::cos(yawRadians);
 
         const float rightZ =
             -std::sin(yawRadians);
+
+        // The project's input logic uses:
+        // worldX = strafe * cos(yaw) - forward * sin(yaw)
+        // worldZ = -strafe * sin(yaw) - forward * cos(yaw)
+        // which is equivalent to the movement vector below when the inputs are
+        // mapped as W/S and A/D.
 
         float speed = g_Camera.movementSpeed;
 
