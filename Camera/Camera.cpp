@@ -330,12 +330,12 @@ namespace ViewPoint
             rightInput /= movementLength;
         }
 
+        // Use the same inverse-yaw convention as the OpenGL camera transform.
+        // The renderer rotates the world by -yaw, so movement must be derived
+        // from the matching inverse basis to stay consistent at all headings.
         const float yawRadians =
-            g_Camera.yaw * PI / 180.0f;
+            -g_Camera.yaw * PI / 180.0f;
 
-        // Keep the yaw basis consistent with the room/world convention used by
-        // the renderer: forward and strafe must rotate together, and neither
-        // should be mirrored on cardinal headings.
         const float forwardX =
             std::sin(yawRadians);
 
