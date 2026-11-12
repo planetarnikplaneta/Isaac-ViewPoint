@@ -1057,9 +1057,10 @@ namespace ViewPoint
                 const unsigned int row = i / width;
                 const unsigned int column = i % width;
 
+                // Match the actual Isaac room left/right orientation.
                 const float centerX =
-                    (static_cast<float>(column) -
-                     (static_cast<float>(width) - 1.0f) * 0.5f) *
+                    ((static_cast<float>(width) - 1.0f) * 0.5f -
+                     static_cast<float>(column)) *
                     TILE_SIZE;
 
                 const float centerZ =
