@@ -1057,16 +1057,17 @@ namespace ViewPoint
                 const unsigned int row = i / width;
                 const unsigned int column = i % width;
 
-                // Match vanilla room-space orientation instead of a
-                // mirrored renderer-space orientation.
+                // Isaac's room grid is mirrored relative to the 3D world
+                // used by the renderer. Keep the X axis sign consistent
+                // between the room mesh, player camera, and entity positions.
                 const float centerX =
                     ((static_cast<float>(width) - 1.0f) * 0.5f -
                      static_cast<float>(column)) *
                     TILE_SIZE;
 
                 const float centerZ =
-                    (static_cast<float>(row) -
-                     (static_cast<float>(height) - 1.0f) * 0.5f) *
+                    ((static_cast<float>(height) - 1.0f) * 0.5f -
+                     static_cast<float>(row)) *
                     TILE_SIZE;
 
                 if (entityType == GRID_DOOR)

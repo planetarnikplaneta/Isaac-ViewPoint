@@ -98,8 +98,10 @@ namespace ViewPoint
 
             WorldPoint result{};
 
+            // Mirror the room-space X axis to match the room mesh and the
+            // player-follow camera transform.
             result.x =
-                (position.x - roomCenterX) /
+                (roomCenterX - position.x) /
                 PIXELS_PER_TILE;
 
             result.y = FLOOR_Y;

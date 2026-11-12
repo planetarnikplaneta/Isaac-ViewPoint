@@ -59,8 +59,11 @@ namespace ViewPoint
             const float roomCenterY =
                 280.0f + (static_cast<float>(room->_gridHeight) - 9.0f) * 20.0f;
 
+            // Isaac room coordinates are mirrored along X relative to the
+            // renderer's 3D world. Use the same sign convention here as the
+            // generated room mesh and entity positions.
             g_Camera.position.x =
-                (playerPosition->x - roomCenterX) / ISAAC_PIXELS_PER_TILE;
+                (roomCenterX - playerPosition->x) / ISAAC_PIXELS_PER_TILE;
 
             g_Camera.position.z =
                 (roomCenterY - playerPosition->y) / ISAAC_PIXELS_PER_TILE;
@@ -337,10 +340,10 @@ namespace ViewPoint
             std::cos(yawRadians);
 
         const float rightX =
-            std::cos(yawRadians);
+            -std::cos(yawRadians);
 
         const float rightZ =
-            -std::sin(yawRadians);
+            std::sin(yawRadians);
 
         float speed = g_Camera.movementSpeed;
 

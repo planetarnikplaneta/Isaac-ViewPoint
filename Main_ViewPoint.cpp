@@ -173,10 +173,10 @@ HOOK_METHOD(
     const float cosYaw = std::cos(yaw);
 
     const float worldX =
-        strafe * cosYaw + forward * sinYaw;
+        strafe * cosYaw - forward * sinYaw;
 
     const float worldZ =
-        -strafe * sinYaw + forward * cosYaw;
+        -strafe * sinYaw - forward * cosYaw;
 
     switch (action)
     {
