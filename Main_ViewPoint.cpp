@@ -52,9 +52,10 @@ namespace ViewPoint
         const float yawRadians =
             g_Camera.yaw * VIEWPOINT_PI / 180.0f;
 
-        const float forwardX = -std::sin(yawRadians);
-        const float forwardZ = -std::cos(yawRadians);
-        const float rightX = std::cos(yawRadians);
+        // Convert the camera yaw to Isaac's 2D screen axes.
+        // Isaac's X grows to the right and Y grows downward.
+        const float aimX = std::sin(yawRadians);
+        const float aimY = -std::cos(yawRadians);
 
         float value = 0.0f;
 
@@ -62,29 +63,29 @@ namespace ViewPoint
         {
             // Shoot left
             case 4:
-                value = -rightX;
+                value = std::clamp(-aimX, 0.0f, 1.0f);
                 break;
 
             // Shoot right
             case 5:
-                value = rightX;
+                value = std::clamp(aimX, 0.0f, 1.0f);
                 break;
 
             // Shoot up
             case 6:
-                value = -forwardZ;
+                value = std::clamp(-aimY, 0.0f, 1.0f);
                 break;
 
             // Shoot down
             case 7:
-                value = forwardZ;
+                value = std::clamp(aimY, 0.0f, 1.0f);
                 break;
 
             default:
                 return 0.0f;
         }
 
-        return std::clamp(value, 0.0f, 1.0f);
+        return value;
     }
 }
 // ------------------------------------------------------
@@ -110,10 +111,11 @@ HOOK_METHOD(
             const float forwardX = -std::sin(yawRadians);
             const float forwardZ = -std::cos(yawRadians);
 
-            // Convert ViewPoint world coordinates to Isaac's
-            // 2D coordinates. Isaac's positive Y points downward.
+            // Convert ViewPoint camera forward to Isaac's 2D aim basis.
+            // Isaac uses X to the right and Y downward, while the camera's
+            // local forward vector uses a different sign convention.
             const Vector cameraAim(
-                forwardX,
+                -forwardX,
                 forwardZ
             );
 
