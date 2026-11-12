@@ -1043,29 +1043,8 @@ namespace ViewPoint
             unsigned int webCount = 0;
             unsigned int objectCount = 0;
 
-            std::vector<bool> doorCellMap(cellCount, false);
-
-            for (unsigned int slot = 0; slot < 8; ++slot)
-            {
-                const unsigned int doorIndex =
-                    room->_doorGridPositions[slot];
-
-                if (doorIndex < cellCount)
-                {
-                    doorCellMap[doorIndex] = true;
-                }
-            }
-
             for (unsigned int i = 0; i < cellCount; ++i)
             {
-                const bool isDoorCell = doorCellMap[i];
-
-                if (isDoorCell)
-                {
-                    ++doorCount;
-                    continue;
-                }
-
                 GridEntity *grid =
                     room->GetGridEntity(static_cast<int>(i));
 
@@ -1078,15 +1057,23 @@ namespace ViewPoint
                 const unsigned int row = i / width;
                 const unsigned int column = i % width;
 
+                // Match vanilla room-space orientation instead of a
+                // mirrored renderer-space orientation.
                 const float centerX =
-                    (static_cast<float>(column) -
-                     (static_cast<float>(width) - 1.0f) * 0.5f) *
+                    ((static_cast<float>(width) - 1.0f) * 0.5f -
+                     static_cast<float>(column)) *
                     TILE_SIZE;
 
                 const float centerZ =
-                    ((static_cast<float>(height) - 1.0f) * 0.5f -
-                     static_cast<float>(row)) *
+                    (static_cast<float>(row) -
+                     (static_cast<float>(height) - 1.0f) * 0.5f) *
                     TILE_SIZE;
+
+                if (entityType == GRID_DOOR)
+                {
+                    ++doorCount;
+                    continue;
+                }
 
                 if (entityType == GRID_WALL)
                 {
