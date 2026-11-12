@@ -71,12 +71,12 @@ namespace ViewPoint
 
             // Shoot up
             case 6:
-                value = forwardZ;
+                value = -forwardZ;
                 break;
 
             // Shoot down
             case 7:
-                value = -forwardZ;
+                value = forwardZ;
                 break;
 
             default:
@@ -113,7 +113,7 @@ HOOK_METHOD(
             // 2D coordinates. Isaac's positive Y points downward.
             const Vector cameraAim(
                 forwardX,
-                -forwardZ
+                forwardZ
             );
 
             super(cameraAim, isShooting, isInterpolated);
@@ -173,10 +173,10 @@ HOOK_METHOD(
     const float cosYaw = std::cos(yaw);
 
     const float worldX =
-        strafe * cosYaw - forward * sinYaw;
+        strafe * cosYaw + forward * sinYaw;
 
     const float worldZ =
-        -strafe * sinYaw - forward * cosYaw;
+        -strafe * sinYaw + forward * cosYaw;
 
     switch (action)
     {

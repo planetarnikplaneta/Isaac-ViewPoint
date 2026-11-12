@@ -333,14 +333,11 @@ namespace ViewPoint
         const float yawRadians =
             g_Camera.yaw * PI / 180.0f;
 
-        // World axes convention: yaw=0 faces +Z (north), +X is east.
-        // Keep the camera basis aligned with the room instead of mirroring
-        // the X/Z plane.
         const float forwardX =
-            std::sin(yawRadians);
+            -std::sin(yawRadians);
 
         const float forwardZ =
-            std::cos(yawRadians);
+            -std::cos(yawRadians);
 
         const float rightX =
             std::cos(yawRadians);
