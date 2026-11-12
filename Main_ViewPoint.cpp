@@ -172,11 +172,15 @@ HOOK_METHOD(
     const float sinYaw = std::sin(yaw);
     const float cosYaw = std::cos(yaw);
 
+    // Rotate the camera-relative input into Isaac's world axes.
+    // The ViewPoint camera convention uses +X as right and +Z as up,
+    // while Isaac's player movement expects the forward axis to stay
+    // consistent with the room/world space after rotation.
     const float worldX =
-        strafe * cosYaw - forward * sinYaw;
+        strafe * cosYaw + forward * sinYaw;
 
     const float worldZ =
-        -strafe * sinYaw - forward * cosYaw;
+        -strafe * sinYaw + forward * cosYaw;
 
     switch (action)
     {

@@ -59,11 +59,8 @@ namespace ViewPoint
             const float roomCenterY =
                 280.0f + (static_cast<float>(room->_gridHeight) - 9.0f) * 20.0f;
 
-            // Isaac's room-space X axis is mirrored relative to the
-            // generated view-space room mesh; flip it here so the camera
-            // and the rendered walls match the actual room layout.
             g_Camera.position.x =
-                (roomCenterX - playerPosition->x) / ISAAC_PIXELS_PER_TILE;
+                (playerPosition->x - roomCenterX) / ISAAC_PIXELS_PER_TILE;
 
             g_Camera.position.z =
                 (roomCenterY - playerPosition->y) / ISAAC_PIXELS_PER_TILE;
