@@ -333,14 +333,17 @@ namespace ViewPoint
         const float yawRadians =
             g_Camera.yaw * PI / 180.0f;
 
+        // Keep this basis aligned with the view transform used in the
+        // renderer: camera +Z is effectively the room's local forward axis,
+        // while the world-space basis is built around the same yaw rotation.
         const float forwardX =
             std::sin(yawRadians);
 
         const float forwardZ =
-            std::cos(yawRadians);
+            -std::cos(yawRadians);
 
         const float rightX =
-            -std::cos(yawRadians);
+            std::cos(yawRadians);
 
         const float rightZ =
             std::sin(yawRadians);
