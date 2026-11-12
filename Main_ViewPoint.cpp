@@ -54,6 +54,7 @@ namespace ViewPoint
 
         const float forwardX = -std::sin(yawRadians);
         const float forwardZ = -std::cos(yawRadians);
+        const float rightX = std::cos(yawRadians);
 
         float value = 0.0f;
 
@@ -61,12 +62,12 @@ namespace ViewPoint
         {
             // Shoot left
             case 4:
-                value = -forwardX;
+                value = -rightX;
                 break;
 
             // Shoot right
             case 5:
-                value = forwardX;
+                value = rightX;
                 break;
 
             // Shoot up
