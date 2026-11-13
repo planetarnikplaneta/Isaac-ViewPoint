@@ -47,20 +47,20 @@ namespace ViewPoint
                (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
     }
 
-    Vector GetCameraAimVector()
+    Vector GetCameraShootVector()
     {
         const float yawRadians =
             g_Camera.yaw * VIEWPOINT_PI / 180.0f;
 
-        const float forwardX = -std::sin(yawRadians);
-        const float forwardY = std::cos(yawRadians);
+        const float shootX = -std::sin(yawRadians);
+        const float shootY = std::cos(yawRadians);
 
-        return Vector(forwardX, forwardY);
+        return Vector(shootX, shootY);
     }
 
     float GetMouseAimActionValue(int action)
     {
-        const Vector cameraAim = GetCameraAimVector();
+        const Vector cameraShoot = GetCameraShootVector();
 
         float value = 0.0f;
 
@@ -68,22 +68,22 @@ namespace ViewPoint
         {
             // Shoot left
             case 4:
-                value = -cameraAim.x;
+                value = -cameraShoot.x;
                 break;
 
             // Shoot right
             case 5:
-                value = cameraAim.x;
+                value = cameraShoot.x;
                 break;
 
             // Shoot up
             case 6:
-                value = cameraAim.y;
+                value = cameraShoot.y;
                 break;
 
             // Shoot down
             case 7:
-                value = -cameraAim.y;
+                value = -cameraShoot.y;
                 break;
 
             default:
@@ -102,19 +102,6 @@ HOOK_METHOD(
     Fire,
     (const Vector& dir, bool isShooting, bool isInterpolated)->void)
 {
-    if (ViewPoint::IsMouseAiming() && g_Game)
-    {
-        Entity_Player* player = g_Game->GetPlayer(0);
-
-        if (player && GetOwner() == player)
-        {
-            const Vector cameraAim = ViewPoint::GetCameraAimVector();
-
-            super(cameraAim, isShooting, isInterpolated);
-            return;
-        }
-    }
-
     super(dir, isShooting, isInterpolated);
 }
 // ------------------------------------------------------------
