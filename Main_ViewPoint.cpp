@@ -40,6 +40,16 @@ namespace ViewPoint
 {
     constexpr float VIEWPOINT_PI = 3.14159265358979323846f;
 
+    Vector GetCameraAimDirection()
+    {
+        const float yawRadians =
+            g_Camera.yaw * VIEWPOINT_PI / 180.0f;
+
+        return Vector(
+            -std::sin(yawRadians),
+            -std::cos(yawRadians));
+    }
+
     bool IsMouseAiming()
     {
         return g_Camera.enabled &&
@@ -49,11 +59,7 @@ namespace ViewPoint
 
     float GetMouseAimActionValue(int action)
     {
-        const float yawRadians =
-            g_Camera.yaw * VIEWPOINT_PI / 180.0f;
-
-        const float forwardX = -std::sin(yawRadians);
-        const float forwardZ = std::cos(yawRadians);
+        const Vector aim = GetCameraAimDirection();
 
         float value = 0.0f;
 
@@ -61,22 +67,22 @@ namespace ViewPoint
         {
             // Shoot left
             case 4:
-                value = -forwardX;
+                value = -aim.x;
                 break;
 
             // Shoot right
             case 5:
-                value = forwardX;
+                value = aim.x;
                 break;
 
             // Shoot up
             case 6:
-                value = forwardZ;
+                value = -aim.y;
                 break;
 
             // Shoot down
             case 7:
-                value = -forwardZ;
+                value = aim.y;
                 break;
 
             default:
@@ -101,18 +107,8 @@ HOOK_METHOD(
 
         if (player && GetOwner() == player)
         {
-            constexpr float PI = 3.14159265358979323846f;
-
-            const float yawRadians =
-                ViewPoint::g_Camera.yaw * PI / 180.0f;
-
-            const float forwardX = -std::sin(yawRadians);
-            const float forwardZ = std::cos(yawRadians);
-
-            const Vector cameraAim(
-                -forwardX,
-                -forwardZ
-            );
+            const Vector cameraAim =
+                ViewPoint::GetCameraAimDirection();
 
             super(cameraAim, isShooting, isInterpolated);
             return;
