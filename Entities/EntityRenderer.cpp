@@ -612,72 +612,6 @@ static void RenderSpriteLayer(
         // ENTITY SPRITE
         // ------------------------------------------------------------
 
-        static bool IsEntityVisible(
-            Entity *entity,
-            Room *room,
-            float radius)
-        {
-            if (!entity || !room)
-                return false;
-
-            const Vector *entityPosition = entity->GetPosition();
-
-            if (!entityPosition)
-                return false;
-
-            const WorldPoint worldPosition =
-                IsaacToWorld(*entityPosition, room);
-
-            const float dx = worldPosition.x - g_Camera.position.x;
-            const float dy = worldPosition.y - g_Camera.position.y;
-            const float dz = worldPosition.z - g_Camera.position.z;
-
-            const float yawRadians =
-                g_Camera.yaw * PI / 180.0f;
-
-            const float cosYaw = std::cos(yawRadians);
-            const float sinYaw = std::sin(yawRadians);
-
-            const float forwardX = sinYaw;
-            const float forwardY = 0.0f;
-            const float forwardZ = cosYaw;
-
-            const float rightX = cosYaw;
-            const float rightY = 0.0f;
-            const float rightZ = -sinYaw;
-
-            const float cameraX =
-                dx * rightX + dy * rightY + dz * rightZ;
-            const float cameraY =
-                dy;
-            const float cameraZ =
-                dx * forwardX + dy * forwardY + dz * forwardZ;
-
-            if (cameraZ <= -radius)
-                return false;
-
-            GLint viewport[4] = {};
-            glGetIntegerv(GL_VIEWPORT, viewport);
-
-            const float aspect =
-                viewport[2] > 0 && viewport[3] > 0
-                    ? static_cast<float>(viewport[2]) /
-                          static_cast<float>(viewport[3])
-                    : 1.7777778f;
-
-            const float halfFovTan =
-                std::tan(
-                    g_Camera.fieldOfView *
-                    PI / 360.0f);
-
-            const float distance = (std::max)(0.1f, cameraZ);
-            const float halfHeight = halfFovTan * distance;
-            const float halfWidth = halfHeight * aspect;
-
-            return std::fabs(cameraX) <= halfWidth + radius &&
-                   std::fabs(cameraY) <= halfHeight + radius * 2.0f;
-        }
-
         static void RenderEntitySprite(
             Entity *entity,
             Room *room,
@@ -740,6 +674,76 @@ static void RenderSpriteLayer(
                     cameraRightX,
                     cameraRightZ);
             }
+        }
+
+        // ------------------------------------------------------------
+        // CAMERA CULLING
+        // ------------------------------------------------------------
+
+        static bool IsEntityVisibleToCamera(
+            const Entity *entity,
+            const Room *room)
+        {
+            if (!entity || !room)
+                return false;
+
+            const Vector *position = entity->GetPosition();
+
+            if (!position)
+                return false;
+
+            const WorldPoint world = IsaacToWorld(*position, room);
+
+            const float dx = world.x - g_Camera.position.x;
+            const float dz = world.z - g_Camera.position.z;
+            const float dy =
+                (world.y + GetEntityRenderHeightOffset(entity)) -
+                g_Camera.position.y;
+
+            const float distanceSq =
+                dx * dx + dy * dy + dz * dz;
+
+            const float farPlaneSq =
+                g_Camera.farPlane * g_Camera.farPlane;
+
+            if (distanceSq > farPlaneSq)
+                return false;
+
+            const float yawRadians =
+                g_Camera.yaw * PI / 180.0f;
+
+            const float cameraForwardX = std::sin(yawRadians);
+            const float cameraForwardZ = std::cos(yawRadians);
+            const float cameraRightX = std::cos(yawRadians);
+            const float cameraRightZ = -std::sin(yawRadians);
+
+            const float forwardDot =
+                dx * cameraForwardX +
+                dz * cameraForwardZ;
+
+            if (forwardDot <= 0.0f)
+                return false;
+
+            const float rightDot =
+                dx * cameraRightX +
+                dz * cameraRightZ;
+
+            const float halfFov =
+                g_Camera.fieldOfView * PI / 360.0f;
+
+            const float horizontalHalfWidth =
+                forwardDot * std::tan(halfFov) + 1.5f;
+
+            const float verticalHalfHeight =
+                horizontalHalfWidth * 0.75f + 1.5f;
+
+            if (std::fabs(rightDot) > horizontalHalfWidth)
+                return false;
+
+            if (std::fabs(dy) > verticalHalfHeight)
+                return false;
+
+            return true;
         }
 
         // ------------------------------------------------------------
@@ -1117,14 +1121,12 @@ static void RenderSpriteLayer(
                 continue;
             }
 
+            if (!IsEntityVisibleToCamera(entity, room))
+                continue;
+
             const Vector *entityPosition = entity->GetPosition();
 
             if (!entityPosition)
-                continue;
-
-            const float radius = 0.75f;
-
-            if (!IsEntityVisible(entity, room, radius))
                 continue;
 
             orderedEntities.push_back(entity);
@@ -1192,9 +1194,6 @@ static void RenderSpriteLayer(
             Entity *entity = renderList->_data[i];
 
             if (!entity)
-                continue;
-
-            if (!IsEntityVisible(entity, room, 0.75f))
                 continue;
 
             RenderCollisionCapsule(
