@@ -177,7 +177,7 @@ HOOK_METHOD(
     const float rightZ = -sinYaw;
 
     const float worldX =
-        strafe * rightX + forward * forwardX;
+        -strafe * rightX + forward * forwardX;
 
     const float worldZ =
         strafe * rightZ + forward * forwardZ;
