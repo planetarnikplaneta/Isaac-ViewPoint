@@ -78,12 +78,12 @@ namespace ViewPoint
 
             // Shoot up
             case 6:
-                value = cameraShoot.y;
+                value = -cameraShoot.y;
                 break;
 
             // Shoot down
             case 7:
-                value = -cameraShoot.y;
+                value = cameraShoot.y;
                 break;
 
             default:
