@@ -52,10 +52,8 @@ namespace ViewPoint
         const float yawRadians =
             g_Camera.yaw * VIEWPOINT_PI / 180.0f;
 
-        // Convert the camera yaw to Isaac's 2D screen axes.
-        // Isaac's X grows to the right and Y grows downward.
-        const float aimX = std::sin(yawRadians);
-        const float aimY = -std::cos(yawRadians);
+        const float forwardX = -std::sin(yawRadians);
+        const float forwardZ = -std::cos(yawRadians);
 
         float value = 0.0f;
 
@@ -63,29 +61,29 @@ namespace ViewPoint
         {
             // Shoot left
             case 4:
-                value = std::clamp(-aimX, 0.0f, 1.0f);
+                value = -forwardX;
                 break;
 
             // Shoot right
             case 5:
-                value = std::clamp(aimX, 0.0f, 1.0f);
+                value = forwardX;
                 break;
 
             // Shoot up
             case 6:
-                value = std::clamp(-aimY, 0.0f, 1.0f);
+                value = -forwardZ;
                 break;
 
             // Shoot down
             case 7:
-                value = std::clamp(aimY, 0.0f, 1.0f);
+                value = forwardZ;
                 break;
 
             default:
                 return 0.0f;
         }
 
-        return value;
+        return std::clamp(value, 0.0f, 1.0f);
     }
 }
 // ------------------------------------------------------
@@ -111,11 +109,10 @@ HOOK_METHOD(
             const float forwardX = -std::sin(yawRadians);
             const float forwardZ = -std::cos(yawRadians);
 
-            // Convert ViewPoint camera forward to Isaac's 2D aim basis.
-            // Isaac uses X to the right and Y downward, while the camera's
-            // local forward vector uses a different sign convention.
+            // Use the same camera-forward basis as the action input mapping.
+            // This keeps mouse aim and projectile fire in lockstep.
             const Vector cameraAim(
-                -forwardX,
+                forwardX,
                 forwardZ
             );
 
