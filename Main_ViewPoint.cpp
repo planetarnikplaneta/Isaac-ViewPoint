@@ -47,7 +47,7 @@ namespace ViewPoint
 
         return Vector(
             -std::sin(yawRadians),
-            -std::cos(yawRadians));
+            std::cos(yawRadians));
     }
 
     bool IsMouseAiming()
@@ -77,12 +77,12 @@ namespace ViewPoint
 
             // Shoot up
             case 6:
-                value = -aim.y;
+                value = aim.y;
                 break;
 
             // Shoot down
             case 7:
-                value = aim.y;
+                value = -aim.y;
                 break;
 
             default:
