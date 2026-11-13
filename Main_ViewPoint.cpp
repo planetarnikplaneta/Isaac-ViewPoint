@@ -49,12 +49,12 @@ namespace ViewPoint
 
     float GetMouseAimActionValue(int action)
     {
+        // Projectile aim is offset by 180° relative to the camera's world yaw.
+        // This keeps north/south from being mirrored while preserving the
+        // already-correct east/west movement basis.
         const float yawRadians =
-            g_Camera.yaw * VIEWPOINT_PI / 180.0f;
+            (g_Camera.yaw + 180.0f) * VIEWPOINT_PI / 180.0f;
 
-        // Match the world-space movement basis used earlier in this file:
-        // positive Z is north/up, yaw 0 points north, and the Isaac screen
-        // Y axis is inverted when converted to a 2D aim vector.
         const float forwardX = std::sin(yawRadians);
         const float forwardZ = std::cos(yawRadians);
 
@@ -106,16 +106,14 @@ HOOK_METHOD(
         {
             constexpr float PI = 3.14159265358979323846f;
 
+            // The actual projectile aim needs the camera yaw shifted by 180° to
+            // match Isaac's forward basis for the room/world direction.
             const float yawRadians =
-                ViewPoint::g_Camera.yaw * PI / 180.0f;
+                (ViewPoint::g_Camera.yaw + 180.0f) * PI / 180.0f;
 
             const float forwardX = std::sin(yawRadians);
             const float forwardZ = std::cos(yawRadians);
 
-            // Convert the ViewPoint world-space forward vector to Isaac's 2D
-            // screen-space aim basis. Isaac's Y axis points downward, so we
-            // invert the world Z component when translating from north/up to
-            // screen-space up/down.
             const Vector cameraAim(
                 forwardX,
                 -forwardZ
