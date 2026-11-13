@@ -56,50 +56,9 @@ namespace ViewPoint
         Room *g_LastRoom = nullptr;
         int g_LastRoomIndex = -1;
         int g_LastDimension = -1;
-        std::uint64_t g_LastRoomLayoutHash = 0;
+        uint64_t g_LastRoomGridSignature = 0;
 
         Model g_RoomModel;
-
-        std::uint64_t ComputeRoomLayoutHash(const Room *room)
-        {
-            if (!room)
-                return 0;
-
-            std::uint64_t hash = 14695981039346656037ull;
-
-            const auto mix = [&hash](std::uint64_t value)
-            {
-                hash ^= value + 0x9e3779b97f4a7c15ull +
-                        (hash << 6) + (hash >> 2);
-            };
-
-            mix(static_cast<std::uint64_t>(room->_gridWidth));
-            mix(static_cast<std::uint64_t>(room->_gridHeight));
-
-            const unsigned int width = room->_gridWidth;
-            const unsigned int height = room->_gridHeight;
-            const unsigned int cellCount = width * height;
-
-            for (unsigned int i = 0; i < cellCount; ++i)
-            {
-                GridEntity *grid = room->GetGridEntity(i);
-                const int type = grid ? static_cast<int>(grid->GetType()) : -1;
-                mix(static_cast<std::uint64_t>(type + 1));
-            }
-
-            for (int slot = 0; slot < 8; ++slot)
-            {
-                GridEntity *door = room->_doors[slot];
-                const std::uint64_t doorValue =
-                    door ? (static_cast<std::uint64_t>(slot + 1) << 32) |
-                              static_cast<std::uint64_t>(room->_doorGridPositions[slot])
-                         : 0;
-
-                mix(doorValue);
-            }
-
-            return hash;
-        }
         void DiagnoseFloorImage(
             const char *name,
             KAGE_Graphics_ImageBase *image)
@@ -1262,6 +1221,61 @@ namespace ViewPoint
             return true;
         }
 
+        uint64_t ComputeRoomGridSignature(
+            const Room *room)
+        {
+            if (!room)
+                return 0;
+
+            const unsigned int width =
+                static_cast<unsigned int>(room->_gridWidth);
+
+            const unsigned int height =
+                static_cast<unsigned int>(room->_gridHeight);
+
+            const unsigned int cellCount = width * height;
+
+            uint64_t hash = 14695981039346656037ull;
+
+            hash ^= static_cast<uint64_t>(width) + 0x9e3779b97f4a7c15ull;
+            hash *= 1099511628211ull;
+
+            hash ^= static_cast<uint64_t>(height) + 0x9e3779b97f4a7c15ull;
+            hash *= 1099511628211ull;
+
+            for (unsigned int i = 0; i < cellCount; ++i)
+            {
+                const GridEntity *grid =
+                    room->GetGridEntity(i);
+
+                const uint32_t type =
+                    grid ? static_cast<uint32_t>(grid->GetType()) : 0u;
+
+                hash ^= static_cast<uint64_t>(type + 1u) +
+                    static_cast<uint64_t>(i * 131u);
+                hash *= 1099511628211ull;
+            }
+
+            for (unsigned int i = 0; i < 8; ++i)
+            {
+                const GridEntity *door =
+                    room->_doors[i];
+
+                const uint32_t doorType =
+                    door ? static_cast<uint32_t>(door->GetType()) : 0u;
+
+                hash ^= static_cast<uint64_t>(doorType + 1u) +
+                    static_cast<uint64_t>(i * 131u);
+                hash *= 1099511628211ull;
+
+                hash ^= static_cast<uint64_t>(room->_doorGridPositions[i]) +
+                    static_cast<uint64_t>(i * 17u);
+                hash *= 1099511628211ull;
+            }
+
+            return hash;
+        }
+
         void LogRoom(
             Room *room,
             int roomIndex,
@@ -1331,7 +1345,7 @@ namespace ViewPoint
             g_LastRoom = nullptr;
             g_LastRoomIndex = -1;
             g_LastDimension = -1;
-            g_LastRoomLayoutHash = 0;
+            g_LastRoomGridSignature = 0;
 
             ResetRoomModel();
             return;
@@ -1343,13 +1357,13 @@ namespace ViewPoint
         const int dimension =
             g_Game->GetDimension();
 
-        const std::uint64_t roomLayoutHash =
-            ComputeRoomLayoutHash(room);
+        const uint64_t roomGridSignature =
+            ComputeRoomGridSignature(room);
 
         if (room == g_LastRoom &&
             roomIndex == g_LastRoomIndex &&
             dimension == g_LastDimension &&
-            roomLayoutHash == g_LastRoomLayoutHash)
+            roomGridSignature == g_LastRoomGridSignature)
         {
             if (g_RoomModel.materials.size() > MAT_FLOOR)
             {
@@ -1364,7 +1378,7 @@ namespace ViewPoint
         g_LastRoom = room;
         g_LastRoomIndex = roomIndex;
         g_LastDimension = dimension;
-        g_LastRoomLayoutHash = roomLayoutHash;
+        g_LastRoomGridSignature = roomGridSignature;
 
         ResetRoomModel();
 
