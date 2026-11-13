@@ -334,7 +334,7 @@ namespace ViewPoint
             g_Camera.yaw * PI / 180.0f;
 
         const float forwardX =
-            std::sin(yawRadians);
+            -std::sin(yawRadians);
 
         const float forwardZ =
             -std::cos(yawRadians);
@@ -343,7 +343,7 @@ namespace ViewPoint
             std::cos(yawRadians);
 
         const float rightZ =
-            std::sin(yawRadians);
+            -std::sin(yawRadians);
 
         float speed = g_Camera.movementSpeed;
 
