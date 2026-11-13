@@ -40,16 +40,6 @@ namespace ViewPoint
 {
     constexpr float VIEWPOINT_PI = 3.14159265358979323846f;
 
-    Vector GetCameraAimDirection()
-    {
-        const float yawRadians =
-            g_Camera.yaw * VIEWPOINT_PI / 180.0f;
-
-        return Vector(
-            -std::sin(yawRadians),
-            std::cos(yawRadians));
-    }
-
     bool IsMouseAiming()
     {
         return g_Camera.enabled &&
@@ -59,7 +49,11 @@ namespace ViewPoint
 
     float GetMouseAimActionValue(int action)
     {
-        const Vector aim = GetCameraAimDirection();
+        const float yawRadians =
+            g_Camera.yaw * VIEWPOINT_PI / 180.0f;
+
+        const float forwardX = -std::sin(yawRadians);
+        const float forwardZ = std::cos(yawRadians);
 
         float value = 0.0f;
 
@@ -67,22 +61,22 @@ namespace ViewPoint
         {
             // Shoot left
             case 4:
-                value = -aim.x;
+                value = -forwardX;
                 break;
 
             // Shoot right
             case 5:
-                value = aim.x;
+                value = forwardX;
                 break;
 
             // Shoot up
             case 6:
-                value = aim.y;
+                value = forwardZ;
                 break;
 
             // Shoot down
             case 7:
-                value = -aim.y;
+                value = -forwardZ;
                 break;
 
             default:
@@ -107,8 +101,18 @@ HOOK_METHOD(
 
         if (player && GetOwner() == player)
         {
-            const Vector cameraAim =
-                ViewPoint::GetCameraAimDirection();
+            constexpr float PI = 3.14159265358979323846f;
+
+            const float yawRadians =
+                ViewPoint::g_Camera.yaw * PI / 180.0f;
+
+            const float forwardX = -std::sin(yawRadians);
+            const float forwardZ = std::cos(yawRadians);
+
+            const Vector cameraAim(
+                -forwardX,
+                -forwardZ
+            );
 
             super(cameraAim, isShooting, isInterpolated);
             return;
