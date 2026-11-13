@@ -107,7 +107,7 @@ HOOK_METHOD(
             constexpr float PI = 3.14159265358979323846f;
 
             const float yawRadians =
-                (ViewPoint::g_Camera.yaw + 90.0f) * PI / 180.0f;
+                (ViewPoint::g_Camera.yaw - 90.0f) * PI / 180.0f;
 
             const float forwardX = std::cos(yawRadians);
             const float forwardZ = std::sin(yawRadians);
@@ -168,7 +168,7 @@ HOOK_METHOD(
     const float forward = up - down;
 
     const float yaw =
-        (ViewPoint::g_Camera.yaw + 90.0f) * PI / 180.0f;
+        (ViewPoint::g_Camera.yaw - 90.0f) * PI / 180.0f;
 
     const float sinYaw = std::sin(yaw);
     const float cosYaw = std::cos(yaw);
