@@ -171,14 +171,16 @@ HOOK_METHOD(
     const float sinYaw = std::sin(yaw);
     const float cosYaw = std::cos(yaw);
 
-    // Standard camera-to-world rotation for a right-handed X/Z plane.
-    // This keeps the local forward/strafe axes consistent at every cardinal
-    // orientation without the alternating mirrored quadrant flips.
+    const float forwardX = -sinYaw;
+    const float forwardZ = -cosYaw;
+    const float rightX = cosYaw;
+    const float rightZ = -sinYaw;
+
     const float worldX =
-        strafe * cosYaw - forward * sinYaw;
+        -strafe * rightX + forward * forwardX;
 
     const float worldZ =
-        strafe * sinYaw + forward * cosYaw;
+        strafe * rightZ + forward * forwardZ;
 
     switch (action)
     {
