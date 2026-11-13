@@ -52,8 +52,8 @@ namespace ViewPoint
         const float yawRadians =
             g_Camera.yaw * VIEWPOINT_PI / 180.0f;
 
-        const float forwardX = std::sin(yawRadians);
-        const float forwardZ = std::cos(yawRadians);
+        const float forwardX = -std::sin(yawRadians);
+        const float forwardZ = -std::cos(yawRadians);
 
         float value = 0.0f;
 
@@ -106,12 +106,12 @@ HOOK_METHOD(
             const float yawRadians =
                 ViewPoint::g_Camera.yaw * PI / 180.0f;
 
-            const float forwardX = std::sin(yawRadians);
-            const float forwardZ = std::cos(yawRadians);
+            const float forwardX = -std::sin(yawRadians);
+            const float forwardZ = -std::cos(yawRadians);
 
             const Vector cameraAim(
                 forwardX,
-                -forwardZ
+                forwardZ
             );
 
             super(cameraAim, isShooting, isInterpolated);
@@ -170,11 +170,16 @@ HOOK_METHOD(
     const float sinYaw = std::sin(yaw);
     const float cosYaw = std::cos(yaw);
 
+    const float forwardX = -sinYaw;
+    const float forwardZ = -cosYaw;
+    const float rightX = cosYaw;
+    const float rightZ = -sinYaw;
+
     const float worldX =
-        strafe * cosYaw + forward * sinYaw;
+        strafe * rightX + forward * forwardX;
 
     const float worldZ =
-        -strafe * sinYaw + forward * cosYaw;
+        strafe * rightZ + forward * forwardZ;
 
     switch (action)
     {
