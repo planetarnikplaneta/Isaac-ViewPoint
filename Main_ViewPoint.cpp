@@ -49,11 +49,14 @@ namespace ViewPoint
 
     float GetMouseAimActionValue(int action)
     {
+        // The camera yaw is measured in the room's local frame, while the
+        // movement/aim basis here uses north/up as the zero heading. Rotate the
+        // yaw into the room basis before generating the aim vectors.
         const float yawRadians =
-            g_Camera.yaw * VIEWPOINT_PI / 180.0f;
+            (g_Camera.yaw + 90.0f) * VIEWPOINT_PI / 180.0f;
 
-        const float forwardX = std::sin(yawRadians);
-        const float forwardZ = std::cos(yawRadians);
+        const float forwardX = std::cos(yawRadians);
+        const float forwardZ = std::sin(yawRadians);
 
         float value = 0.0f;
 
@@ -104,10 +107,10 @@ HOOK_METHOD(
             constexpr float PI = 3.14159265358979323846f;
 
             const float yawRadians =
-                ViewPoint::g_Camera.yaw * PI / 180.0f;
+                (ViewPoint::g_Camera.yaw + 90.0f) * PI / 180.0f;
 
-            const float forwardX = std::sin(yawRadians);
-            const float forwardZ = std::cos(yawRadians);
+            const float forwardX = std::cos(yawRadians);
+            const float forwardZ = std::sin(yawRadians);
 
             const Vector cameraAim(
                 forwardX,
@@ -165,7 +168,7 @@ HOOK_METHOD(
     const float forward = up - down;
 
     const float yaw =
-        ViewPoint::g_Camera.yaw * PI / 180.0f;
+        (ViewPoint::g_Camera.yaw + 90.0f) * PI / 180.0f;
 
     const float sinYaw = std::sin(yaw);
     const float cosYaw = std::cos(yaw);
