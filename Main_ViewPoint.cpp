@@ -52,8 +52,11 @@ namespace ViewPoint
         const float yawRadians =
             g_Camera.yaw * VIEWPOINT_PI / 180.0f;
 
-        const float forwardX = -std::sin(yawRadians);
-        const float forwardZ = -std::cos(yawRadians);
+        // Match the world-space movement basis used earlier in this file:
+        // positive Z is north/up, yaw 0 points north, and the Isaac screen
+        // Y axis is inverted when converted to a 2D aim vector.
+        const float forwardX = std::sin(yawRadians);
+        const float forwardZ = std::cos(yawRadians);
 
         float value = 0.0f;
 
@@ -71,12 +74,12 @@ namespace ViewPoint
 
             // Shoot up
             case 6:
-                value = -forwardZ;
+                value = forwardZ;
                 break;
 
             // Shoot down
             case 7:
-                value = forwardZ;
+                value = -forwardZ;
                 break;
 
             default:
@@ -106,14 +109,16 @@ HOOK_METHOD(
             const float yawRadians =
                 ViewPoint::g_Camera.yaw * PI / 180.0f;
 
-            const float forwardX = -std::sin(yawRadians);
-            const float forwardZ = -std::cos(yawRadians);
+            const float forwardX = std::sin(yawRadians);
+            const float forwardZ = std::cos(yawRadians);
 
-            // Use the same camera-forward basis as the action input mapping.
-            // This keeps mouse aim and projectile fire in lockstep.
+            // Convert the ViewPoint world-space forward vector to Isaac's 2D
+            // screen-space aim basis. Isaac's Y axis points downward, so we
+            // invert the world Z component when translating from north/up to
+            // screen-space up/down.
             const Vector cameraAim(
                 forwardX,
-                forwardZ
+                -forwardZ
             );
 
             super(cameraAim, isShooting, isInterpolated);
