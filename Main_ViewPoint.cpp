@@ -52,11 +52,8 @@ namespace ViewPoint
         const float yawRadians =
             g_Camera.yaw * VIEWPOINT_PI / 180.0f;
 
-        // Isaac's 2D aim uses a screen-space Y that increases downward, so the
-        // camera-forward vector must be inverted on the vertical axis. This keeps
-        // the camera movement/yaw code unchanged while fixing the tear direction.
-        const float shootX = -std::sin(yawRadians);
-        const float shootY = -std::cos(yawRadians);
+        const float shootX = std::sin(yawRadians);
+        const float shootY = std::cos(yawRadians);
 
         return Vector(shootX, shootY);
     }
@@ -81,12 +78,12 @@ namespace ViewPoint
 
             // Shoot up
             case 6:
-                value = -cameraShoot.y;
+                value = cameraShoot.y;
                 break;
 
             // Shoot down
             case 7:
-                value = cameraShoot.y;
+                value = -cameraShoot.y;
                 break;
 
             default:
@@ -105,6 +102,18 @@ HOOK_METHOD(
     Fire,
     (const Vector& dir, bool isShooting, bool isInterpolated)->void)
 {
+    if (ViewPoint::IsMouseAiming() && g_Game)
+    {
+        Entity_Player* player = g_Game->GetPlayer(0);
+
+        if (player && GetOwner() == player)
+        {
+            const Vector cameraAim = ViewPoint::GetCameraShootVector();
+            super(cameraAim, isShooting, isInterpolated);
+            return;
+        }
+    }
+
     super(dir, isShooting, isInterpolated);
 }
 // ------------------------------------------------------------
