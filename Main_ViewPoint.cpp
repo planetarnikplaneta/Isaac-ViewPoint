@@ -176,25 +176,34 @@ HOOK_METHOD(
     const float rightX = cosYaw;
     const float rightZ = -sinYaw;
 
+    // Project the movement vector back onto the camera-local axes to avoid the
+    // per-cardinal swaps that happen when the input is mixed with world X/Z
+    // sign conventions.
     const float worldX =
-        -strafe * rightX + forward * forwardX;
+        strafe * rightX + forward * forwardX;
 
     const float worldZ =
         strafe * rightZ + forward * forwardZ;
 
+    const float localRight =
+        worldX * rightX + worldZ * rightZ;
+
+    const float localForward =
+        worldX * forwardX + worldZ * forwardZ;
+
     switch (action)
     {
         case 0:
-            return worldX < 0.0f ? -worldX : 0.0f;
+            return localRight < 0.0f ? -localRight : 0.0f;
 
         case 1:
-            return worldX > 0.0f ? worldX : 0.0f;
+            return localRight > 0.0f ? localRight : 0.0f;
 
         case 2:
-            return worldZ > 0.0f ? worldZ : 0.0f;
+            return localForward > 0.0f ? localForward : 0.0f;
 
         case 3:
-            return worldZ < 0.0f ? -worldZ : 0.0f;
+            return localForward < 0.0f ? -localForward : 0.0f;
     }
 
     return 0.0f;
