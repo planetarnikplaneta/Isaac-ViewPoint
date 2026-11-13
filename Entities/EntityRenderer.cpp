@@ -168,16 +168,32 @@ namespace ViewPoint
             if (!image)
                 return nullptr;
 
-            auto found = g_SpriteTextures.find(image);
-
-            if (found != g_SpriteTextures.end())
-                return &found->second;
-
             const int width =
                 static_cast<int>(image->GetWidth());
 
             const int height =
                 static_cast<int>(image->GetHeight());
+
+            auto found = g_SpriteTextures.find(image);
+
+            if (found != g_SpriteTextures.end())
+            {
+                if (found->second.width == width &&
+                    found->second.height == height)
+                {
+                    return &found->second;
+                }
+
+                if (found->second.id != 0)
+                {
+                    glDeleteTextures(1, &found->second.id);
+                    found->second.id = 0;
+                }
+
+                found->second.width = 0;
+                found->second.height = 0;
+                g_SpriteTextures.erase(found);
+            }
 
             if (width <= 0 || height <= 0)
                 return nullptr;
@@ -677,76 +693,6 @@ static void RenderSpriteLayer(
         }
 
         // ------------------------------------------------------------
-        // CAMERA CULLING
-        // ------------------------------------------------------------
-
-        static bool IsEntityVisibleToCamera(
-            const Entity *entity,
-            const Room *room)
-        {
-            if (!entity || !room)
-                return false;
-
-            const Vector *position = entity->GetPosition();
-
-            if (!position)
-                return false;
-
-            const WorldPoint world = IsaacToWorld(*position, room);
-
-            const float dx = world.x - g_Camera.position.x;
-            const float dz = world.z - g_Camera.position.z;
-            const float dy =
-                (world.y + GetEntityRenderHeightOffset(entity)) -
-                g_Camera.position.y;
-
-            const float distanceSq =
-                dx * dx + dy * dy + dz * dz;
-
-            const float farPlaneSq =
-                g_Camera.farPlane * g_Camera.farPlane;
-
-            if (distanceSq > farPlaneSq)
-                return false;
-
-            const float yawRadians =
-                g_Camera.yaw * PI / 180.0f;
-
-            const float cameraForwardX = std::sin(yawRadians);
-            const float cameraForwardZ = std::cos(yawRadians);
-            const float cameraRightX = std::cos(yawRadians);
-            const float cameraRightZ = -std::sin(yawRadians);
-
-            const float forwardDot =
-                dx * cameraForwardX +
-                dz * cameraForwardZ;
-
-            if (forwardDot <= 0.0f)
-                return false;
-
-            const float rightDot =
-                dx * cameraRightX +
-                dz * cameraRightZ;
-
-            const float halfFov =
-                g_Camera.fieldOfView * PI / 360.0f;
-
-            const float horizontalHalfWidth =
-                forwardDot * std::tan(halfFov) + 1.5f;
-
-            const float verticalHalfHeight =
-                horizontalHalfWidth * 0.75f + 1.5f;
-
-            if (std::fabs(rightDot) > horizontalHalfWidth)
-                return false;
-
-            if (std::fabs(dy) > verticalHalfHeight)
-                return false;
-
-            return true;
-        }
-
-        // ------------------------------------------------------------
         // COLLISION CAPSULE
         // ------------------------------------------------------------
 
@@ -1076,12 +1022,14 @@ static void RenderSpriteLayer(
             ClearSpriteTextureCache();
             g_TextureContext = currentContext;
         }
-
-        // Sprite-sheet pointers are reused by the game engine and can be recycled
-        // while the old OpenGL texture is still cached. Clearing the atlas cache
-        // each render pass prevents stale sprite IDs from being reused for a new
-        // entity's sheet, which caused tears to draw with enemy sprites.
-        ClearSpriteTextureCache();
+        else if (g_SpriteTextures.size() > 1024)
+        {
+            // Sprite-sheet pointers can be recycled by the game engine, but we do
+            // not need to rebuild the entire atlas cache every frame. A bounded
+            // invalidation keeps stale textures from lingering without stalling the
+            // render loop on a full OpenGL reupload for every sprite sheet.
+            ClearSpriteTextureCache();
+        }
 
         RenderState state{};
 
@@ -1120,9 +1068,6 @@ static void RenderSpriteLayer(
             {
                 continue;
             }
-
-            if (!IsEntityVisibleToCamera(entity, room))
-                continue;
 
             const Vector *entityPosition = entity->GetPosition();
 
