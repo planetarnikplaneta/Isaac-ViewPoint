@@ -61,7 +61,7 @@ namespace ViewPoint
         Model g_RoomModel;
 
         uint64_t ComputeRoomGridSignature(
-            const Room *room)
+            Room *room)
         {
             if (!room)
                 return 0;
@@ -96,7 +96,7 @@ namespace ViewPoint
                     continue;
                 }
 
-                const GridEntityDesc *desc = grid->GetDesc();
+                GridEntityDesc *desc = grid->GetDesc();
 
                 if (!desc)
                 {
@@ -112,7 +112,7 @@ namespace ViewPoint
 
             for (unsigned int i = 0; i < 8; ++i)
             {
-                const GridEntity *door = room->_doors[i];
+                GridEntity *door = room->_doors[i];
 
                 const uint32_t doorType =
                     door ? static_cast<uint32_t>(door->GetType()) : 0u;
