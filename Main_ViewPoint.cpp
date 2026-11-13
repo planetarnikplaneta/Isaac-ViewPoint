@@ -171,39 +171,28 @@ HOOK_METHOD(
     const float sinYaw = std::sin(yaw);
     const float cosYaw = std::cos(yaw);
 
-    const float forwardX = -sinYaw;
-    const float forwardZ = -cosYaw;
-    const float rightX = cosYaw;
-    const float rightZ = -sinYaw;
-
-    // Project the movement vector back onto the camera-local axes to avoid the
-    // per-cardinal swaps that happen when the input is mixed with world X/Z
-    // sign conventions.
+    // Standard camera-to-world rotation for a right-handed X/Z plane.
+    // This keeps the local forward/strafe axes consistent at every cardinal
+    // orientation without the alternating mirrored quadrant flips.
     const float worldX =
-        strafe * rightX + forward * forwardX;
+        strafe * cosYaw - forward * sinYaw;
 
     const float worldZ =
-        strafe * rightZ + forward * forwardZ;
-
-    const float localRight =
-        worldX * rightX + worldZ * rightZ;
-
-    const float localForward =
-        worldX * forwardX + worldZ * forwardZ;
+        strafe * sinYaw + forward * cosYaw;
 
     switch (action)
     {
         case 0:
-            return localRight < 0.0f ? -localRight : 0.0f;
+            return worldX < 0.0f ? -worldX : 0.0f;
 
         case 1:
-            return localRight > 0.0f ? localRight : 0.0f;
+            return worldX > 0.0f ? worldX : 0.0f;
 
         case 2:
-            return localForward > 0.0f ? localForward : 0.0f;
+            return worldZ > 0.0f ? worldZ : 0.0f;
 
         case 3:
-            return localForward < 0.0f ? -localForward : 0.0f;
+            return worldZ < 0.0f ? -worldZ : 0.0f;
     }
 
     return 0.0f;
