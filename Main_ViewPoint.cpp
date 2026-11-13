@@ -40,11 +40,43 @@ namespace ViewPoint
 {
     constexpr float VIEWPOINT_PI = 3.14159265358979323846f;
 
+    float GetMouseAimActionValue(int action);
+
     bool IsMouseAiming()
     {
         return g_Camera.enabled &&
                g_Camera.followPlayer &&
                (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
+    }
+
+    Vector GetMouseAimDirection()
+    {
+        const float left =
+            GetMouseAimActionValue(4);
+
+        const float right =
+            GetMouseAimActionValue(5);
+
+        const float up =
+            GetMouseAimActionValue(6);
+
+        const float down =
+            GetMouseAimActionValue(7);
+
+        Vector dir(
+            right - left,
+            up - down);
+
+        const float length =
+            std::sqrt(dir.x * dir.x + dir.y * dir.y);
+
+        if (length > 0.0001f)
+        {
+            dir.x /= length;
+            dir.y /= length;
+        }
+
+        return dir;
     }
 
     float GetMouseAimActionValue(int action)
@@ -103,16 +135,8 @@ HOOK_METHOD(
         {
             constexpr float PI = 3.14159265358979323846f;
 
-            const float yawRadians =
-                ViewPoint::g_Camera.yaw * PI / 180.0f;
-
-            const float forwardX = -std::sin(yawRadians);
-            const float forwardZ = std::cos(yawRadians);
-
-            const Vector cameraAim(
-                forwardX,
-                forwardZ
-            );
+            const Vector cameraAim =
+                ViewPoint::GetMouseAimDirection();
 
             super(cameraAim, isShooting, isInterpolated);
             return;
