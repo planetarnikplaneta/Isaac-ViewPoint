@@ -109,6 +109,82 @@ namespace ViewPoint
             return (std::min)(1.0f,
                               AMBIENT_LIGHT + DIFFUSE_LIGHT * diffuse);
         }
+
+        static bool IsWorldPositionVisible(
+            const Vertex3 &worldPosition,
+            float radius)
+        {
+            const float dx = worldPosition.x - g_Camera.position.x;
+            const float dy = worldPosition.y - g_Camera.position.y;
+            const float dz = worldPosition.z - g_Camera.position.z;
+
+            const float yawRadians =
+                g_Camera.yaw * PI / 180.0f;
+
+            const float pitchRadians =
+                g_Camera.pitch * PI / 180.0f;
+
+            const float cosYaw = std::cos(yawRadians);
+            const float sinYaw = std::sin(yawRadians);
+            const float cosPitch = std::cos(pitchRadians);
+            const float sinPitch = std::sin(pitchRadians);
+
+            const float forwardX = sinYaw * cosPitch;
+            const float forwardY = -sinPitch;
+            const float forwardZ = cosYaw * cosPitch;
+
+            const float rightX = cosYaw;
+            const float rightY = 0.0f;
+            const float rightZ = -sinYaw;
+
+            const float upX = -sinYaw * sinPitch;
+            const float upY = cosPitch;
+            const float upZ = -cosYaw * sinPitch;
+
+            const float viewX =
+                dx * rightX + dy * rightY + dz * rightZ;
+            const float viewY =
+                dx * upX + dy * upY + dz * upZ;
+            const float viewZ =
+                dx * forwardX + dy * forwardY + dz * forwardZ;
+
+            if (viewZ <= -radius)
+                return false;
+
+            GLint viewport[4] = {};
+            glGetIntegerv(GL_VIEWPORT, viewport);
+
+            const float aspect =
+                viewport[2] > 0 && viewport[3] > 0
+                    ? static_cast<float>(viewport[2]) /
+                          static_cast<float>(viewport[3])
+                    : 1.7777778f;
+
+            const float halfFovTan =
+                std::tan(
+                    g_Camera.fieldOfView *
+                    PI / 360.0f);
+
+            const float distance = (std::max)(0.1f, viewZ);
+            const float halfHeight = halfFovTan * distance;
+            const float halfWidth = halfHeight * aspect;
+
+            return std::fabs(viewX) <= halfWidth + radius &&
+                   std::fabs(viewY) <= halfHeight + radius;
+        }
+
+        static bool IsModelVisible(const Model &model)
+        {
+            if (!model.loaded)
+                return false;
+
+            const float radius =
+                (std::max)(1.0f, std::fabs(model.scale)) * 1.5f;
+
+            return IsWorldPositionVisible(
+                model.position,
+                radius);
+        }
         // OPENGL FUNCTION LOADING
 
         static PROC GetGLProc(const char *name)
@@ -653,6 +729,9 @@ namespace ViewPoint
         static void RenderModel(Model &model)
         {
             if (!model.loaded)
+                return;
+
+            if (!IsModelVisible(model))
                 return;
 
             GLint viewport[4] = {};
