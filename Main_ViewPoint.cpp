@@ -110,8 +110,8 @@ HOOK_METHOD(
             const float forwardZ = std::cos(yawRadians);
 
             const Vector cameraAim(
-                forwardX,
-                forwardZ
+                -forwardX,
+                -forwardZ
             );
 
             super(cameraAim, isShooting, isInterpolated);
