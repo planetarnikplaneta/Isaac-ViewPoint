@@ -274,11 +274,11 @@ namespace ViewPoint
 
             if (g_Camera.followPlayer)
             {
-                g_Camera.yaw -= yawChange;
+                g_Camera.yaw += yawChange;
             }
             else
             {
-                g_Camera.yaw -= yawChange;
+                g_Camera.yaw += yawChange;
             }
 
             g_Camera.pitch -= pitchChange;
