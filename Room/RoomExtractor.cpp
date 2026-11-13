@@ -351,10 +351,10 @@ namespace ViewPoint
             const int texcoordBase =
                 static_cast<int>(model.texcoords.size());
 
-            model.texcoords.push_back({0.0f, 0.0f});
-            model.texcoords.push_back({1.0f, 0.0f});
             model.texcoords.push_back({1.0f, 1.0f});
             model.texcoords.push_back({0.0f, 1.0f});
+            model.texcoords.push_back({0.0f, 0.0f});
+            model.texcoords.push_back({1.0f, 0.0f});
 
             AddQuad(
                 model,
