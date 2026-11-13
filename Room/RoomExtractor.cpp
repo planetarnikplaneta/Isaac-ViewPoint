@@ -56,8 +56,50 @@ namespace ViewPoint
         Room *g_LastRoom = nullptr;
         int g_LastRoomIndex = -1;
         int g_LastDimension = -1;
+        std::uint64_t g_LastRoomLayoutHash = 0;
 
         Model g_RoomModel;
+
+        std::uint64_t ComputeRoomLayoutHash(const Room *room)
+        {
+            if (!room)
+                return 0;
+
+            std::uint64_t hash = 14695981039346656037ull;
+
+            const auto mix = [&hash](std::uint64_t value)
+            {
+                hash ^= value + 0x9e3779b97f4a7c15ull +
+                        (hash << 6) + (hash >> 2);
+            };
+
+            mix(static_cast<std::uint64_t>(room->_gridWidth));
+            mix(static_cast<std::uint64_t>(room->_gridHeight));
+
+            const unsigned int width = room->_gridWidth;
+            const unsigned int height = room->_gridHeight;
+            const unsigned int cellCount = width * height;
+
+            for (unsigned int i = 0; i < cellCount; ++i)
+            {
+                GridEntity *grid = room->GetGridEntity(i);
+                const int type = grid ? static_cast<int>(grid->GetType()) : -1;
+                mix(static_cast<std::uint64_t>(type + 1));
+            }
+
+            for (int slot = 0; slot < 8; ++slot)
+            {
+                GridEntity *door = room->_doors[slot];
+                const std::uint64_t doorValue =
+                    door ? (static_cast<std::uint64_t>(slot + 1) << 32) |
+                              static_cast<std::uint64_t>(room->_doorGridPositions[slot])
+                         : 0;
+
+                mix(doorValue);
+            }
+
+            return hash;
+        }
         void DiagnoseFloorImage(
             const char *name,
             KAGE_Graphics_ImageBase *image)
@@ -1289,6 +1331,7 @@ namespace ViewPoint
             g_LastRoom = nullptr;
             g_LastRoomIndex = -1;
             g_LastDimension = -1;
+            g_LastRoomLayoutHash = 0;
 
             ResetRoomModel();
             return;
@@ -1300,9 +1343,13 @@ namespace ViewPoint
         const int dimension =
             g_Game->GetDimension();
 
+        const std::uint64_t roomLayoutHash =
+            ComputeRoomLayoutHash(room);
+
         if (room == g_LastRoom &&
             roomIndex == g_LastRoomIndex &&
-            dimension == g_LastDimension)
+            dimension == g_LastDimension &&
+            roomLayoutHash == g_LastRoomLayoutHash)
         {
             if (g_RoomModel.materials.size() > MAT_FLOOR)
             {
@@ -1317,6 +1364,7 @@ namespace ViewPoint
         g_LastRoom = room;
         g_LastRoomIndex = roomIndex;
         g_LastDimension = dimension;
+        g_LastRoomLayoutHash = roomLayoutHash;
 
         ResetRoomModel();
 
