@@ -59,6 +59,72 @@ namespace ViewPoint
         uint64_t g_LastRoomGridSignature = 0;
 
         Model g_RoomModel;
+
+        uint64_t ComputeRoomGridSignature(
+            const Room *room)
+        {
+            if (!room)
+                return 0;
+
+            const unsigned int width =
+                static_cast<unsigned int>(room->_gridWidth);
+
+            const unsigned int height =
+                static_cast<unsigned int>(room->_gridHeight);
+
+            const unsigned int cellCount = width * height;
+
+            uint64_t hash = 14695981039346656037ull;
+
+            const auto mix = [&hash](uint64_t value)
+            {
+                hash ^= value + 0x9e3779b97f4a7c15ull +
+                        (hash << 6) + (hash >> 2);
+            };
+
+            mix(static_cast<uint64_t>(width));
+            mix(static_cast<uint64_t>(height));
+            mix(static_cast<uint64_t>(room->_roomType));
+
+            for (unsigned int i = 0; i < cellCount; ++i)
+            {
+                GridEntity *grid = room->GetGridEntity(i);
+
+                if (!grid)
+                {
+                    mix(0ull);
+                    continue;
+                }
+
+                const GridEntityDesc *desc = grid->GetDesc();
+
+                if (!desc)
+                {
+                    mix(0ull);
+                    continue;
+                }
+
+                mix(static_cast<uint64_t>(desc->_type));
+                mix(static_cast<uint64_t>(desc->_variant));
+                mix(static_cast<uint64_t>(desc->_state));
+                mix(static_cast<uint64_t>(desc->_varData));
+            }
+
+            for (unsigned int i = 0; i < 8; ++i)
+            {
+                const GridEntity *door = room->_doors[i];
+
+                const uint32_t doorType =
+                    door ? static_cast<uint32_t>(door->GetType()) : 0u;
+
+                mix(static_cast<uint64_t>(doorType + 1u) +
+                    static_cast<uint64_t>(i * 131u));
+                mix(static_cast<uint64_t>(room->_doorGridPositions[i]) +
+                    static_cast<uint64_t>(i * 17u));
+            }
+
+            return hash;
+        }
         void DiagnoseFloorImage(
             const char *name,
             KAGE_Graphics_ImageBase *image)
@@ -1219,61 +1285,6 @@ namespace ViewPoint
                 g_RoomModel.triangles.size());
 
             return true;
-        }
-
-        uint64_t ComputeRoomGridSignature(
-            const Room *room)
-        {
-            if (!room)
-                return 0;
-
-            const unsigned int width =
-                static_cast<unsigned int>(room->_gridWidth);
-
-            const unsigned int height =
-                static_cast<unsigned int>(room->_gridHeight);
-
-            const unsigned int cellCount = width * height;
-
-            uint64_t hash = 14695981039346656037ull;
-
-            hash ^= static_cast<uint64_t>(width) + 0x9e3779b97f4a7c15ull;
-            hash *= 1099511628211ull;
-
-            hash ^= static_cast<uint64_t>(height) + 0x9e3779b97f4a7c15ull;
-            hash *= 1099511628211ull;
-
-            for (unsigned int i = 0; i < cellCount; ++i)
-            {
-                const GridEntity *grid =
-                    room->GetGridEntity(i);
-
-                const uint32_t type =
-                    grid ? static_cast<uint32_t>(grid->GetType()) : 0u;
-
-                hash ^= static_cast<uint64_t>(type + 1u) +
-                    static_cast<uint64_t>(i * 131u);
-                hash *= 1099511628211ull;
-            }
-
-            for (unsigned int i = 0; i < 8; ++i)
-            {
-                const GridEntity *door =
-                    room->_doors[i];
-
-                const uint32_t doorType =
-                    door ? static_cast<uint32_t>(door->GetType()) : 0u;
-
-                hash ^= static_cast<uint64_t>(doorType + 1u) +
-                    static_cast<uint64_t>(i * 131u);
-                hash *= 1099511628211ull;
-
-                hash ^= static_cast<uint64_t>(room->_doorGridPositions[i]) +
-                    static_cast<uint64_t>(i * 17u);
-                hash *= 1099511628211ull;
-            }
-
-            return hash;
         }
 
         void LogRoom(
