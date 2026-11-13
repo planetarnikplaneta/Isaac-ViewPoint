@@ -563,19 +563,34 @@ namespace ViewPoint
             AddTriangle(model, materialIndex, base + 3, base + 4, base);
         }
 
-        void AddWallBlock(
+        void AddWallSegment(
             Model &model,
             float centerX,
-            float centerZ)
+            float centerZ,
+            float halfWidth,
+            float halfDepth)
         {
             AddBox(
                 model,
                 MAT_WALL,
                 centerX,
                 centerZ,
-                TILE_SIZE * 0.5f,
+                halfWidth,
                 FLOOR_Y,
                 WALL_TOP_Y,
+                halfDepth);
+        }
+
+        void AddWallBlock(
+            Model &model,
+            float centerX,
+            float centerZ)
+        {
+            AddWallSegment(
+                model,
+                centerX,
+                centerZ,
+                TILE_SIZE * 0.5f,
                 TILE_SIZE * 0.5f);
         }
 
@@ -1043,6 +1058,10 @@ namespace ViewPoint
             unsigned int webCount = 0;
             unsigned int objectCount = 0;
 
+            std::vector<unsigned char> wallMask(
+                cellCount,
+                0);
+
             for (unsigned int i = 0; i < cellCount; ++i)
             {
                 GridEntity *grid =
@@ -1053,6 +1072,19 @@ namespace ViewPoint
 
                 const int entityType =
                     static_cast<int>(grid->GetType());
+
+                if (entityType == GRID_DOOR)
+                {
+                    ++doorCount;
+                    continue;
+                }
+
+                if (entityType == GRID_WALL)
+                {
+                    wallMask[i] = 1;
+                    ++wallCount;
+                    continue;
+                }
 
                 const unsigned int row = i / width;
                 const unsigned int column = i % width;
@@ -1070,19 +1102,6 @@ namespace ViewPoint
                      static_cast<float>(row)) *
                     TILE_SIZE;
 
-                if (entityType == GRID_DOOR)
-                {
-                    ++doorCount;
-                    continue;
-                }
-
-                if (entityType == GRID_WALL)
-                {
-                    AddWallBlock(model, centerX, centerZ);
-                    ++wallCount;
-                    continue;
-                }
-
                 AddGridEntityGeometry(
                     model,
                     entityType,
@@ -1093,6 +1112,88 @@ namespace ViewPoint
                     spikeCount,
                     webCount,
                     objectCount);
+            }
+
+            std::vector<unsigned char> wallProcessed(
+                cellCount,
+                0);
+
+            for (unsigned int row = 0; row < height; ++row)
+            {
+                for (unsigned int column = 0; column < width; ++column)
+                {
+                    const unsigned int index = row * width + column;
+
+                    if (!wallMask[index] || wallProcessed[index])
+                        continue;
+
+                    unsigned int spanWidth = 1;
+                    while (column + spanWidth < width)
+                    {
+                        const unsigned int nextIndex =
+                            row * width + (column + spanWidth);
+
+                        if (!wallMask[nextIndex] || wallProcessed[nextIndex])
+                            break;
+
+                        ++spanWidth;
+                    }
+
+                    unsigned int spanHeight = 1;
+                    while (row + spanHeight < height)
+                    {
+                        bool rowFull = true;
+
+                        for (unsigned int x = 0; x < spanWidth; ++x)
+                        {
+                            const unsigned int nextIndex =
+                                (row + spanHeight) * width +
+                                (column + x);
+
+                            if (!wallMask[nextIndex] ||
+                                wallProcessed[nextIndex])
+                            {
+                                rowFull = false;
+                                break;
+                            }
+                        }
+
+                        if (!rowFull)
+                            break;
+
+                        ++spanHeight;
+                    }
+
+                    const float centerX =
+                        ((static_cast<float>(width) - 1.0f) * 0.5f -
+                         (static_cast<float>(column) +
+                          (static_cast<float>(spanWidth) - 1.0f) * 0.5f)) *
+                        TILE_SIZE;
+
+                    const float centerZ =
+                        ((static_cast<float>(height) - 1.0f) * 0.5f -
+                         (static_cast<float>(row) +
+                          (static_cast<float>(spanHeight) - 1.0f) * 0.5f)) *
+                        TILE_SIZE;
+
+                    AddWallSegment(
+                        model,
+                        centerX,
+                        centerZ,
+                        (static_cast<float>(spanWidth) * 0.5f) * TILE_SIZE,
+                        (static_cast<float>(spanHeight) * 0.5f) * TILE_SIZE);
+
+                    for (unsigned int y = 0; y < spanHeight; ++y)
+                    {
+                        for (unsigned int x = 0; x < spanWidth; ++x)
+                        {
+                            const unsigned int markIndex =
+                                (row + y) * width + (column + x);
+
+                            wallProcessed[markIndex] = 1;
+                        }
+                    }
+                }
             }
 
             model.loaded = true;
