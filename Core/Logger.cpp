@@ -38,6 +38,20 @@ namespace ViewPoint
         OutputDebugStringA("\n");
     }
 
+    void LogNumber(const char* label, long long value)
+    {
+        char buffer[256];
+
+        sprintf_s(
+            buffer,
+            "%s: %lld",
+            label ? label : "",
+            value
+        );
+
+        LogMessage(buffer);
+    }
+
     void LogNumber(const char* label, unsigned long long value)
     {
         char buffer[256];
@@ -50,5 +64,24 @@ namespace ViewPoint
         );
 
         LogMessage(buffer);
+    }
+
+    void LogNumber(const char* label, double value)
+    {
+        char buffer[256];
+
+        sprintf_s(
+            buffer,
+            "%s: %.6f",
+            label ? label : "",
+            value
+        );
+
+        LogMessage(buffer);
+    }
+
+    void LogNumber(const char* label, float value)
+    {
+        LogNumber(label, static_cast<double>(value));
     }
 }
