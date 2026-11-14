@@ -351,8 +351,9 @@ namespace ViewPoint
             y = oldX * sine + oldY * cosine;
         }
 
-        static bool BuildSpriteQuad(
-            Entity *entity,
+        static bool BuildSpriteQuadAtWorldPosition(
+            const WorldPoint &base,
+            float spriteHeightOffset,
             Room *room,
             ANM2 *sprite,
             LayerState *layer,
@@ -362,7 +363,7 @@ namespace ViewPoint
             float cameraRightZ,
             SpriteVertex (&vertices)[4])
         {
-            if (!entity || !room || !sprite ||
+            if (!room || !sprite ||
                 !layer || !frame || !texture)
             {
                 return false;
@@ -374,17 +375,8 @@ namespace ViewPoint
                 return false;
             }
 
-            const Vector *entityPosition =
-                entity->GetPosition();
-
-            if (!entityPosition)
-                return false;
-
-            const WorldPoint base =
-                IsaacToWorld(*entityPosition, room);
-
             const float entityHeightOffset =
-                GetEntityRenderHeightOffset(entity);
+                spriteHeightOffset;
 
             // Atlas rectangle.
             const float cropX = frame->crop.x;
@@ -518,139 +510,204 @@ namespace ViewPoint
             return true;
         }
 
+        static bool BuildSpriteQuad(
+            Entity *entity,
+            Room *room,
+            ANM2 *sprite,
+            LayerState *layer,
+            AnimationFrame *frame,
+            SpriteTexture *texture,
+            float cameraRightX,
+            float cameraRightZ,
+            SpriteVertex (&vertices)[4])
+        {
+            if (!entity || !room || !sprite ||
+                !layer || !frame || !texture)
+            {
+                return false;
+            }
+
+            const Vector *entityPosition =
+                entity->GetPosition();
+
+            if (!entityPosition)
+                return false;
+
+            const WorldPoint base =
+                IsaacToWorld(*entityPosition, room);
+
+            const float entityHeightOffset =
+                GetEntityRenderHeightOffset(entity);
+
+            return BuildSpriteQuadAtWorldPosition(
+                base,
+                entityHeightOffset,
+                room,
+                sprite,
+                layer,
+                frame,
+                texture,
+                cameraRightX,
+                cameraRightZ,
+                vertices);
+        }
+
         // ------------------------------------------------------------
         // ONE ANIMATION LAYER
         // ------------------------------------------------------------
 
+        static void RenderSpriteLayerAtWorldPosition(
+            const Vector &position,
+            Room *room,
+            ANM2 *sprite,
+            AnimationState *animationState,
+            AnimationLayer *animationLayer,
+            float heightOffset,
+            float cameraRightX,
+            float cameraRightZ)
+        {
+            if (!room || !sprite ||
+                !animationState || !animationLayer)
+                return;
 
-static void RenderSpriteLayer(
-    Entity* entity,
-    Room* room,
-    ANM2* sprite,
-    AnimationState* animationState,
-    AnimationLayer* animationLayer,
-    float cameraRightX,
-    float cameraRightZ)
-{
-    if (!entity || !room || !sprite ||
-        !animationState || !animationLayer)
-        return;
+            if (!animationState->_layerFrames ||
+                !animationState->_animData)
+                return;
 
-    if (!animationState->_layerFrames ||
-        !animationState->_animData)
-        return;
+            const int layerID = animationLayer->_layerID;
 
-    const int layerID = animationLayer->_layerID;
+            if (layerID < 0 || layerID >= 64)
+                return;
 
-    if (layerID < 0 || layerID >= 64)
-        return;
+            const int frameIndex =
+                animationState->_layerFrames[layerID];
 
-    // Animation frame storage is indexed by layer ID,
-    // not by animation draw order.
-    const int frameIndex =
-        animationState->_layerFrames[layerID];
+            if (frameIndex < 0)
+                return;
 
-    if (frameIndex < 0)
-        return;
+            AnimationFrame *frame =
+                animationLayer->GetFrame(frameIndex);
 
-    AnimationFrame* frame =
-        animationLayer->GetFrame(frameIndex);
+            if (!frame)
+                return;
 
-    if (!frame)
-        return;
+            if (!animationLayer->IsVisible() ||
+                !frame->visible)
+                return;
 
-    if (!animationLayer->IsVisible() ||
-        !frame->visible)
-        return;
+            LayerState *layer =
+                sprite->GetLayer(layerID);
 
-    // Get the corresponding ANM2 layer state.
-    LayerState* layer =
-        sprite->GetLayer(layerID);
+            if (!layer || !layer->_visible)
+                return;
 
-    if (!layer || !layer->_visible)
-        return;
+            if (!layer->_spriteSheetLoaded)
+                return;
 
-    if (!layer->_spriteSheetLoaded)
-        return;
+            KAGE_SmartPointer_ImageBase sheet =
+                layer->GetSpriteSheet();
 
-    KAGE_SmartPointer_ImageBase sheet =
-        layer->GetSpriteSheet();
+            if (!sheet.image)
+                return;
 
-    if (!sheet.image)
-        return;
+            SpriteTexture *texture =
+                GetSpriteTexture(sheet.image);
 
-    SpriteTexture* texture =
-        GetSpriteTexture(sheet.image);
+            if (!texture || !texture->id)
+                return;
 
-    if (!texture || !texture->id)
-        return;
+            SpriteVertex vertices[4]{};
+            const WorldPoint base =
+                IsaacToWorld(position, room);
 
-    SpriteVertex vertices[4]{};
+            if (!BuildSpriteQuadAtWorldPosition(
+                    base,
+                    heightOffset,
+                    room,
+                    sprite,
+                    layer,
+                    frame,
+                    texture,
+                    cameraRightX,
+                    cameraRightZ,
+                    vertices))
+                return;
 
-    if (!BuildSpriteQuad(
-            entity,
-            room,
-            sprite,
-            layer,
-            frame,
-            texture,
-            cameraRightX,
-            cameraRightZ,
-            vertices))
-        return;
+            float red;
+            float green;
+            float blue;
+            float alpha;
 
-    float red;
-    float green;
-    float blue;
-    float alpha;
+            GetSpriteColor(
+                sprite,
+                layer,
+                frame,
+                red,
+                green,
+                blue,
+                alpha);
 
-    GetSpriteColor(
-        sprite,
-        layer,
-        frame,
-        red,
-        green,
-        blue,
-        alpha);
+            if (alpha <= 0.001f)
+                return;
 
-    if (alpha <= 0.001f)
-        return;
+            glBindTexture(GL_TEXTURE_2D, texture->id);
+            glColor4f(red, green, blue, alpha);
 
-    glBindTexture(GL_TEXTURE_2D, texture->id);
-    glColor4f(red, green, blue, alpha);
+            glBegin(GL_QUADS);
 
-    glBegin(GL_QUADS);
+            for (int i = 0; i < 4; ++i)
+            {
+                glTexCoord2f(vertices[i].u, vertices[i].v);
+                glVertex3f(vertices[i].x, vertices[i].y, vertices[i].z);
+            }
 
-    for (int i = 0; i < 4; ++i)
-    {
-        glTexCoord2f(vertices[i].u, vertices[i].v);
-        glVertex3f(vertices[i].x, vertices[i].y, vertices[i].z);
-    }
+            glEnd();
+        }
 
-    glEnd();
-}
+        static void RenderSpriteLayer(
+            Entity* entity,
+            Room* room,
+            ANM2* sprite,
+            AnimationState* animationState,
+            AnimationLayer* animationLayer,
+            float cameraRightX,
+            float cameraRightZ)
+        {
+            if (!entity || !room || !sprite ||
+                !animationState || !animationLayer)
+                return;
+
+            const Vector *entityPosition =
+                entity->GetPosition();
+
+            if (!entityPosition)
+                return;
+
+            RenderSpriteLayerAtWorldPosition(
+                *entityPosition,
+                room,
+                sprite,
+                animationState,
+                animationLayer,
+                GetEntityRenderHeightOffset(entity),
+                cameraRightX,
+                cameraRightZ);
+        }
 
         // ------------------------------------------------------------
         // ENTITY SPRITE
         // ------------------------------------------------------------
 
-        static void RenderEntitySprite(
-            Entity *entity,
+        static void RenderANM2SpriteAtPosition(
+            ANM2 *sprite,
+            const Vector &position,
             Room *room,
+            float heightOffset,
             float cameraRightX,
             float cameraRightZ)
         {
-            if (!entity || !room)
+            if (!sprite || !room)
                 return;
-
-            if (!entity->_exists ||
-                entity->_dead ||
-                !entity->_visible)
-            {
-                return;
-            }
-
-            ANM2 *sprite = &entity->_sprite;
 
             if (!sprite->_loaded ||
                 !sprite->_layerState ||
@@ -677,8 +734,6 @@ static void RenderSpriteLayer(
                 return;
             }
 
-            // AnimationData's order is the draw order.
-            // The ANM2 layer state is retrieved separately by ID.
             for (int i = 0; i < animationData->_layerCount; ++i)
             {
                 AnimationLayer* animationLayer =
@@ -687,12 +742,79 @@ static void RenderSpriteLayer(
                 if (!animationLayer)
                     continue;
 
-                RenderSpriteLayer(
-                    entity,
+                RenderSpriteLayerAtWorldPosition(
+                    position,
                     room,
                     sprite,
                     animationState,
                     animationLayer,
+                    heightOffset,
+                    cameraRightX,
+                    cameraRightZ);
+            }
+        }
+
+        static void RenderEntitySprite(
+            Entity *entity,
+            Room *room,
+            float cameraRightX,
+            float cameraRightZ)
+        {
+            if (!entity || !room)
+                return;
+
+            if (!entity->_exists ||
+                entity->_dead ||
+                !entity->_visible)
+            {
+                return;
+            }
+
+            const Vector *entityPosition =
+                entity->GetPosition();
+
+            if (!entityPosition)
+                return;
+
+            RenderANM2SpriteAtPosition(
+                &entity->_sprite,
+                *entityPosition,
+                room,
+                GetEntityRenderHeightOffset(entity),
+                cameraRightX,
+                cameraRightZ);
+        }
+
+        static void RenderGridDoorSprite(
+            GridEntity *gridDoor,
+            Room *room,
+            float cameraRightX,
+            float cameraRightZ)
+        {
+            if (!gridDoor || !room)
+                return;
+
+            Vector renderPosition(0.0f, 0.0f);
+            gridDoor->GetRenderPosition(&renderPosition);
+
+            RenderANM2SpriteAtPosition(
+                &gridDoor->_sprite,
+                renderPosition,
+                room,
+                0.0f,
+                cameraRightX,
+                cameraRightZ);
+
+            if (gridDoor->GetType() == GRID_DOOR)
+            {
+                auto *door =
+                    static_cast<GridEntity_Door *>(gridDoor);
+
+                RenderANM2SpriteAtPosition(
+                    &door->_extraSprite,
+                    renderPosition,
+                    room,
+                    0.0f,
                     cameraRightX,
                     cameraRightZ);
             }
@@ -1127,6 +1249,24 @@ static void RenderSpriteLayer(
         }
 
         glDepthMask(GL_TRUE);
+
+        // ------------------------------------------------------------
+        // GRID DOOR SPRITES
+        // ------------------------------------------------------------
+
+        for (int slot = 0; slot < 8; ++slot)
+        {
+            GridEntity *gridDoor = room->_doors[slot];
+
+            if (!gridDoor)
+                continue;
+
+            RenderGridDoorSprite(
+                gridDoor,
+                room,
+                cameraRightX,
+                cameraRightZ);
+        }
 
         // ------------------------------------------------------------
         // COLLISION OUTLINES
