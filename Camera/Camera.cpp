@@ -17,13 +17,13 @@ namespace ViewPoint
 
         // Isaac grid coordinates use 40 pixels per tile.
         // ViewPoint uses one world unit per tile.
-        constexpr float ISAAC_PIXELS_PER_TILE = 30.0f;
+        constexpr float ISAAC_PIXELS_PER_TILE = 40.0f;
 
         // RoomExtractor uses FLOOR_Y = -1.0f.
         constexpr float ROOM_FLOOR_Y = -1.0f;
 
         // Camera height above the room floor.
-        constexpr float PLAYER_EYE_HEIGHT = 0.4f;
+        constexpr float PLAYER_EYE_HEIGHT = 0.3f;
 
         bool KeyDown(int key)
         {
