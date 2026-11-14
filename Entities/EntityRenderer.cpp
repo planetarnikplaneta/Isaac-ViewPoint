@@ -539,8 +539,87 @@ namespace ViewPoint
             if (doorSlot < 0)
                 return 0.0f;
 
-            const int side = doorSlot % 4;
-            return static_cast<float>((side + 3) % 4) * 90.0f;
+            switch (doorSlot)
+            {
+                case 0:
+                case 4:
+                    return 90.0f;
+                case 1:
+                case 5:
+                    return 180.0f;
+                case 2:
+                case 6:
+                    return 270.0f;
+                case 3:
+                case 7:
+                    return 0.0f;
+                default:
+                    return 0.0f;
+            }
+        }
+
+        static void GetDoorWallCenter(
+            const Room *room,
+            int doorSlot,
+            float &centerX,
+            float &centerZ)
+        {
+            centerX = 0.0f;
+            centerZ = 0.0f;
+
+            if (!room)
+                return;
+
+            const float halfRoomWidth =
+                (static_cast<float>(room->_gridWidth) * 0.5f - 0.5f) *
+                TILE_SIZE;
+
+            const float halfRoomHeight =
+                (static_cast<float>(room->_gridHeight) * 0.5f - 0.5f) *
+                TILE_SIZE;
+
+            const float leftX = -halfRoomWidth + 0.5f;
+            const float rightX = halfRoomWidth - 0.5f;
+            const float topZ = -halfRoomHeight + 0.5f;
+            const float bottomZ = halfRoomHeight - 0.5f;
+
+            switch (doorSlot)
+            {
+                case 0:
+                    centerX = leftX;
+                    centerZ = topZ;
+                    break;
+                case 1:
+                    centerX = leftX;
+                    centerZ = topZ;
+                    break;
+                case 2:
+                    centerX = rightX;
+                    centerZ = topZ;
+                    break;
+                case 3:
+                    centerX = leftX;
+                    centerZ = bottomZ;
+                    break;
+                case 4:
+                    centerX = leftX;
+                    centerZ = bottomZ;
+                    break;
+                case 5:
+                    centerX = rightX;
+                    centerZ = topZ;
+                    break;
+                case 6:
+                    centerX = rightX;
+                    centerZ = bottomZ;
+                    break;
+                case 7:
+                    centerX = rightX;
+                    centerZ = bottomZ;
+                    break;
+                default:
+                    break;
+            }
         }
 
         static WorldPoint GetDoorRenderWorldPosition(
@@ -553,29 +632,13 @@ namespace ViewPoint
             if (!room || !door)
                 return result;
 
-            Vector position(0.0f, 0.0f);
-            door->GetRenderPosition(&position);
-            result = IsaacToWorld(position, room);
+            float centerX = 0.0f;
+            float centerZ = 0.0f;
+            GetDoorWallCenter(room, doorSlot, centerX, centerZ);
 
-            constexpr float INSET_INTO_ROOM = 0.42f;
-
-            switch (doorSlot % 4)
-            {
-                case 0:
-                    result.x -= INSET_INTO_ROOM;
-                    break;
-                case 1:
-                    result.z -= INSET_INTO_ROOM;
-                    break;
-                case 2:
-                    result.x += INSET_INTO_ROOM;
-                    break;
-                case 3:
-                    result.z += INSET_INTO_ROOM;
-                    break;
-                default:
-                    break;
-            }
+            result.x = centerX;
+            result.y = FLOOR_Y + 0.09f;
+            result.z = centerZ;
 
             return result;
         }
@@ -587,9 +650,8 @@ namespace ViewPoint
             AnimationFrame *frame,
             SpriteTexture *texture,
             const WorldPoint &base,
+            int doorSlot,
             float extraRotationDegrees,
-            float cameraRightX,
-            float cameraRightZ,
             SpriteVertex (&vertices)[4])
         {
             if (!room || !sprite || !layer || !frame || !texture)
@@ -628,98 +690,78 @@ namespace ViewPoint
             if (layer->_flipY != sprite->_flipY)
                 std::swap(v0, v1);
 
-            const float scaleX =
-                frame->scale.x * sprite->_scale.x;
-
-            const float scaleY =
-                frame->scale.y * sprite->_scale.y;
-
-            const float width =
-                cropWidth * std::fabs(scaleX);
-
-            const float height =
-                cropHeight * std::fabs(scaleY);
-
-            if (width <= 0.001f || height <= 0.001f)
-                return false;
-
-            const float left =
-                frame->pos.x +
-                layer->_pos.x +
-                sprite->_offset.x -
-                frame->pivot.x;
-
-            const float top =
-                frame->pos.y +
-                layer->_pos.y +
-                sprite->_offset.y -
-                frame->pivot.y;
-
-            const float rotation =
-                (frame->rotation +
-                 layer->_rotation +
-                 sprite->_rotation +
-                 extraRotationDegrees) *
-                PI / 180.0f;
-
-            float localX[4] =
-                {
-                    left,
-                    left + width,
-                    left + width,
-                    left};
-
-            float localY[4] =
-                {
-                    top,
-                    top,
-                    top + height,
-                    top + height};
-
-            for (int i = 0; i < 4; ++i)
-            {
-                RotateSpritePoint(
-                    localX[i],
-                    localY[i],
-                    rotation);
-            }
+            const float scaleX = frame->scale.x * sprite->_scale.x;
+            const float scaleY = frame->scale.y * sprite->_scale.y;
+            const float widthTile = cropWidth * std::fabs(scaleX) / PIXELS_PER_TILE;
+            const float heightTile = cropHeight * std::fabs(scaleY) / PIXELS_PER_TILE;
+            const float tangentHalf = widthTile * 0.5f;
+            const float wallInset = 0.02f;
+            const float halfWidth = tangentHalf + wallInset;
+            const float halfHeight = heightTile * 0.5f;
 
             const float u[4] = {u0, u1, u1, u0};
             const float v[4] = {v0, v0, v1, v1};
 
+            const bool leftRightWall =
+                (doorSlot == 0 || doorSlot == 2 || doorSlot == 4 || doorSlot == 6);
+
+            if (leftRightWall)
+            {
+                const float x = base.x;
+                const float z0 = base.z - halfWidth;
+                const float z1 = base.z + halfWidth;
+                const float y0 = base.y;
+                const float y1 = base.y + heightTile;
+
+                vertices[0] = {x, y0, z0};
+                vertices[1] = {x, y0, z1};
+                vertices[2] = {x, y1, z1};
+                vertices[3] = {x, y1, z0};
+            }
+            else
+            {
+                const float z = base.z;
+                const float x0 = base.x - halfWidth;
+                const float x1 = base.x + halfWidth;
+                const float y0 = base.y;
+                const float y1 = base.y + heightTile;
+
+                vertices[0] = {x0, y0, z};
+                vertices[1] = {x1, y0, z};
+                vertices[2] = {x1, y1, z};
+                vertices[3] = {x0, y1, z};
+            }
+
+            const float rotationRadians = extraRotationDegrees * PI / 180.0f;
+            const float cosA = std::cos(rotationRadians);
+            const float sinA = std::sin(rotationRadians);
+
             for (int i = 0; i < 4; ++i)
             {
-                const float horizontal =
-                    localX[i] / PIXELS_PER_TILE;
+                const float localX = vertices[i].x - base.x;
+                const float localY = vertices[i].y - base.y;
+                const float localZ = vertices[i].z - base.z;
 
-                const float vertical =
-                    localY[i] / PIXELS_PER_TILE;
+                float rotatedLocalX = localX;
+                float rotatedLocalY = localY;
+                float rotatedLocalZ = localZ;
 
-                vertices[i].x =
-                    base.x +
-                    cameraRightX * horizontal;
+                if (leftRightWall)
+                {
+                    rotatedLocalZ = localZ * cosA - localY * sinA;
+                    rotatedLocalY = localZ * sinA + localY * cosA;
+                }
+                else
+                {
+                    rotatedLocalX = localX * cosA - localY * sinA;
+                    rotatedLocalY = localX * sinA + localY * cosA;
+                }
 
-                vertices[i].y =
-                    base.y - vertical;
-
-                vertices[i].z =
-                    base.z +
-                    cameraRightZ * horizontal;
-
+                vertices[i].x = base.x + rotatedLocalX;
+                vertices[i].y = base.y + rotatedLocalY;
+                vertices[i].z = base.z + rotatedLocalZ;
                 vertices[i].u = u[i];
                 vertices[i].v = v[i];
-            }
-
-            if (scaleX < 0.0f)
-            {
-                std::swap(vertices[0], vertices[1]);
-                std::swap(vertices[3], vertices[2]);
-            }
-
-            if (scaleY < 0.0f)
-            {
-                std::swap(vertices[0], vertices[3]);
-                std::swap(vertices[1], vertices[2]);
             }
 
             return true;
@@ -816,9 +858,8 @@ namespace ViewPoint
                         frame,
                         texture,
                         base,
+                        doorSlot,
                         extraRotationDegrees,
-                        cameraRightX,
-                        cameraRightZ,
                         vertices))
                 {
                     continue;

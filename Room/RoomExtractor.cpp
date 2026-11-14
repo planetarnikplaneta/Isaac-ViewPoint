@@ -1142,6 +1142,7 @@ namespace ViewPoint
 
                 if (entityType == GRID_DOOR)
                 {
+                    wallMask[i] = 1;
                     ++doorCount;
                     continue;
                 }
