@@ -534,26 +534,49 @@ namespace ViewPoint
             return -1;
         }
 
-        static float GetDoorRenderRotationDegrees(int doorSlot)
+        enum DoorWallSide
+        {
+            DOOR_WALL_NORTH = 0,
+            DOOR_WALL_EAST = 1,
+            DOOR_WALL_SOUTH = 2,
+            DOOR_WALL_WEST = 3
+        };
+
+        static DoorWallSide GetDoorWallSide(int doorSlot)
         {
             switch (doorSlot)
             {
-                case DOOR_SLOT_LEFT0:
-                case DOOR_SLOT_LEFT1:
-                    return 90.0f;
-
                 case DOOR_SLOT_UP0:
                 case DOOR_SLOT_UP1:
-                    return 0.0f;
+                    return DOOR_WALL_NORTH;
 
                 case DOOR_SLOT_RIGHT0:
                 case DOOR_SLOT_RIGHT1:
-                    return 270.0f;
+                    return DOOR_WALL_EAST;
 
                 case DOOR_SLOT_DOWN0:
                 case DOOR_SLOT_DOWN1:
-                    return 180.0f;
+                    return DOOR_WALL_SOUTH;
 
+                case DOOR_SLOT_LEFT0:
+                case DOOR_SLOT_LEFT1:
+                default:
+                    return DOOR_WALL_WEST;
+            }
+        }
+
+        static float GetDoorRenderRotationDegrees(int doorSlot)
+        {
+            switch (GetDoorWallSide(doorSlot))
+            {
+                case DOOR_WALL_NORTH:
+                    return 0.0f;
+                case DOOR_WALL_EAST:
+                    return 270.0f;
+                case DOOR_WALL_SOUTH:
+                    return 180.0f;
+                case DOOR_WALL_WEST:
+                    return 90.0f;
                 default:
                     return 0.0f;
             }
@@ -569,9 +592,6 @@ namespace ViewPoint
             if (!room || !door)
                 return result;
 
-            // Use Isaac's own render-space position. The door's slot only
-            // determines wall orientation; adding a generic inset based on
-            // slot index pushes the sprite into the wrong place for some doors.
             Vector position(0.0f, 0.0f);
             door->GetRenderPosition(&position);
             result = IsaacToWorld(position, room);
@@ -587,6 +607,7 @@ namespace ViewPoint
             AnimationFrame *frame,
             SpriteTexture *texture,
             const WorldPoint &base,
+            int doorSlot,
             float extraRotationDegrees,
             float cameraRightX,
             float cameraRightZ,
@@ -687,6 +708,7 @@ namespace ViewPoint
             const float u[4] = {u0, u1, u1, u0};
             const float v[4] = {v0, v0, v1, v1};
             const float wallDepth = 0.14f;
+            const DoorWallSide wallSide = GetDoorWallSide(doorSlot);
 
             for (int i = 0; i < 4; ++i)
             {
@@ -696,23 +718,24 @@ namespace ViewPoint
                 const float vertical =
                     localY[i] / PIXELS_PER_TILE;
 
-                switch (static_cast<int>(std::round(extraRotationDegrees / 90.0f)) % 4)
+                switch (wallSide)
                 {
-                    case 0:
-                        vertices[i].x = base.x - wallDepth;
-                        vertices[i].z = base.z + horizontal;
-                        break;
-                    case 1:
+                    case DOOR_WALL_NORTH:
                         vertices[i].x = base.x + horizontal;
                         vertices[i].z = base.z - wallDepth;
                         break;
-                    case 2:
+                    case DOOR_WALL_EAST:
                         vertices[i].x = base.x + wallDepth;
                         vertices[i].z = base.z - horizontal;
                         break;
-                    default:
+                    case DOOR_WALL_SOUTH:
                         vertices[i].x = base.x - horizontal;
                         vertices[i].z = base.z + wallDepth;
+                        break;
+                    case DOOR_WALL_WEST:
+                    default:
+                        vertices[i].x = base.x - wallDepth;
+                        vertices[i].z = base.z + horizontal;
                         break;
                 }
 
@@ -827,6 +850,7 @@ namespace ViewPoint
                         frame,
                         texture,
                         base,
+                        doorSlot,
                         extraRotationDegrees,
                         cameraRightX,
                         cameraRightZ,
