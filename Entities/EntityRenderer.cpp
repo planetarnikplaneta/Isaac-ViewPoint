@@ -623,7 +623,7 @@ namespace ViewPoint
             {
                 case DOOR_WALL_NORTH:
                     result.x -= 0.9f;
-                    result.y = FLOOR_Y + 1.8f;
+                    result.y = FLOOR_Y + 1.9f;
                     result.z -= 0.4f; // higher value closer to north
                     break;
                 case DOOR_WALL_EAST:
@@ -647,6 +647,47 @@ namespace ViewPoint
             }
 
             return result;
+        }
+
+        static Vertex3 GetDoorFaceNormal(int doorSlot)
+        {
+            switch (GetDoorWallSide(doorSlot))
+            {
+                case DOOR_WALL_NORTH:
+                    return {0.0f, 0.0f, -1.0f};
+                case DOOR_WALL_EAST:
+                    return {-1.0f, 0.0f, 0.0f};
+                case DOOR_WALL_SOUTH:
+                    return {0.0f, 0.0f, 1.0f};
+                case DOOR_WALL_WEST:
+                default:
+                    return {1.0f, 0.0f, 0.0f};
+            }
+        }
+
+        static float CalculateSpriteBrightness(const Vertex3 &normal)
+        {
+            constexpr float LIGHT_X = -0.42f;
+            constexpr float LIGHT_Y = 0.80f;
+            constexpr float LIGHT_Z = -0.62f;
+            constexpr float AMBIENT_LIGHT = 0.58f;
+            constexpr float DIFFUSE_LIGHT = 0.92f;
+
+            const float lightLength = std::sqrt(
+                LIGHT_X * LIGHT_X +
+                LIGHT_Y * LIGHT_Y +
+                LIGHT_Z * LIGHT_Z);
+
+            const float diffuse = (std::max)(
+                0.0f,
+                (normal.x * LIGHT_X +
+                 normal.y * LIGHT_Y +
+                 normal.z * LIGHT_Z) /
+                    lightLength);
+
+            return (std::min)(
+                1.0f,
+                AMBIENT_LIGHT + DIFFUSE_LIGHT * diffuse);
         }
 
         static bool BuildDoorSpriteQuad(
@@ -925,12 +966,24 @@ namespace ViewPoint
                 if (alpha <= 0.001f)
                     continue;
 
+                const Vertex3 doorNormal = GetDoorFaceNormal(doorSlot);
+                const float brightness =
+                    CalculateSpriteBrightness(doorNormal);
+
                 glBindTexture(GL_TEXTURE_2D, texture->id);
-                glColor4f(red, green, blue, alpha);
+                glColor4f(
+                    red * brightness,
+                    green * brightness,
+                    blue * brightness,
+                    alpha);
 
                 glBegin(GL_QUADS);
                 for (int v = 0; v < 4; ++v)
                 {
+                    glNormal3f(
+                        doorNormal.x,
+                        doorNormal.y,
+                        doorNormal.z);
                     glTexCoord2f(vertices[v].u, vertices[v].v);
                     glVertex3f(vertices[v].x, vertices[v].y, vertices[v].z);
                 }
