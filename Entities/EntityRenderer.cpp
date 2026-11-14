@@ -681,10 +681,10 @@ namespace ViewPoint
                 frame->scale.y * sprite->_scale.y;
 
             const float width =
-                cropWidth * std::fabs(scaleX) * 2.0f;
+                cropWidth * std::fabs(scaleX) * 1.5f;
 
             const float height =
-                cropHeight * std::fabs(scaleY) * 2.0f;
+                cropHeight * std::fabs(scaleY) * 1.5f;
 
             if (width <= 0.001f || height <= 0.001f)
                 return false;
