@@ -52,6 +52,7 @@ namespace ViewPoint
         constexpr int MAT_OBJECT = 6;
         constexpr int MAT_POOP = 7;
         constexpr int MAT_FIRE = 8;
+        constexpr int MAT_DECORATION = 9;
 
         Room *g_LastRoom = nullptr;
         int g_LastRoomIndex = -1;
@@ -902,6 +903,23 @@ namespace ViewPoint
                 0.24f);
         }
 
+        void AddDecoration(
+            Model &model,
+            float centerX,
+            float centerZ)
+        {
+            const float half = 0.22f;
+            const float y = FLOOR_Y + 0.02f;
+
+            AddQuad(
+                model,
+                MAT_DECORATION,
+                {centerX - half, y, centerZ - half},
+                {centerX + half, y, centerZ - half},
+                {centerX + half, y, centerZ + half},
+                {centerX - half, y, centerZ + half});
+        }
+
         bool IsRockType(int type)
         {
             return type == GRID_ROCK ||
@@ -968,6 +986,11 @@ namespace ViewPoint
 
             case GRID_POOP:
                 AddPoop(model, centerX, centerZ);
+                ++objectCount;
+                break;
+
+            case GRID_DECORATION:
+                AddDecoration(model, centerX, centerZ);
                 ++objectCount;
                 break;
 
@@ -1091,6 +1114,12 @@ namespace ViewPoint
             fireMaterial.diffuse[1] = 0.35f;
             fireMaterial.diffuse[2] = 0.035f;
 
+            Material decorationMaterial;
+            decorationMaterial.name = "GridDecoration";
+            decorationMaterial.diffuse[0] = 0.88f;
+            decorationMaterial.diffuse[1] = 0.84f;
+            decorationMaterial.diffuse[2] = 0.76f;
+
             model.materials.push_back(std::move(floorMaterial));
             model.materials.push_back(std::move(wallMaterial));
             model.materials.push_back(std::move(rockMaterial));
@@ -1100,6 +1129,7 @@ namespace ViewPoint
             model.materials.push_back(std::move(objectMaterial));
             model.materials.push_back(std::move(poopMaterial));
             model.materials.push_back(std::move(fireMaterial));
+            model.materials.push_back(std::move(decorationMaterial));
 
             const float halfWidth =
                 (static_cast<float>(width) - 2.0f) *
