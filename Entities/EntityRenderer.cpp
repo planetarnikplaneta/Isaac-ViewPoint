@@ -632,8 +632,8 @@ namespace ViewPoint
                     result.z -= 0.4f; 
                     break;
                 case DOOR_WALL_SOUTH:
-                    result.x -= 3.0f; // on the left, from 0.1
-                    result.y = FLOOR_Y + 1.25f;
+                    result.x -= -0.6f; // higher value closer to east
+                    result.y = FLOOR_Y + 1.2f;
                     result.z += 0.42f;
                     break;
                 case DOOR_WALL_WEST:
