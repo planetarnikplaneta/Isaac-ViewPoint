@@ -628,8 +628,8 @@ namespace ViewPoint
                     break;
                 case DOOR_WALL_EAST:
                     result.x += 0.40f;
-                    result.y = FLOOR_Y + 1.6f;
-                    result.z -= 0.0f; // from 0.18
+                    result.y = FLOOR_Y + 1.55f;
+                    result.z -= 0.05f; // from 0.0
                     break;
                 case DOOR_WALL_SOUTH:
                     result.x -= 0.1f;
@@ -638,8 +638,8 @@ namespace ViewPoint
                     break;
                 case DOOR_WALL_WEST:
                     result.x -= 0.40f;
-                    result.y = FLOOR_Y + 1.6f;
-                    result.z -= 0.0f; // from 0.18
+                    result.y = FLOOR_Y + 1.55f;
+                    result.z += 0.05f; // from 0.18
                     break;
                 default:
                     result.y = FLOOR_Y + 1.6f;
@@ -732,12 +732,19 @@ namespace ViewPoint
                  extraRotationDegrees) *
                 PI / 180.0f;
 
+            // Match the vanilla door face silhouette: keep the upper edge wide
+            // and compress the lower edge so the quad reads like a trapezoid.
+            const float bottomWidth = width * 0.8f;
+            const float centerX = left + width * 0.5f;
+            const float bottomLeft = centerX - bottomWidth * 0.5f;
+            const float bottomRight = centerX + bottomWidth * 0.5f;
+
             float localX[4] =
                 {
                     left,
                     left + width,
-                    left + width,
-                    left};
+                    bottomRight,
+                    bottomLeft};
 
             float localY[4] =
                 {
