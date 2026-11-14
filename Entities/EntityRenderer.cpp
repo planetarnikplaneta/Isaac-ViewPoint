@@ -96,16 +96,14 @@ namespace ViewPoint
                 LIGHT_Y * LIGHT_Y +
                 LIGHT_Z * LIGHT_Z);
 
-            const float diffuse = (std::max)(
-                0.0f,
-                (normalX * LIGHT_X +
-                 normalY * LIGHT_Y +
-                 normalZ * LIGHT_Z) /
-                    lightLength);
+            const float diffuse = (std::max)(0.0f,
+                                             (normalX * LIGHT_X +
+                                              normalY * LIGHT_Y +
+                                              normalZ * LIGHT_Z) /
+                                                 lightLength);
 
-            return (std::min)(
-                1.0f,
-                AMBIENT_LIGHT + DIFFUSE_LIGHT * diffuse);
+            return (std::min)(1.0f,
+                              AMBIENT_LIGHT + DIFFUSE_LIGHT * diffuse);
         }
 
         // ------------------------------------------------------------
@@ -575,22 +573,22 @@ namespace ViewPoint
         {
             switch (doorSlot)
             {
-                case DOOR_SLOT_UP0:
-                case DOOR_SLOT_UP1:
-                    return DOOR_WALL_NORTH;
+            case DOOR_SLOT_UP0:
+            case DOOR_SLOT_UP1:
+                return DOOR_WALL_NORTH;
 
-                case DOOR_SLOT_RIGHT0:
-                case DOOR_SLOT_RIGHT1:
-                    return DOOR_WALL_EAST;
+            case DOOR_SLOT_RIGHT0:
+            case DOOR_SLOT_RIGHT1:
+                return DOOR_WALL_EAST;
 
-                case DOOR_SLOT_DOWN0:
-                case DOOR_SLOT_DOWN1:
-                    return DOOR_WALL_SOUTH;
+            case DOOR_SLOT_DOWN0:
+            case DOOR_SLOT_DOWN1:
+                return DOOR_WALL_SOUTH;
 
-                case DOOR_SLOT_LEFT0:
-                case DOOR_SLOT_LEFT1:
-                default:
-                    return DOOR_WALL_WEST;
+            case DOOR_SLOT_LEFT0:
+            case DOOR_SLOT_LEFT1:
+            default:
+                return DOOR_WALL_WEST;
             }
         }
 
@@ -598,15 +596,15 @@ namespace ViewPoint
         {
             switch (GetDoorWallSide(doorSlot))
             {
-                case DOOR_WALL_NORTH:
-                    return CalculateDoorBrightness(0.0f, 0.0f, -1.0f);
-                case DOOR_WALL_EAST:
-                    return CalculateDoorBrightness(1.0f, 0.0f, 0.0f);
-                case DOOR_WALL_SOUTH:
-                    return CalculateDoorBrightness(0.0f, 0.0f, 1.0f);
-                case DOOR_WALL_WEST:
-                default:
-                    return CalculateDoorBrightness(-1.0f, 0.0f, 0.0f);
+            case DOOR_WALL_NORTH:
+                return CalculateDoorBrightness(0.0f, 0.0f, -1.0f);
+            case DOOR_WALL_EAST:
+                return CalculateDoorBrightness(1.0f, 0.0f, 0.0f);
+            case DOOR_WALL_SOUTH:
+                return CalculateDoorBrightness(0.0f, 0.0f, 1.0f);
+            case DOOR_WALL_WEST:
+            default:
+                return CalculateDoorBrightness(-1.0f, 0.0f, 0.0f);
             }
         }
 
@@ -614,16 +612,16 @@ namespace ViewPoint
         {
             switch (GetDoorWallSide(doorSlot))
             {
-                case DOOR_WALL_NORTH:
-                    return 0.0f;
-                case DOOR_WALL_EAST:
-                    return 270.0f;
-                case DOOR_WALL_SOUTH:
-                    return 180.0f;
-                case DOOR_WALL_WEST:
-                    return 90.0f;
-                default:
-                    return 0.0f;
+            case DOOR_WALL_NORTH:
+                return 0.0f;
+            case DOOR_WALL_EAST:
+                return 270.0f;
+            case DOOR_WALL_SOUTH:
+                return 180.0f;
+            case DOOR_WALL_WEST:
+                return 90.0f;
+            default:
+                return 0.0f;
             }
         }
 
@@ -645,20 +643,20 @@ namespace ViewPoint
                 static_cast<unsigned int>(room->_gridHeight);
 
             const unsigned int cellIndex =
-                door->_gridIndex < width * height ?
-                    static_cast<unsigned int>(door->_gridIndex) :
-                    room->_doorGridPositions[doorSlot];
+                door->_gridIndex < width * height ? static_cast<unsigned int>(door->_gridIndex) : room->_doorGridPositions[doorSlot];
 
             const unsigned int row = cellIndex / width;
             const unsigned int column = cellIndex % width;
 
             const float centerX =
                 ((static_cast<float>(width) - 1.0f) * 0.5f -
-                 static_cast<float>(column)) * TILE_SIZE;
+                 static_cast<float>(column)) *
+                TILE_SIZE;
 
             const float centerZ =
                 ((static_cast<float>(height) - 1.0f) * 0.5f -
-                 static_cast<float>(row)) * TILE_SIZE;
+                 static_cast<float>(row)) *
+                TILE_SIZE;
 
             result.x = centerX;
             result.y = FLOOR_Y + 0.12f;
@@ -666,29 +664,29 @@ namespace ViewPoint
 
             switch (GetDoorWallSide(doorSlot))
             {
-                case DOOR_WALL_NORTH:
-                    result.x -= 0.9f;
-                    result.y = FLOOR_Y + 1.9f;
-                    result.z -= 0.4f; // higher value closer to north
-                    break;
-                case DOOR_WALL_EAST:
-                    result.x += 0.40f;
-                    result.y = FLOOR_Y + 1.56f;
-                    result.z -= -0.6f; 
-                    break;
-                case DOOR_WALL_SOUTH:
-                    result.x -= -0.9f; // higher value closer to east
-                    result.y = FLOOR_Y + 1.2f;
-                    result.z += 0.42f;
-                    break;
-                case DOOR_WALL_WEST:
-                    result.x -= 0.40f;
-                    result.y = FLOOR_Y + 1.56f;
-                    result.z += -1.2f;
-                    break;
-                default:
-                    result.y = FLOOR_Y + 1.6f;
-                    break;
+            case DOOR_WALL_NORTH:
+                result.x -= 0.9f;
+                result.y = FLOOR_Y + 2.0f;
+                result.z -= 0.4f; // higher value closer to north
+                break;
+            case DOOR_WALL_EAST:
+                result.x += 0.40f;
+                result.y = FLOOR_Y + 1.56f;
+                result.z -= -0.6f;
+                break;
+            case DOOR_WALL_SOUTH:
+                result.x -= -0.9f; // higher value closer to east
+                result.y = FLOOR_Y + 1.2f;
+                result.z += 0.42f;
+                break;
+            case DOOR_WALL_WEST:
+                result.x -= 0.40f;
+                result.y = FLOOR_Y + 1.56f;
+                result.z += -1.2f;
+                break;
+            default:
+                result.y = FLOOR_Y + 1.6f;
+                break;
             }
 
             return result;
@@ -814,23 +812,23 @@ namespace ViewPoint
 
                 switch (wallSide)
                 {
-                    case DOOR_WALL_NORTH:
-                        vertices[i].x = base.x + horizontal;
-                        vertices[i].z = base.z - wallDepth;
-                        break;
-                    case DOOR_WALL_EAST:
-                        vertices[i].x = base.x + wallDepth;
-                        vertices[i].z = base.z - horizontal;
-                        break;
-                    case DOOR_WALL_SOUTH:
-                        vertices[i].x = base.x - horizontal;
-                        vertices[i].z = base.z + wallDepth;
-                        break;
-                    case DOOR_WALL_WEST:
-                    default:
-                        vertices[i].x = base.x - wallDepth;
-                        vertices[i].z = base.z + horizontal;
-                        break;
+                case DOOR_WALL_NORTH:
+                    vertices[i].x = base.x + horizontal;
+                    vertices[i].z = base.z - wallDepth;
+                    break;
+                case DOOR_WALL_EAST:
+                    vertices[i].x = base.x + wallDepth;
+                    vertices[i].z = base.z - horizontal;
+                    break;
+                case DOOR_WALL_SOUTH:
+                    vertices[i].x = base.x - horizontal;
+                    vertices[i].z = base.z + wallDepth;
+                    break;
+                case DOOR_WALL_WEST:
+                default:
+                    vertices[i].x = base.x - wallDepth;
+                    vertices[i].z = base.z + horizontal;
+                    break;
                 }
 
                 vertices[i].y = base.y - vertical;
@@ -972,6 +970,7 @@ namespace ViewPoint
 
                 const float doorBrightness = GetDoorFaceBrightness(doorSlot);
 
+                glPushAttrib(GL_CURRENT_BIT);
                 glBindTexture(GL_TEXTURE_2D, texture->id);
                 glColor4f(
                     red * doorBrightness,
@@ -986,6 +985,7 @@ namespace ViewPoint
                     glVertex3f(vertices[v].x, vertices[v].y, vertices[v].z);
                 }
                 glEnd();
+                glPopAttrib();
             }
         }
 
@@ -993,113 +993,114 @@ namespace ViewPoint
         // ONE ANIMATION LAYER
         // ------------------------------------------------------------
 
+        static void RenderSpriteLayer(
+            Entity *entity,
+            Room *room,
+            ANM2 *sprite,
+            AnimationState *animationState,
+            AnimationLayer *animationLayer,
+            float cameraRightX,
+            float cameraRightZ)
+        {
+            if (!entity || !room || !sprite ||
+                !animationState || !animationLayer)
+                return;
 
-static void RenderSpriteLayer(
-    Entity* entity,
-    Room* room,
-    ANM2* sprite,
-    AnimationState* animationState,
-    AnimationLayer* animationLayer,
-    float cameraRightX,
-    float cameraRightZ)
-{
-    if (!entity || !room || !sprite ||
-        !animationState || !animationLayer)
-        return;
+            if (!animationState->_layerFrames ||
+                !animationState->_animData)
+                return;
 
-    if (!animationState->_layerFrames ||
-        !animationState->_animData)
-        return;
+            const int layerID = animationLayer->_layerID;
 
-    const int layerID = animationLayer->_layerID;
+            if (layerID < 0 || layerID >= 64)
+                return;
 
-    if (layerID < 0 || layerID >= 64)
-        return;
+            // Animation frame storage is indexed by layer ID,
+            // not by animation draw order.
+            const int frameIndex =
+                animationState->_layerFrames[layerID];
 
-    // Animation frame storage is indexed by layer ID,
-    // not by animation draw order.
-    const int frameIndex =
-        animationState->_layerFrames[layerID];
+            if (frameIndex < 0)
+                return;
 
-    if (frameIndex < 0)
-        return;
+            AnimationFrame *frame =
+                animationLayer->GetFrame(frameIndex);
 
-    AnimationFrame* frame =
-        animationLayer->GetFrame(frameIndex);
+            if (!frame)
+                return;
 
-    if (!frame)
-        return;
+            if (!animationLayer->IsVisible() ||
+                !frame->visible)
+                return;
 
-    if (!animationLayer->IsVisible() ||
-        !frame->visible)
-        return;
+            // Get the corresponding ANM2 layer state.
+            LayerState *layer =
+                sprite->GetLayer(layerID);
 
-    // Get the corresponding ANM2 layer state.
-    LayerState* layer =
-        sprite->GetLayer(layerID);
+            if (!layer || !layer->_visible)
+                return;
 
-    if (!layer || !layer->_visible)
-        return;
+            if (!layer->_spriteSheetLoaded)
+                return;
 
-    if (!layer->_spriteSheetLoaded)
-        return;
+            KAGE_SmartPointer_ImageBase sheet =
+                layer->GetSpriteSheet();
 
-    KAGE_SmartPointer_ImageBase sheet =
-        layer->GetSpriteSheet();
+            if (!sheet.image)
+                return;
 
-    if (!sheet.image)
-        return;
+            SpriteTexture *texture =
+                GetSpriteTexture(sheet.image);
 
-    SpriteTexture* texture =
-        GetSpriteTexture(sheet.image);
+            if (!texture || !texture->id)
+                return;
 
-    if (!texture || !texture->id)
-        return;
+            SpriteVertex vertices[4]{};
 
-    SpriteVertex vertices[4]{};
+            if (!BuildSpriteQuad(
+                    entity,
+                    room,
+                    sprite,
+                    layer,
+                    frame,
+                    texture,
+                    cameraRightX,
+                    cameraRightZ,
+                    vertices))
+                return;
 
-    if (!BuildSpriteQuad(
-            entity,
-            room,
-            sprite,
-            layer,
-            frame,
-            texture,
-            cameraRightX,
-            cameraRightZ,
-            vertices))
-        return;
+            float red;
+            float green;
+            float blue;
+            float alpha;
 
-    float red;
-    float green;
-    float blue;
-    float alpha;
+            GetSpriteColor(
+                sprite,
+                layer,
+                frame,
+                red,
+                green,
+                blue,
+                alpha);
 
-    GetSpriteColor(
-        sprite,
-        layer,
-        frame,
-        red,
-        green,
-        blue,
-        alpha);
+            if (alpha <= 0.001f)
+                return;
 
-    if (alpha <= 0.001f)
-        return;
+            glPushAttrib(GL_CURRENT_BIT);
+            glBindTexture(GL_TEXTURE_2D, texture->id);
+            glColor4f(red, green, blue, alpha);
 
-    glBindTexture(GL_TEXTURE_2D, texture->id);
-    glColor4f(red, green, blue, alpha);
+            glBegin(GL_QUADS);
 
-    glBegin(GL_QUADS);
+            for (int i = 0; i < 4; ++i)
+            {
+                glTexCoord2f(vertices[i].u, vertices[i].v);
+                glVertex3f(vertices[i].x, vertices[i].y, vertices[i].z);
+            }
 
-    for (int i = 0; i < 4; ++i)
-    {
-        glTexCoord2f(vertices[i].u, vertices[i].v);
-        glVertex3f(vertices[i].x, vertices[i].y, vertices[i].z);
-    }
-
-    glEnd();
-}
+            glEnd();
+            glPopAttrib();
+        }
 
         // ------------------------------------------------------------
         // ENTITY SPRITE
@@ -1152,7 +1153,7 @@ static void RenderSpriteLayer(
             // The ANM2 layer state is retrieved separately by ID.
             for (int i = 0; i < animationData->_layerCount; ++i)
             {
-                AnimationLayer* animationLayer =
+                AnimationLayer *animationLayer =
                     animationData->GetLayerByOrder(i);
 
                 if (!animationLayer)
