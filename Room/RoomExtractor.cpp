@@ -42,7 +42,7 @@ namespace ViewPoint
         constexpr int GRID_ROCK_GOLD = 27;
 
         constexpr float FLOOR_Y = -1.5f;
-        constexpr float WALL_TOP_Y = 1.0f;
+        constexpr float WALL_TOP_Y = 0.75f;
         constexpr float TILE_SIZE = 1.0f;
 
         // Material indices.
