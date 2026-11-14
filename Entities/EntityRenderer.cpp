@@ -1036,6 +1036,9 @@ namespace ViewPoint
                 return;
             }
 
+            if (grid->GetDesc() && grid->GetDesc()->_state == 2)
+                return;
+
             ANM2 *sprite = &grid->_sprite;
             if (!sprite->_loaded ||
                 !sprite->_layerState ||
@@ -1855,6 +1858,9 @@ namespace ViewPoint
             {
                 continue;
             }
+
+            if (grid->GetDesc() && grid->GetDesc()->_state == 2)
+                continue;
 
             RenderGridDecorationSprite(
                 room,
