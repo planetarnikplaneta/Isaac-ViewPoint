@@ -666,7 +666,7 @@ namespace ViewPoint
             {
             case DOOR_WALL_NORTH:
                 result.x -= 0.9f;
-                result.y = FLOOR_Y + 2.0f;
+                result.y = FLOOR_Y + 1.95f;
                 result.z -= 0.4f; // higher value closer to north
                 break;
             case DOOR_WALL_EAST:
@@ -986,6 +986,7 @@ namespace ViewPoint
                 }
                 glEnd();
                 glPopAttrib();
+                glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
             }
         }
 
@@ -1100,6 +1101,7 @@ namespace ViewPoint
 
             glEnd();
             glPopAttrib();
+            glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
         }
 
         // ------------------------------------------------------------
