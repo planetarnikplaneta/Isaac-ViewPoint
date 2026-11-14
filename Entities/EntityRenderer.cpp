@@ -1044,7 +1044,8 @@ namespace ViewPoint
             const int type = grid->GetType();
             if (type != GRID_DECORATION &&
                 type != GRID_TRAPDOOR &&
-                type != GRID_PRESSURE_PLATE)
+                type != GRID_PRESSURE_PLATE &&
+                type != GRID_PIT)
             {
                 return;
             }
@@ -1222,6 +1223,9 @@ namespace ViewPoint
 
                 const int layerID = animationLayer->_layerID;
                 if (layerID < 0 || layerID >= 64)
+                    continue;
+
+                if (layerID == 0)
                     continue;
 
                 const int frameIndex = animationState->_layerFrames[layerID];
@@ -1864,7 +1868,8 @@ namespace ViewPoint
             const int type = grid->GetType();
             if (type != GRID_DECORATION &&
                 type != GRID_TRAPDOOR &&
-                type != GRID_PRESSURE_PLATE)
+                type != GRID_PRESSURE_PLATE &&
+                type != GRID_PIT)
             {
                 continue;
             }

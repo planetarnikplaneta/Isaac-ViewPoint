@@ -1073,8 +1073,8 @@ namespace ViewPoint
                 break;
 
             case GRID_PIT:
-                AddPit(model, centerX, centerZ);
-                ++pitCount;
+                // Pits are rendered via their sprite layer instead of a
+                // 3D block mesh, matching the non-mesh room decorations.
                 break;
 
             case GRID_SPIKES:
