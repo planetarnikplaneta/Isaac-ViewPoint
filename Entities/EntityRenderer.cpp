@@ -536,11 +536,27 @@ namespace ViewPoint
 
         static float GetDoorRenderRotationDegrees(int doorSlot)
         {
-            if (doorSlot < 0)
-                return 0.0f;
+            switch (doorSlot)
+            {
+                case DOOR_SLOT_LEFT0:
+                case DOOR_SLOT_LEFT1:
+                    return 90.0f;
 
-            const int side = doorSlot % 4;
-            return static_cast<float>((side + 3) % 4) * 90.0f;
+                case DOOR_SLOT_UP0:
+                case DOOR_SLOT_UP1:
+                    return 0.0f;
+
+                case DOOR_SLOT_RIGHT0:
+                case DOOR_SLOT_RIGHT1:
+                    return 270.0f;
+
+                case DOOR_SLOT_DOWN0:
+                case DOOR_SLOT_DOWN1:
+                    return 180.0f;
+
+                default:
+                    return 0.0f;
+            }
         }
 
         static WorldPoint GetDoorRenderWorldPosition(
@@ -553,29 +569,13 @@ namespace ViewPoint
             if (!room || !door)
                 return result;
 
+            // Use Isaac's own render-space position. The door's slot only
+            // determines wall orientation; adding a generic inset based on
+            // slot index pushes the sprite into the wrong place for some doors.
             Vector position(0.0f, 0.0f);
             door->GetRenderPosition(&position);
             result = IsaacToWorld(position, room);
-
-            constexpr float INSET_INTO_ROOM = 0.18f;
-
-            switch (doorSlot % 4)
-            {
-                case 0:
-                    result.x -= INSET_INTO_ROOM;
-                    break;
-                case 1:
-                    result.z -= INSET_INTO_ROOM;
-                    break;
-                case 2:
-                    result.x += INSET_INTO_ROOM;
-                    break;
-                case 3:
-                    result.z += INSET_INTO_ROOM;
-                    break;
-                default:
-                    break;
-            }
+            result.y = FLOOR_Y + 0.12f;
 
             return result;
         }
