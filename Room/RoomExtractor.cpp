@@ -841,9 +841,7 @@ namespace ViewPoint
             const float toothSize = 0.11f;
 
             const std::vector<std::pair<float, float>> positions = {
-                {-0.38f, -0.38f}, {0.00f, -0.38f}, {0.38f, -0.38f}, {0.76f, -0.38f},
-                {-0.19f, 0.00f}, {0.19f, 0.00f}, {0.57f, 0.00f},
-                {-0.38f, 0.38f}, {0.00f, 0.38f}, {0.38f, 0.38f}, {0.76f, 0.38f}};
+                {-0.38f, -0.38f}, {0.00f, -0.38f}, {0.38f, -0.38f}, {0.76f, -0.38f}, {-0.19f, 0.00f}, {0.19f, 0.00f}, {0.57f, 0.00f}, {-0.38f, 0.38f}, {0.00f, 0.38f}, {0.38f, 0.38f}, {0.76f, 0.38f}};
 
             for (const auto &[offsetX, offsetZ] : positions)
             {
