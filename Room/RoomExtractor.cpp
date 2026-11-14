@@ -1142,6 +1142,9 @@ namespace ViewPoint
 
                 if (entityType == GRID_DOOR)
                 {
+                    // Keep the wall patch behind the door so there is no
+                    // visible opening in the room shell, then render the
+                    // animated door sprite on top of that wall face.
                     wallMask[i] = 1;
                     ++doorCount;
                     continue;
