@@ -952,10 +952,9 @@ namespace ViewPoint
             for (int i = 0; i < 4; ++i)
             {
                 const float horizontal = localX[i] / PIXELS_PER_TILE;
-                const float vertical = localY[i] / PIXELS_PER_TILE;
 
                 vertices[i].x = base.x + cameraRightX * horizontal;
-                vertices[i].y = base.y - vertical;
+                vertices[i].y = base.y;
                 vertices[i].z = base.z + cameraRightZ * horizontal;
                 vertices[i].u = u[i];
                 vertices[i].v = v[i];
@@ -1119,18 +1118,12 @@ namespace ViewPoint
                 if (alpha <= 0.001f)
                     continue;
 
-                const float brightness =
-                    CalculateQuadBrightness(
-                        vertices[0],
-                        vertices[1],
-                        vertices[2]);
-
                 glPushAttrib(GL_CURRENT_BIT);
                 glBindTexture(GL_TEXTURE_2D, texture->id);
                 glColor4f(
-                    red * brightness,
-                    green * brightness,
-                    blue * brightness,
+                    red,
+                    green,
+                    blue,
                     alpha);
 
                 glBegin(GL_QUADS);
@@ -1262,18 +1255,12 @@ namespace ViewPoint
                 if (alpha <= 0.001f)
                     continue;
 
-                const float doorBrightness =
-                    CalculateQuadBrightness(
-                        vertices[0],
-                        vertices[1],
-                        vertices[2]);
-
                 glPushAttrib(GL_CURRENT_BIT);
                 glBindTexture(GL_TEXTURE_2D, texture->id);
                 glColor4f(
-                    red * doorBrightness,
-                    green * doorBrightness,
-                    blue * doorBrightness,
+                    red,
+                    green,
+                    blue,
                     alpha);
 
                 glBegin(GL_QUADS);
