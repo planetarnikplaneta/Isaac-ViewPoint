@@ -725,14 +725,6 @@ namespace ViewPoint
                 sprite->_offset.y -
                 frame->pivot.y;
 
-            // Vanilla door sprites taper toward the lower edge. Flatten the lower
-            // half by forcing the bottom width to match the top width so the
-            // rendered door reads as a rectangle instead of an isosceles trapezoid.
-            const float topWidth = width;
-            const float bottomWidth = topWidth;
-            const float lowerHalfLeft = left + (width - bottomWidth) * 0.5f;
-            const float lowerHalfRight = lowerHalfLeft + bottomWidth;
-
             const float rotation =
                 (frame->rotation +
                  layer->_rotation +
@@ -743,9 +735,9 @@ namespace ViewPoint
             float localX[4] =
                 {
                     left,
-                    left + topWidth,
-                    lowerHalfRight,
-                    lowerHalfLeft};
+                    left + width,
+                    left + width,
+                    left};
 
             float localY[4] =
                 {
