@@ -30,6 +30,51 @@ namespace ViewPoint
             return (GetAsyncKeyState(key) & 0x8000) != 0;
         }
 
+        bool CanRenderCurrentRoom()
+        {
+            if (!g_Game)
+                return false;
+
+            Room *room = g_Game->GetCurrentRoom();
+
+            if (!room)
+                return false;
+
+            if (room->_gridWidth <= 0 || room->_gridHeight <= 0)
+                return false;
+
+            Entity_Player *player = g_Game->GetPlayer(0);
+
+            if (!player)
+                return false;
+
+            return player->GetPosition() != nullptr;
+        }
+
+        void SetSystemCursorVisible(bool visible)
+        {
+            static bool cursorHidden = false;
+
+            if (visible && cursorHidden)
+            {
+                while (ShowCursor(TRUE) < 0)
+                {
+                }
+
+                cursorHidden = false;
+                return;
+            }
+
+            if (!visible && !cursorHidden)
+            {
+                while (ShowCursor(FALSE) >= 0)
+                {
+                }
+
+                cursorHidden = true;
+            }
+        }
+
         bool UpdatePlayerCamera()
         {
             if (!g_Game)
@@ -128,21 +173,35 @@ namespace ViewPoint
 
         if (f1Down && !g_Camera.previousF1State)
         {
-            g_Camera.enabled = !g_Camera.enabled;
-
-            if (!g_Camera.enabled)
+            if (!CanRenderCurrentRoom())
             {
+                g_Camera.enabled = false;
                 ReleaseCameraCursor();
+                SetSystemCursorVisible(true);
 
                 ViewPoint::LogMessage(
-                    "First-person camera disabled.");
+                    "ViewPoint camera is unavailable in the main menu.");
             }
             else
             {
-                g_CursorCaptured = false;
+                g_Camera.enabled = !g_Camera.enabled;
 
-                ViewPoint::LogMessage(
-                    "First-person camera enabled.");
+                if (!g_Camera.enabled)
+                {
+                    ReleaseCameraCursor();
+                    SetSystemCursorVisible(true);
+
+                    ViewPoint::LogMessage(
+                        "First-person camera disabled.");
+                }
+                else
+                {
+                    g_CursorCaptured = false;
+                    SetSystemCursorVisible(false);
+
+                    ViewPoint::LogMessage(
+                        "First-person camera enabled.");
+                }
             }
         }
 
@@ -153,8 +212,20 @@ namespace ViewPoint
             if (g_CursorCaptured)
                 ReleaseCameraCursor();
 
+            SetSystemCursorVisible(true);
             return;
         }
+
+        if (!CanRenderCurrentRoom())
+        {
+            g_Camera.enabled = false;
+            if (g_CursorCaptured)
+                ReleaseCameraCursor();
+            SetSystemCursorVisible(true);
+            return;
+        }
+
+        SetSystemCursorVisible(false);
 
         // -------------------------------------------------
         // F2: Toggle player-follow / free-fly

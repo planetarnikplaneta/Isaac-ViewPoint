@@ -44,7 +44,8 @@ namespace ViewPoint
     {
         return g_Camera.enabled &&
                g_Camera.followPlayer &&
-               (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
+               (((GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0) ||
+                ((GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0));
     }
 
     Vector GetCameraShootVector()
@@ -52,8 +53,13 @@ namespace ViewPoint
         const float yawRadians =
             g_Camera.yaw * VIEWPOINT_PI / 180.0f;
 
-        const float shootX = std::sin(yawRadians);
-        const float shootY = std::cos(yawRadians);
+        const float direction =
+            (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0
+                ? -1.0f
+                : 1.0f;
+
+        const float shootX = std::sin(yawRadians) * direction;
+        const float shootY = std::cos(yawRadians) * direction;
 
         return Vector(shootX, shootY);
     }
