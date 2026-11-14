@@ -18,7 +18,6 @@ namespace ViewPoint
     {
         constexpr unsigned int MAX_GRID_CELLS = 448;
 
-        constexpr int GRID_DECORATION = 1;
         constexpr int GRID_ROCK = 2;
         constexpr int GRID_ROCKB = 3;
         constexpr int GRID_ROCKT = 4;
@@ -55,13 +54,6 @@ namespace ViewPoint
         constexpr int MAT_OBJECT = 6;
         constexpr int MAT_POOP = 7;
         constexpr int MAT_FIRE = 8;
-        constexpr int MAT_CRACKED_ROCK = 9;
-        constexpr int MAT_ROCK_B = 10;
-        constexpr int MAT_ROCK_T = 11;
-        constexpr int MAT_TNT = 12;
-        constexpr int MAT_TRAPDOOR = 13;
-        constexpr int MAT_PRESSURE_PLATE = 14;
-        constexpr int MAT_BOMB = 15;
 
         Room *g_LastRoom = nullptr;
         int g_LastRoomIndex = -1;
@@ -676,40 +668,195 @@ namespace ViewPoint
             float centerX,
             float centerZ)
         {
-            const float bottom = FLOOR_Y + 0.03f;
-            const float middle = FLOOR_Y + 0.43f;
-            const float top = FLOOR_Y + 0.85f;
+            const float bottom = FLOOR_Y + 0.02f;
+            const float top = FLOOR_Y + 0.82f;
 
-            const int base =
-                static_cast<int>(model.vertices.size());
+            AddBox(
+                model,
+                MAT_ROCK,
+                centerX,
+                centerZ,
+                0.36f,
+                bottom,
+                top,
+                0.33f);
 
-            model.vertices.push_back(
-                {centerX - 0.43f, middle, centerZ - 0.38f});
+            AddQuad(
+                model,
+                MAT_ROCK,
+                {centerX - 0.22f, top - 0.02f, centerZ - 0.10f},
+                {centerX + 0.04f, top - 0.02f, centerZ - 0.22f},
+                {centerX + 0.18f, top - 0.02f, centerZ + 0.08f},
+                {centerX - 0.12f, top - 0.02f, centerZ + 0.16f});
 
-            model.vertices.push_back(
-                {centerX + 0.39f, middle, centerZ - 0.42f});
+            AddQuad(
+                model,
+                MAT_ROCK,
+                {centerX - 0.10f, top - 0.01f, centerZ - 0.24f},
+                {centerX + 0.13f, top - 0.01f, centerZ - 0.08f},
+                {centerX + 0.08f, top - 0.01f, centerZ + 0.22f},
+                {centerX - 0.18f, top - 0.01f, centerZ + 0.05f});
+        }
 
-            model.vertices.push_back(
-                {centerX + 0.44f, middle, centerZ + 0.36f});
+        void AddRockB(
+            Model &model,
+            float centerX,
+            float centerZ)
+        {
+            AddBox(
+                model,
+                MAT_ROCK,
+                centerX,
+                centerZ,
+                0.31f,
+                FLOOR_Y + 0.02f,
+                FLOOR_Y + 0.56f,
+                0.29f);
 
-            model.vertices.push_back(
-                {centerX - 0.38f, middle, centerZ + 0.43f});
+            AddBox(
+                model,
+                MAT_ROCK,
+                centerX,
+                centerZ,
+                0.22f,
+                FLOOR_Y + 0.56f,
+                FLOOR_Y + 0.78f,
+                0.20f);
+        }
 
-            model.vertices.push_back(
-                {centerX - 0.12f, top, centerZ - 0.10f});
+        void AddRockT(
+            Model &model,
+            float centerX,
+            float centerZ)
+        {
+            AddRock(model, centerX, centerZ);
 
-            model.vertices.push_back(
-                {centerX + 0.08f, bottom, centerZ + 0.05f});
+            AddQuad(
+                model,
+                MAT_ROCK,
+                {centerX - 0.22f, FLOOR_Y + 0.70f, centerZ - 0.22f},
+                {centerX + 0.22f, FLOOR_Y + 0.70f, centerZ - 0.22f},
+                {centerX + 0.22f, FLOOR_Y + 0.70f, centerZ + 0.22f},
+                {centerX - 0.22f, FLOOR_Y + 0.70f, centerZ + 0.22f});
 
-            AddTriangle(model, MAT_ROCK, base, base + 1, base + 4);
-            AddTriangle(model, MAT_ROCK, base + 1, base + 2, base + 4);
-            AddTriangle(model, MAT_ROCK, base + 2, base + 3, base + 4);
-            AddTriangle(model, MAT_ROCK, base + 3, base, base + 4);
+            AddQuad(
+                model,
+                MAT_ROCK,
+                {centerX - 0.22f, FLOOR_Y + 0.70f, centerZ + 0.22f},
+                {centerX + 0.22f, FLOOR_Y + 0.70f, centerZ - 0.22f},
+                {centerX + 0.22f, FLOOR_Y + 0.70f, centerZ + 0.22f},
+                {centerX - 0.22f, FLOOR_Y + 0.70f, centerZ - 0.22f});
+        }
 
-            AddTriangle(model, MAT_ROCK, base + 1, base, base + 5);
-            AddTriangle(model, MAT_ROCK, base + 2, base + 1, base + 5);
-            AddTriangle(model, MAT_ROCK, base + 3, base + 2, base + 5);
-            AddTriangle(model, MAT_ROCK, base, base + 3, base + 5);
+        void AddRockBomb(
+            Model &model,
+            float centerX,
+            float centerZ)
+        {
+            AddRock(model, centerX, centerZ);
+
+            AddBox(
+                model,
+                MAT_OBJECT,
+                centerX + 0.20f,
+                centerZ + 0.05f,
+                0.18f,
+                FLOOR_Y + 0.16f,
+                FLOOR_Y + 0.42f,
+                0.15f);
+
+            AddBox(
+                model,
+                MAT_OBJECT,
+                centerX + 0.20f,
+                centerZ + 0.18f,
+                0.05f,
+                FLOOR_Y + 0.42f,
+                FLOOR_Y + 0.56f,
+                0.05f);
+        }
+
+        void AddPit(
+            Model &model,
+            float centerX,
+            float centerZ)
+        {
+            const float half = TILE_SIZE * 0.46f;
+            const float bottom = FLOOR_Y - 0.08f;
+            const float top = FLOOR_Y + 0.02f;
+
+            AddQuad(
+                model,
+                MAT_PIT,
+                {centerX - half, bottom, centerZ - half},
+                {centerX + half, bottom, centerZ - half},
+                {centerX + half, bottom, centerZ + half},
+                {centerX - half, bottom, centerZ + half});
+
+            AddQuad(
+                model,
+                MAT_PIT,
+                {centerX - half, top, centerZ - half},
+                {centerX - half, top, centerZ + half},
+                {centerX - half, bottom, centerZ + half},
+                {centerX - half, bottom, centerZ - half});
+
+            AddQuad(
+                model,
+                MAT_PIT,
+                {centerX + half, top, centerZ - half},
+                {centerX + half, top, centerZ + half},
+                {centerX + half, bottom, centerZ + half},
+                {centerX + half, bottom, centerZ - half});
+
+            AddQuad(
+                model,
+                MAT_PIT,
+                {centerX - half, top, centerZ - half},
+                {centerX + half, top, centerZ - half},
+                {centerX + half, bottom, centerZ - half},
+                {centerX - half, bottom, centerZ - half});
+
+            AddQuad(
+                model,
+                MAT_PIT,
+                {centerX - half, top, centerZ + half},
+                {centerX + half, top, centerZ + half},
+                {centerX + half, bottom, centerZ + half},
+                {centerX - half, bottom, centerZ + half});
+        }
+
+        void AddSpikes(
+            Model &model,
+            float centerX,
+            float centerZ)
+        {
+            const float base = FLOOR_Y + 0.03f;
+            const float top = FLOOR_Y + 0.52f;
+            const float rowOffsets[3] = {-0.24f, 0.0f, 0.24f};
+            const int counts[3] = {4, 3, 4};
+
+            for (int row = 0; row < 3; ++row)
+            {
+                const float z = centerZ + rowOffsets[row];
+                const int count = counts[row];
+                const float step = 0.14f;
+                const float startX = centerX - ((count - 1) * step * 0.5f);
+
+                for (int i = 0; i < count; ++i)
+                {
+                    const float x = startX + i * step;
+                    AddPyramid(
+                        model,
+                        MAT_SPIKES,
+                        x,
+                        z,
+                        0.09f,
+                        base,
+                        top,
+                        0.09f);
+                }
+            }
         }
 
         void AddWeb(
@@ -784,6 +931,66 @@ namespace ViewPoint
                 0.10f);
         }
 
+        void AddTNT(
+            Model &model,
+            float centerX,
+            float centerZ)
+        {
+            AddBox(
+                model,
+                MAT_OBJECT,
+                centerX,
+                centerZ,
+                0.20f,
+                FLOOR_Y + 0.03f,
+                FLOOR_Y + 0.54f,
+                0.18f);
+
+            AddBox(
+                model,
+                MAT_OBJECT,
+                centerX,
+                centerZ,
+                0.17f,
+                FLOOR_Y + 0.54f,
+                FLOOR_Y + 0.68f,
+                0.15f);
+
+            AddBox(
+                model,
+                MAT_OBJECT,
+                centerX,
+                centerZ,
+                0.06f,
+                FLOOR_Y + 0.68f,
+                FLOOR_Y + 0.82f,
+                0.06f);
+
+            AddQuad(
+                model,
+                MAT_OBJECT,
+                {centerX - 0.12f, FLOOR_Y + 0.34f, centerZ + 0.13f},
+                {centerX + 0.12f, FLOOR_Y + 0.34f, centerZ + 0.13f},
+                {centerX + 0.12f, FLOOR_Y + 0.48f, centerZ + 0.13f},
+                {centerX - 0.12f, FLOOR_Y + 0.48f, centerZ + 0.13f});
+
+            AddQuad(
+                model,
+                MAT_OBJECT,
+                {centerX - 0.06f, FLOOR_Y + 0.34f, centerZ + 0.14f},
+                {centerX + 0.06f, FLOOR_Y + 0.34f, centerZ + 0.14f},
+                {centerX + 0.06f, FLOOR_Y + 0.55f, centerZ + 0.14f},
+                {centerX - 0.06f, FLOOR_Y + 0.55f, centerZ + 0.14f});
+
+            AddQuad(
+                model,
+                MAT_OBJECT,
+                {centerX - 0.12f, FLOOR_Y + 0.34f, centerZ + 0.15f},
+                {centerX - 0.02f, FLOOR_Y + 0.34f, centerZ + 0.15f},
+                {centerX - 0.02f, FLOOR_Y + 0.46f, centerZ + 0.15f},
+                {centerX - 0.12f, FLOOR_Y + 0.46f, centerZ + 0.15f});
+        }
+
         void AddFireplace(
             Model &model,
             float centerX,
@@ -836,306 +1043,6 @@ namespace ViewPoint
                 0.24f);
         }
 
-        void AddFlatDecoration(
-            Model &model,
-            int materialIndex,
-            float centerX,
-            float centerZ,
-            float halfSize,
-            float y)
-        {
-            AddQuad(
-                model,
-                materialIndex,
-                {centerX - halfSize, y, centerZ - halfSize},
-                {centerX + halfSize, y, centerZ - halfSize},
-                {centerX + halfSize, y, centerZ + halfSize},
-                {centerX - halfSize, y, centerZ + halfSize});
-        }
-
-        void AddCrackedRock(
-            Model &model,
-            float centerX,
-            float centerZ)
-        {
-            AddBox(
-                model,
-                MAT_CRACKED_ROCK,
-                centerX,
-                centerZ,
-                0.43f,
-                FLOOR_Y + 0.03f,
-                FLOOR_Y + 0.62f,
-                0.38f);
-
-            AddQuad(
-                model,
-                MAT_CRACKED_ROCK,
-                {centerX - 0.13f, FLOOR_Y + 0.66f, centerZ - 0.12f},
-                {centerX + 0.10f, FLOOR_Y + 0.66f, centerZ - 0.08f},
-                {centerX + 0.03f, FLOOR_Y + 0.66f, centerZ + 0.17f},
-                {centerX - 0.19f, FLOOR_Y + 0.66f, centerZ + 0.12f});
-
-            AddQuad(
-                model,
-                MAT_CRACKED_ROCK,
-                {centerX - 0.06f, FLOOR_Y + 0.63f, centerZ - 0.18f},
-                {centerX + 0.17f, FLOOR_Y + 0.63f, centerZ - 0.15f},
-                {centerX + 0.08f, FLOOR_Y + 0.63f, centerZ + 0.06f},
-                {centerX - 0.14f, FLOOR_Y + 0.63f, centerZ + 0.05f});
-        }
-
-        void AddRockB(
-            Model &model,
-            float centerX,
-            float centerZ)
-        {
-            AddBox(
-                model,
-                MAT_ROCK_B,
-                centerX,
-                centerZ,
-                0.36f,
-                FLOOR_Y + 0.03f,
-                FLOOR_Y + 0.54f,
-                0.32f);
-
-            AddQuad(
-                model,
-                MAT_ROCK_B,
-                {centerX - 0.30f, FLOOR_Y + 0.56f, centerZ - 0.07f},
-                {centerX + 0.30f, FLOOR_Y + 0.56f, centerZ - 0.07f},
-                {centerX + 0.18f, FLOOR_Y + 0.56f, centerZ + 0.24f},
-                {centerX - 0.18f, FLOOR_Y + 0.56f, centerZ + 0.24f});
-        }
-
-        void AddRockT(
-            Model &model,
-            float centerX,
-            float centerZ)
-        {
-            AddBox(
-                model,
-                MAT_ROCK_T,
-                centerX,
-                centerZ,
-                0.42f,
-                FLOOR_Y + 0.03f,
-                FLOOR_Y + 0.62f,
-                0.38f);
-
-            const float y = FLOOR_Y + 0.66f;
-
-            AddQuad(
-                model,
-                MAT_ROCK_T,
-                {centerX - 0.28f, y, centerZ - 0.02f},
-                {centerX + 0.28f, y, centerZ + 0.02f},
-                {centerX + 0.20f, y, centerZ + 0.18f},
-                {centerX - 0.20f, y, centerZ - 0.18f});
-
-            AddQuad(
-                model,
-                MAT_ROCK_T,
-                {centerX - 0.28f, y, centerZ + 0.02f},
-                {centerX + 0.28f, y, centerZ - 0.02f},
-                {centerX + 0.20f, y, centerZ - 0.18f},
-                {centerX - 0.20f, y, centerZ + 0.18f});
-        }
-
-        void AddBomb(
-            Model &model,
-            float centerX,
-            float centerZ)
-        {
-            AddBox(
-                model,
-                MAT_BOMB,
-                centerX + 0.12f,
-                centerZ + 0.12f,
-                0.12f,
-                FLOOR_Y + 0.18f,
-                FLOOR_Y + 0.40f,
-                0.10f);
-
-            AddPyramid(
-                model,
-                MAT_BOMB,
-                centerX + 0.12f,
-                centerZ + 0.12f,
-                0.10f,
-                FLOOR_Y + 0.40f,
-                FLOOR_Y + 0.62f,
-                0.10f);
-        }
-
-        void AddRockBomb(
-            Model &model,
-            float centerX,
-            float centerZ)
-        {
-            AddCrackedRock(model, centerX, centerZ);
-            AddBomb(model, centerX, centerZ);
-        }
-
-        void AddSpikes(
-            Model &model,
-            float centerX,
-            float centerZ)
-        {
-            const float base = FLOOR_Y + 0.03f;
-            const float top = FLOOR_Y + 0.46f;
-
-            const float zOffsets[] = {-0.35f, 0.0f, 0.35f};
-            const int counts[] = {4, 3, 4};
-
-            for (int row = 0; row < 3; ++row)
-            {
-                const float rowCenterZ = centerZ + zOffsets[row];
-                const int count = counts[row];
-                const float startX = centerX - ((count - 1) * 0.16f) * 0.5f;
-
-                for (int i = 0; i < count; ++i)
-                {
-                    const float offsetX = startX + i * 0.16f;
-
-                    AddPyramid(
-                        model,
-                        MAT_SPIKES,
-                        offsetX,
-                        rowCenterZ,
-                        0.08f,
-                        base,
-                        top,
-                        0.08f);
-                }
-            }
-        }
-
-        void AddTNT(
-            Model &model,
-            float centerX,
-            float centerZ)
-        {
-            AddBox(
-                model,
-                MAT_TNT,
-                centerX,
-                centerZ,
-                0.28f,
-                FLOOR_Y + 0.04f,
-                FLOOR_Y + 0.52f,
-                0.22f);
-
-            AddBox(
-                model,
-                MAT_TNT,
-                centerX,
-                centerZ,
-                0.20f,
-                FLOOR_Y + 0.52f,
-                FLOOR_Y + 0.66f,
-                0.18f);
-
-            const float frontY = FLOOR_Y + 0.35f;
-            const float frontZ = centerZ - 0.16f;
-
-            AddQuad(
-                model,
-                MAT_TNT,
-                {centerX - 0.18f, frontY + 0.10f, frontZ},
-                {centerX + 0.18f, frontY + 0.10f, frontZ},
-                {centerX + 0.18f, frontY + 0.22f, frontZ},
-                {centerX - 0.18f, frontY + 0.22f, frontZ});
-
-            AddQuad(
-                model,
-                MAT_TNT,
-                {centerX - 0.18f, frontY - 0.10f, frontZ},
-                {centerX - 0.02f, frontY - 0.10f, frontZ},
-                {centerX - 0.02f, frontY + 0.20f, frontZ},
-                {centerX - 0.18f, frontY + 0.20f, frontZ});
-
-            AddQuad(
-                model,
-                MAT_TNT,
-                {centerX + 0.02f, frontY - 0.10f, frontZ},
-                {centerX + 0.18f, frontY - 0.10f, frontZ},
-                {centerX + 0.18f, frontY + 0.20f, frontZ},
-                {centerX + 0.02f, frontY + 0.20f, frontZ});
-        }
-
-        void AddTrapdoor(
-            Model &model,
-            float centerX,
-            float centerZ)
-        {
-            AddFlatDecoration(
-                model,
-                MAT_TRAPDOOR,
-                centerX,
-                centerZ,
-                0.24f,
-                FLOOR_Y + 0.015f);
-        }
-
-        void AddPressurePlate(
-            Model &model,
-            float centerX,
-            float centerZ)
-        {
-            AddFlatDecoration(
-                model,
-                MAT_PRESSURE_PLATE,
-                centerX,
-                centerZ,
-                0.22f,
-                FLOOR_Y + 0.012f);
-        }
-
-        void AddPit(
-            Model &model,
-            float centerX,
-            float centerZ)
-        {
-            const float outer = TILE_SIZE * 0.48f;
-            const float inner = TILE_SIZE * 0.36f;
-            const float pitY = FLOOR_Y - 0.06f;
-            const float rimY = FLOOR_Y + 0.03f;
-
-            AddQuad(
-                model,
-                MAT_PIT,
-                {centerX - outer, pitY, centerZ - outer},
-                {centerX + outer, pitY, centerZ - outer},
-                {centerX + outer, pitY, centerZ + outer},
-                {centerX - outer, pitY, centerZ + outer});
-
-            AddQuad(
-                model,
-                MAT_PIT,
-                {centerX - inner, rimY, centerZ - inner},
-                {centerX + inner, rimY, centerZ - inner},
-                {centerX + inner, rimY, centerZ + inner},
-                {centerX - inner, rimY, centerZ + inner});
-
-            AddQuad(
-                model,
-                MAT_PIT,
-                {centerX - outer, rimY, centerZ - outer},
-                {centerX - inner, rimY, centerZ - outer},
-                {centerX - inner, rimY, centerZ + outer},
-                {centerX - outer, rimY, centerZ + outer});
-
-            AddQuad(
-                model,
-                MAT_PIT,
-                {centerX + inner, rimY, centerZ - outer},
-                {centerX + outer, rimY, centerZ - outer},
-                {centerX + outer, rimY, centerZ + outer},
-                {centerX + inner, rimY, centerZ + outer});
-        }
-
         bool IsRockType(int type)
         {
             return type == GRID_ROCK ||
@@ -1162,39 +1069,22 @@ namespace ViewPoint
         {
             if (IsRockType(entityType))
             {
-                AddRock(model, centerX, centerZ);
-                ++rockCount;
-                return;
-            }
+                switch (entityType)
+                {
+                case GRID_ROCKB:
+                    AddRockB(model, centerX, centerZ);
+                    break;
+                case GRID_ROCKT:
+                    AddRockT(model, centerX, centerZ);
+                    break;
+                case GRID_ROCK_BOMB:
+                    AddRockBomb(model, centerX, centerZ);
+                    break;
+                default:
+                    AddRock(model, centerX, centerZ);
+                    break;
+                }
 
-            if (entityType == GRID_ROCKB)
-            {
-                AddRockB(model, centerX, centerZ);
-                ++rockCount;
-                return;
-            }
-
-            if (entityType == GRID_ROCKT)
-            {
-                AddRockT(model, centerX, centerZ);
-                ++rockCount;
-                return;
-            }
-
-            if (entityType == GRID_ROCK_BOMB)
-            {
-                AddRockBomb(model, centerX, centerZ);
-                ++rockCount;
-                return;
-            }
-
-            if (entityType == GRID_ROCK_ALT ||
-                entityType == GRID_ROCK_ALT2 ||
-                entityType == GRID_ROCK_GOLD ||
-                entityType == GRID_ROCK_SS ||
-                entityType == GRID_ROCK_SPIKED)
-            {
-                AddCrackedRock(model, centerX, centerZ);
                 ++rockCount;
                 return;
             }
@@ -1227,16 +1117,6 @@ namespace ViewPoint
                 ++objectCount;
                 break;
 
-            case GRID_TRAPDOOR:
-                AddTrapdoor(model, centerX, centerZ);
-                ++objectCount;
-                break;
-
-            case GRID_PRESSURE_PLATE:
-                AddPressurePlate(model, centerX, centerZ);
-                ++objectCount;
-                break;
-
             case GRID_FIREPLACE:
                 AddFireplace(model, centerX, centerZ);
                 ++objectCount;
@@ -1248,14 +1128,8 @@ namespace ViewPoint
                 break;
 
             case GRID_DECORATION:
-                AddFlatDecoration(
-                    model,
-                    MAT_POOP,
-                    centerX,
-                    centerZ,
-                    0.18f,
-                    FLOOR_Y + 0.015f);
-                ++objectCount;
+            case GRID_TRAPDOOR:
+            case GRID_PRESSURE_PLATE:
                 break;
 
             default:
@@ -1378,48 +1252,6 @@ namespace ViewPoint
             fireMaterial.diffuse[1] = 0.35f;
             fireMaterial.diffuse[2] = 0.035f;
 
-            Material crackedRockMaterial;
-            crackedRockMaterial.name = "GridCrackedRock";
-            crackedRockMaterial.diffuse[0] = 0.38f;
-            crackedRockMaterial.diffuse[1] = 0.26f;
-            crackedRockMaterial.diffuse[2] = 0.20f;
-
-            Material rockBMaterial;
-            rockBMaterial.name = "GridRockB";
-            rockBMaterial.diffuse[0] = 0.52f;
-            rockBMaterial.diffuse[1] = 0.52f;
-            rockBMaterial.diffuse[2] = 0.53f;
-
-            Material rockTMaterial;
-            rockTMaterial.name = "GridRockT";
-            rockTMaterial.diffuse[0] = 0.60f;
-            rockTMaterial.diffuse[1] = 0.60f;
-            rockTMaterial.diffuse[2] = 0.62f;
-
-            Material tntMaterial;
-            tntMaterial.name = "GridTNT";
-            tntMaterial.diffuse[0] = 0.44f;
-            tntMaterial.diffuse[1] = 0.44f;
-            tntMaterial.diffuse[2] = 0.42f;
-
-            Material trapdoorMaterial;
-            trapdoorMaterial.name = "GridTrapdoor";
-            trapdoorMaterial.diffuse[0] = 0.72f;
-            trapdoorMaterial.diffuse[1] = 0.68f;
-            trapdoorMaterial.diffuse[2] = 0.58f;
-
-            Material pressurePlateMaterial;
-            pressurePlateMaterial.name = "GridPressurePlate";
-            pressurePlateMaterial.diffuse[0] = 0.90f;
-            pressurePlateMaterial.diffuse[1] = 0.92f;
-            pressurePlateMaterial.diffuse[2] = 0.88f;
-
-            Material bombMaterial;
-            bombMaterial.name = "GridBomb";
-            bombMaterial.diffuse[0] = 0.18f;
-            bombMaterial.diffuse[1] = 0.18f;
-            bombMaterial.diffuse[2] = 0.20f;
-
             model.materials.push_back(std::move(floorMaterial));
             model.materials.push_back(std::move(wallMaterial));
             model.materials.push_back(std::move(rockMaterial));
@@ -1429,13 +1261,6 @@ namespace ViewPoint
             model.materials.push_back(std::move(objectMaterial));
             model.materials.push_back(std::move(poopMaterial));
             model.materials.push_back(std::move(fireMaterial));
-            model.materials.push_back(std::move(crackedRockMaterial));
-            model.materials.push_back(std::move(rockBMaterial));
-            model.materials.push_back(std::move(rockTMaterial));
-            model.materials.push_back(std::move(tntMaterial));
-            model.materials.push_back(std::move(trapdoorMaterial));
-            model.materials.push_back(std::move(pressurePlateMaterial));
-            model.materials.push_back(std::move(bombMaterial));
 
             const float halfWidth =
                 (static_cast<float>(width) - 2.0f) *
@@ -1490,6 +1315,13 @@ namespace ViewPoint
                 {
                     wallMask[i] = 1;
                     ++wallCount;
+                    continue;
+                }
+
+                if (entityType == GRID_DECORATION ||
+                    entityType == GRID_TRAPDOOR ||
+                    entityType == GRID_PRESSURE_PLATE)
+                {
                     continue;
                 }
 

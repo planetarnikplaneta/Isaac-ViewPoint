@@ -1019,13 +1019,20 @@ namespace ViewPoint
             return result;
         }
 
+        static bool IsFloorSpriteGridType(int type)
+        {
+            return type == GRID_DECORATION ||
+                   type == GRID_TRAPDOOR ||
+                   type == GRID_PRESSURE_PLATE;
+        }
+
         static void RenderGridDecorationSprite(
             Room *room,
             GridEntity *grid,
             float cameraRightX,
             float cameraRightZ)
         {
-            if (!room || !grid || grid->GetType() != GRID_DECORATION)
+            if (!room || !grid || !IsFloorSpriteGridType(grid->GetType()))
                 return;
 
             ANM2 *sprite = &grid->_sprite;
@@ -1837,7 +1844,7 @@ namespace ViewPoint
         {
             GridEntity *grid = room->GetGridEntity(i);
 
-            if (!grid || grid->GetType() != GRID_DECORATION)
+            if (!grid || !IsFloorSpriteGridType(grid->GetType()))
                 continue;
 
             RenderGridDecorationSprite(
