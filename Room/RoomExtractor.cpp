@@ -73,12 +73,12 @@ namespace ViewPoint
 
         Model g_RoomModel;
 
-        bool IsGridEntityDestroyed(const GridEntity *grid)
+        bool IsGridEntityDestroyed(GridEntity *grid)
         {
             if (!grid)
                 return true;
 
-            const GridEntityDesc *desc = grid->GetDesc();
+            GridEntityDesc *desc = grid->GetDesc();
             if (!desc)
                 return true;
 

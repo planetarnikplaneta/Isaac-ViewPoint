@@ -980,12 +980,12 @@ namespace ViewPoint
         }
 
         static bool IsGridEntityDestroyed(
-            const GridEntity *grid)
+            GridEntity *grid)
         {
             if (!grid)
                 return true;
 
-            const GridEntityDesc *desc = grid->GetDesc();
+            GridEntityDesc *desc = grid->GetDesc();
             if (!desc)
                 return true;
 
