@@ -78,7 +78,11 @@ namespace ViewPoint
             if (!grid)
                 return true;
 
-            return grid->_desc._type <= 0;
+            const GridEntityDesc *desc = grid->GetDesc();
+            if (!desc)
+                return true;
+
+            return desc->_type <= 0 || desc->_state == 2;
         }
 
         uint64_t ComputeRoomGridSignature(
