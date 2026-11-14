@@ -970,7 +970,9 @@ namespace ViewPoint
 
                 const float doorBrightness = GetDoorFaceBrightness(doorSlot);
 
-                glPushAttrib(GL_CURRENT_BIT);
+                glPushAttrib(GL_ENABLE_BIT | GL_TEXTURE_BIT | GL_COLOR_BUFFER_BIT);
+                glEnable(GL_TEXTURE_2D);
+                glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
                 glBindTexture(GL_TEXTURE_2D, texture->id);
                 glColor4f(
                     red * doorBrightness,
@@ -1087,7 +1089,9 @@ namespace ViewPoint
             if (alpha <= 0.001f)
                 return;
 
-            glPushAttrib(GL_CURRENT_BIT);
+            glPushAttrib(GL_ENABLE_BIT | GL_TEXTURE_BIT | GL_COLOR_BUFFER_BIT);
+            glEnable(GL_TEXTURE_2D);
+            glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
             glBindTexture(GL_TEXTURE_2D, texture->id);
             glColor4f(red, green, blue, alpha);
 
