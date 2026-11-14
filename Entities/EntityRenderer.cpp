@@ -925,7 +925,8 @@ namespace ViewPoint
             const float rotation =
                 (frame->rotation +
                  layer->_rotation +
-                 sprite->_rotation) * PI / 180.0f;
+                 sprite->_rotation +
+                 180.0f) * PI / 180.0f;
 
             float localX[4] =
                 {
