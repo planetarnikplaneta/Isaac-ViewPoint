@@ -725,6 +725,14 @@ namespace ViewPoint
                 sprite->_offset.y -
                 frame->pivot.y;
 
+            // Vanilla door sprites taper toward the lower edge. Flatten the lower
+            // half by forcing the bottom width to match the top width so the
+            // rendered door reads as a rectangle instead of an isosceles trapezoid.
+            const float topWidth = width;
+            const float bottomWidth = topWidth;
+            const float lowerHalfLeft = left + (width - bottomWidth) * 0.5f;
+            const float lowerHalfRight = lowerHalfLeft + bottomWidth;
+
             const float rotation =
                 (frame->rotation +
                  layer->_rotation +
@@ -732,19 +740,12 @@ namespace ViewPoint
                  extraRotationDegrees) *
                 PI / 180.0f;
 
-            // Match the vanilla door face silhouette: keep the upper edge wide
-            // and compress the lower edge so the quad reads like a trapezoid.
-            const float bottomWidth = width * 0.8f;
-            const float centerX = left + width * 0.5f;
-            const float bottomLeft = centerX - bottomWidth * 0.5f;
-            const float bottomRight = centerX + bottomWidth * 0.5f;
-
             float localX[4] =
                 {
                     left,
-                    left + width,
-                    bottomRight,
-                    bottomLeft};
+                    left + topWidth,
+                    lowerHalfRight,
+                    lowerHalfLeft};
 
             float localY[4] =
                 {
