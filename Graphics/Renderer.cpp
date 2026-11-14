@@ -83,6 +83,10 @@ namespace ViewPoint
         constexpr float OBJECT_TILT = -12.0f;
         constexpr float OBJECT_FOV = 45.0f;
 
+        // Increase the perceived size of the 3D room and scene while
+        // leaving the separate 2D sprite pass untouched.
+        constexpr float FIRST_PERSON_WORLD_SCALE = 2.0f;
+
         constexpr float LIGHT_X = -0.42f;
         constexpr float LIGHT_Y = 0.80f;
         constexpr float LIGHT_Z = -0.62f;
@@ -807,6 +811,13 @@ namespace ViewPoint
                 -g_Camera.position.x,
                 -g_Camera.position.y,
                 -g_Camera.position.z);
+
+            // Make the first-person 3D world appear larger without
+            // changing the separate sprite pass used for Isaac entities.
+            glScalef(
+                FIRST_PERSON_WORLD_SCALE,
+                FIRST_PERSON_WORLD_SCALE,
+                FIRST_PERSON_WORLD_SCALE);
 
             // ----------------------------------------------
             // Individual object transformation
