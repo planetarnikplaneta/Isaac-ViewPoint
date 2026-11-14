@@ -599,12 +599,12 @@ namespace ViewPoint
             switch (GetDoorWallSide(doorSlot))
             {
                 case DOOR_WALL_NORTH:
-                    result.z -= 2.55f;
+                    result.z -= 2.59f;
                     result.x += 0.50f;
-                    result.y = FLOOR_Y + 0.93f;
+                    result.y = FLOOR_Y + 0.92f;
                     break;
                 case DOOR_WALL_EAST:
-                    result.x += -2.1f;
+                    result.x += -2.05f;
                     result.z -= 4.5f;
                     result.y = FLOOR_Y + 0.54f;
                     break;
@@ -614,7 +614,7 @@ namespace ViewPoint
                     result.y = FLOOR_Y + 0.165f;
                     break;
                 case DOOR_WALL_WEST:
-                    result.x -= -2.1f;
+                    result.x -= -2.05f;
                     result.z -= 4.5f;
                     result.y = FLOOR_Y + 0.54f;
                     break;
