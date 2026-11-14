@@ -601,21 +601,21 @@ namespace ViewPoint
                 case DOOR_WALL_NORTH:
                     result.z -= 2.6f;
                     result.x += 0.00f;
-                    result.y = FLOOR_Y + 0.8f;
+                    result.y = FLOOR_Y + 1.0f;
                     break;
                 case DOOR_WALL_EAST:
                     result.x += -2.0f;
                     result.z -= 4.0f;
-                    result.y = FLOOR_Y + 0.24f;
+                    result.y = FLOOR_Y + 0.5f;
                     break;
                 case DOOR_WALL_SOUTH:
                     result.z += -4.65f;
-                    result.y = FLOOR_Y + 0.19f;
+                    result.y = FLOOR_Y + 0.17f;
                     break;
                 case DOOR_WALL_WEST:
                     result.x -= -2.0f;
                     result.z -= 4.0f;
-                    result.y = FLOOR_Y + 0.18f;
+                    result.y = FLOOR_Y + 0.5f;
                     break;
                 default:
                     result.y = FLOOR_Y + 0.24f;
