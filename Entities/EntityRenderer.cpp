@@ -86,24 +86,50 @@ namespace ViewPoint
         constexpr float AMBIENT_LIGHT = 0.58f;
         constexpr float DIFFUSE_LIGHT = 0.92f;
 
-        static float CalculateDoorBrightness(
-            const float normalX,
-            const float normalY,
-            const float normalZ)
+        static float CalculateQuadBrightness(
+            const SpriteVertex &a,
+            const SpriteVertex &b,
+            const SpriteVertex &c)
         {
+            const float ux = b.x - a.x;
+            const float uy = b.y - a.y;
+            const float uz = b.z - a.z;
+
+            const float vx = c.x - a.x;
+            const float vy = c.y - a.y;
+            const float vz = c.z - a.z;
+
+            const float normalX = uy * vz - uz * vy;
+            const float normalY = uz * vx - ux * vz;
+            const float normalZ = ux * vy - uy * vx;
+
+            const float normalLength = std::sqrt(
+                normalX * normalX +
+                normalY * normalY +
+                normalZ * normalZ);
+
+            if (normalLength <= 0.0001f)
+                return 1.0f;
+
+            const float nx = normalX / normalLength;
+            const float ny = normalY / normalLength;
+            const float nz = normalZ / normalLength;
+
             const float lightLength = std::sqrt(
                 LIGHT_X * LIGHT_X +
                 LIGHT_Y * LIGHT_Y +
                 LIGHT_Z * LIGHT_Z);
 
-            const float diffuse = (std::max)(0.0f,
-                                             (normalX * LIGHT_X +
-                                              normalY * LIGHT_Y +
-                                              normalZ * LIGHT_Z) /
-                                                 lightLength);
+            const float diffuse = (std::max)(
+                0.0f,
+                (nx * LIGHT_X +
+                 ny * LIGHT_Y +
+                 nz * LIGHT_Z) /
+                    lightLength);
 
-            return (std::min)(1.0f,
-                              AMBIENT_LIGHT + DIFFUSE_LIGHT * diffuse);
+            return (std::min)(
+                1.0f,
+                AMBIENT_LIGHT + DIFFUSE_LIGHT * diffuse);
         }
 
         // ------------------------------------------------------------
@@ -592,22 +618,6 @@ namespace ViewPoint
             }
         }
 
-        static float GetDoorFaceBrightness(int doorSlot)
-        {
-            switch (GetDoorWallSide(doorSlot))
-            {
-            case DOOR_WALL_NORTH:
-                return CalculateDoorBrightness(0.0f, 0.0f, -1.0f);
-            case DOOR_WALL_EAST:
-                return CalculateDoorBrightness(1.0f, 0.0f, 0.0f);
-            case DOOR_WALL_SOUTH:
-                return CalculateDoorBrightness(0.0f, 0.0f, 1.0f);
-            case DOOR_WALL_WEST:
-            default:
-                return CalculateDoorBrightness(-1.0f, 0.0f, 0.0f);
-            }
-        }
-
         static float GetDoorRenderRotationDegrees(int doorSlot)
         {
             switch (GetDoorWallSide(doorSlot))
@@ -968,11 +978,13 @@ namespace ViewPoint
                 if (alpha <= 0.001f)
                     continue;
 
-                const float doorBrightness = GetDoorFaceBrightness(doorSlot);
+                const float doorBrightness =
+                    CalculateQuadBrightness(
+                        vertices[0],
+                        vertices[1],
+                        vertices[2]);
 
-                glPushAttrib(GL_ENABLE_BIT | GL_TEXTURE_BIT | GL_COLOR_BUFFER_BIT);
-                glEnable(GL_TEXTURE_2D);
-                glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+                glPushAttrib(GL_CURRENT_BIT);
                 glBindTexture(GL_TEXTURE_2D, texture->id);
                 glColor4f(
                     red * doorBrightness,
@@ -1089,9 +1101,7 @@ namespace ViewPoint
             if (alpha <= 0.001f)
                 return;
 
-            glPushAttrib(GL_ENABLE_BIT | GL_TEXTURE_BIT | GL_COLOR_BUFFER_BIT);
-            glEnable(GL_TEXTURE_2D);
-            glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+            glPushAttrib(GL_CURRENT_BIT);
             glBindTexture(GL_TEXTURE_2D, texture->id);
             glColor4f(red, green, blue, alpha);
 
