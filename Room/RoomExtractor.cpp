@@ -73,6 +73,14 @@ namespace ViewPoint
 
         Model g_RoomModel;
 
+        bool IsGridEntityDestroyed(const GridEntity *grid)
+        {
+            if (!grid)
+                return true;
+
+            return grid->_desc._type <= 0;
+        }
+
         uint64_t ComputeRoomGridSignature(
             Room *room)
         {
@@ -1335,7 +1343,7 @@ namespace ViewPoint
                 GridEntity *grid =
                     room->GetGridEntity(static_cast<int>(i));
 
-                if (!grid)
+                if (!grid || IsGridEntityDestroyed(grid))
                     continue;
 
                 const int entityType =

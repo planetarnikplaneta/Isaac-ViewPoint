@@ -979,6 +979,15 @@ namespace ViewPoint
             return true;
         }
 
+        static bool IsGridEntityDestroyed(
+            const GridEntity *grid)
+        {
+            if (!grid)
+                return true;
+
+            return grid->_desc._type <= 0;
+        }
+
         static WorldPoint GetGridEntityRenderWorldPosition(
             Room *room,
             GridEntity *grid)
@@ -1025,7 +1034,7 @@ namespace ViewPoint
             float cameraRightX,
             float cameraRightZ)
         {
-            if (!room || !grid)
+            if (!room || !grid || IsGridEntityDestroyed(grid))
                 return;
 
             const int type = grid->GetType();
@@ -1035,9 +1044,6 @@ namespace ViewPoint
             {
                 return;
             }
-
-            if (grid->GetDesc() && grid->GetDesc()->_state == 2)
-                return;
 
             ANM2 *sprite = &grid->_sprite;
             if (!sprite->_loaded ||
@@ -1848,7 +1854,7 @@ namespace ViewPoint
         {
             GridEntity *grid = room->GetGridEntity(i);
 
-            if (!grid)
+            if (!grid || IsGridEntityDestroyed(grid))
                 continue;
 
             const int type = grid->GetType();
@@ -1858,9 +1864,6 @@ namespace ViewPoint
             {
                 continue;
             }
-
-            if (grid->GetDesc() && grid->GetDesc()->_state == 2)
-                continue;
 
             RenderGridDecorationSprite(
                 room,
