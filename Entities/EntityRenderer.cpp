@@ -55,6 +55,7 @@ namespace ViewPoint
             GLuint id = 0;
             int width = 0;
             int height = 0;
+            const char *name = nullptr;
         };
 
         std::unordered_map<KAGE_Graphics_ImageBase *, SpriteTexture>
@@ -157,6 +158,7 @@ namespace ViewPoint
 
                 texture.width = 0;
                 texture.height = 0;
+                texture.name = nullptr;
             }
 
             g_SpriteTextures.clear();
@@ -174,12 +176,14 @@ namespace ViewPoint
             const int height =
                 static_cast<int>(image->GetHeight());
 
+            const char *imageName = image->_name;
             auto found = g_SpriteTextures.find(image);
 
             if (found != g_SpriteTextures.end())
             {
                 if (found->second.width == width &&
-                    found->second.height == height)
+                    found->second.height == height &&
+                    found->second.name == imageName)
                 {
                     return &found->second;
                 }
@@ -192,6 +196,7 @@ namespace ViewPoint
 
                 found->second.width = 0;
                 found->second.height = 0;
+                found->second.name = nullptr;
                 g_SpriteTextures.erase(found);
             }
 
@@ -222,6 +227,7 @@ namespace ViewPoint
             SpriteTexture texture{};
             texture.width = width;
             texture.height = height;
+            texture.name = image->_name;
 
             glGenTextures(1, &texture.id);
 
