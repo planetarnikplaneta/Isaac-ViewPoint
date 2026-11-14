@@ -50,12 +50,6 @@ namespace ViewPoint
         constexpr float COLLISION_Y_OFFSET = 0.035f;
         constexpr int CAPSULE_SEGMENTS = 24;
 
-        constexpr float DOOR_LIGHT_X = -0.42f;
-        constexpr float DOOR_LIGHT_Y = 0.80f;
-        constexpr float DOOR_LIGHT_Z = -0.62f;
-        constexpr float DOOR_AMBIENT_LIGHT = 0.58f;
-        constexpr float DOOR_DIFFUSE_LIGHT = 0.92f;
-
         struct SpriteTexture
         {
             GLuint id = 0;
@@ -84,6 +78,35 @@ namespace ViewPoint
             float u;
             float v;
         };
+
+        constexpr float LIGHT_X = -0.42f;
+        constexpr float LIGHT_Y = 0.80f;
+        constexpr float LIGHT_Z = -0.62f;
+
+        constexpr float AMBIENT_LIGHT = 0.58f;
+        constexpr float DIFFUSE_LIGHT = 0.92f;
+
+        static float CalculateDoorBrightness(
+            const float normalX,
+            const float normalY,
+            const float normalZ)
+        {
+            const float lightLength = std::sqrt(
+                LIGHT_X * LIGHT_X +
+                LIGHT_Y * LIGHT_Y +
+                LIGHT_Z * LIGHT_Z);
+
+            const float diffuse = (std::max)(
+                0.0f,
+                (normalX * LIGHT_X +
+                 normalY * LIGHT_Y +
+                 normalZ * LIGHT_Z) /
+                    lightLength);
+
+            return (std::min)(
+                1.0f,
+                AMBIENT_LIGHT + DIFFUSE_LIGHT * diffuse);
+        }
 
         // ------------------------------------------------------------
         // ISAAC POSITION TO VIEWPOINT WORLD POSITION
@@ -571,6 +594,22 @@ namespace ViewPoint
             }
         }
 
+        static float GetDoorFaceBrightness(int doorSlot)
+        {
+            switch (GetDoorWallSide(doorSlot))
+            {
+                case DOOR_WALL_NORTH:
+                    return CalculateDoorBrightness(0.0f, 0.0f, -1.0f);
+                case DOOR_WALL_EAST:
+                    return CalculateDoorBrightness(1.0f, 0.0f, 0.0f);
+                case DOOR_WALL_SOUTH:
+                    return CalculateDoorBrightness(0.0f, 0.0f, 1.0f);
+                case DOOR_WALL_WEST:
+                default:
+                    return CalculateDoorBrightness(-1.0f, 0.0f, 0.0f);
+            }
+        }
+
         static float GetDoorRenderRotationDegrees(int doorSlot)
         {
             switch (GetDoorWallSide(doorSlot))
@@ -586,45 +625,6 @@ namespace ViewPoint
                 default:
                     return 0.0f;
             }
-        }
-
-        static float CalculateDoorBrightness(
-            const DoorWallSide wallSide)
-        {
-            Vertex3 normal{0.0f, 0.0f, 0.0f};
-
-            switch (wallSide)
-            {
-                case DOOR_WALL_NORTH:
-                    normal = {0.0f, 0.0f, -1.0f};
-                    break;
-                case DOOR_WALL_EAST:
-                    normal = {1.0f, 0.0f, 0.0f};
-                    break;
-                case DOOR_WALL_SOUTH:
-                    normal = {0.0f, 0.0f, 1.0f};
-                    break;
-                case DOOR_WALL_WEST:
-                default:
-                    normal = {-1.0f, 0.0f, 0.0f};
-                    break;
-            }
-
-            const float lightLength = std::sqrt(
-                DOOR_LIGHT_X * DOOR_LIGHT_X +
-                DOOR_LIGHT_Y * DOOR_LIGHT_Y +
-                DOOR_LIGHT_Z * DOOR_LIGHT_Z);
-
-            const float diffuse = (std::max)(
-                0.0f,
-                (normal.x * DOOR_LIGHT_X +
-                 normal.y * DOOR_LIGHT_Y +
-                 normal.z * DOOR_LIGHT_Z) /
-                    lightLength);
-
-            return (std::min)(
-                1.0f,
-                DOOR_AMBIENT_LIGHT + DOOR_DIFFUSE_LIGHT * diffuse);
         }
 
         static WorldPoint GetDoorRenderWorldPosition(
@@ -970,14 +970,13 @@ namespace ViewPoint
                 if (alpha <= 0.001f)
                     continue;
 
-                const float brightness =
-                    CalculateDoorBrightness(GetDoorWallSide(doorSlot));
+                const float doorBrightness = GetDoorFaceBrightness(doorSlot);
 
                 glBindTexture(GL_TEXTURE_2D, texture->id);
                 glColor4f(
-                    red * brightness,
-                    green * brightness,
-                    blue * brightness,
+                    red * doorBrightness,
+                    green * doorBrightness,
+                    blue * doorBrightness,
                     alpha);
 
                 glBegin(GL_QUADS);
