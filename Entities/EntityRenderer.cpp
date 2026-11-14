@@ -592,51 +592,36 @@ namespace ViewPoint
             if (!room || !door)
                 return result;
 
-            const float roomHalfWidth =
-                ((static_cast<float>(room->_gridWidth) - 1.0f) * 0.5f) *
-                TILE_SIZE;
-
-            const float roomHalfHeight =
-                ((static_cast<float>(room->_gridHeight) - 1.0f) * 0.5f) *
-                TILE_SIZE;
-
             Vector position(0.0f, 0.0f);
             door->GetRenderPosition(&position);
-
-            const float doorX =
-                (320.0f +
-                 (static_cast<float>(room->_gridWidth) - 15.0f) * 20.0f -
-                 position.x) /
-                PIXELS_PER_TILE;
-
-            const float doorZ =
-                (280.0f +
-                 (static_cast<float>(room->_gridHeight) - 9.0f) * 20.0f -
-                 position.y) /
-                PIXELS_PER_TILE;
+            result = IsaacToWorld(position, room);
 
             switch (GetDoorWallSide(doorSlot))
             {
                 case DOOR_WALL_NORTH:
-                    result.x = doorX + 0.10f;
-                    result.z = -roomHalfHeight + 0.18f;
+                    result.z -= 0.18f;
+                    result.x += 0.02f;
+                    result.y = FLOOR_Y + 0.22f;
                     break;
                 case DOOR_WALL_EAST:
-                    result.x = roomHalfWidth + 0.18f;
-                    result.z = doorZ + 0.52f;
+                    result.x += 0.40f;
+                    result.z -= 0.18f;
+                    result.y = FLOOR_Y + 0.18f;
                     break;
                 case DOOR_WALL_SOUTH:
-                    result.x = doorX;
-                    result.z = roomHalfHeight + 0.52f;
+                    result.z += 0.42f;
+                    result.y = FLOOR_Y + 0.20f;
                     break;
                 case DOOR_WALL_WEST:
+                    result.x -= 0.40f;
+                    result.z -= 0.18f;
+                    result.y = FLOOR_Y + 0.18f;
+                    break;
                 default:
-                    result.x = -roomHalfWidth - 0.18f;
-                    result.z = doorZ + 0.52f;
+                    result.y = FLOOR_Y + 0.12f;
                     break;
             }
 
-            result.y = FLOOR_Y + 0.12f;
             return result;
         }
 
