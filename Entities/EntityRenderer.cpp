@@ -861,6 +861,290 @@ namespace ViewPoint
             return true;
         }
 
+        static bool BuildGridDecorationSpriteQuad(
+            Room *room,
+            ANM2 *sprite,
+            LayerState *layer,
+            AnimationFrame *frame,
+            SpriteTexture *texture,
+            const WorldPoint &base,
+            float cameraRightX,
+            float cameraRightZ,
+            SpriteVertex (&vertices)[4])
+        {
+            if (!room || !sprite || !layer || !frame || !texture)
+                return false;
+
+            if (frame->width <= 0.0f || frame->height <= 0.0f)
+                return false;
+
+            const float cropX = frame->crop.x;
+            const float cropY = frame->crop.y;
+            const float cropWidth = frame->width;
+            const float cropHeight = frame->height;
+
+            if (cropX < 0.0f ||
+                cropY < 0.0f ||
+                cropX + cropWidth > texture->width ||
+                cropY + cropHeight > texture->height)
+            {
+                return false;
+            }
+
+            float u0 = cropX / static_cast<float>(texture->width);
+            float u1 = (cropX + cropWidth) / static_cast<float>(texture->width);
+            float v0 = cropY / static_cast<float>(texture->height);
+            float v1 = (cropY + cropHeight) / static_cast<float>(texture->height);
+
+            if (layer->_flipX != sprite->_flipX)
+                std::swap(u0, u1);
+
+            if (layer->_flipY != sprite->_flipY)
+                std::swap(v0, v1);
+
+            const float scaleX = frame->scale.x * sprite->_scale.x;
+            const float scaleY = frame->scale.y * sprite->_scale.y;
+            const float width = cropWidth * std::fabs(scaleX);
+            const float height = cropHeight * std::fabs(scaleY);
+
+            if (width <= 0.001f || height <= 0.001f)
+                return false;
+
+            const float left =
+                frame->pos.x +
+                layer->_pos.x +
+                sprite->_offset.x -
+                frame->pivot.x;
+
+            const float top =
+                frame->pos.y +
+                layer->_pos.y +
+                sprite->_offset.y -
+                frame->pivot.y;
+
+            const float rotation =
+                (frame->rotation +
+                 layer->_rotation +
+                 sprite->_rotation) * PI / 180.0f;
+
+            float localX[4] =
+                {
+                    left,
+                    left + width,
+                    left + width,
+                    left};
+
+            float localY[4] =
+                {
+                    top,
+                    top,
+                    top + height,
+                    top + height};
+
+            for (int i = 0; i < 4; ++i)
+            {
+                RotateSpritePoint(localX[i], localY[i], rotation);
+            }
+
+            const float u[4] = {u0, u1, u1, u0};
+            const float v[4] = {v0, v0, v1, v1};
+
+            for (int i = 0; i < 4; ++i)
+            {
+                const float horizontal = localX[i] / PIXELS_PER_TILE;
+                const float vertical = localY[i] / PIXELS_PER_TILE;
+
+                vertices[i].x = base.x + cameraRightX * horizontal;
+                vertices[i].y = base.y - vertical;
+                vertices[i].z = base.z + cameraRightZ * horizontal;
+                vertices[i].u = u[i];
+                vertices[i].v = v[i];
+            }
+
+            if (scaleX < 0.0f)
+            {
+                std::swap(vertices[0], vertices[1]);
+                std::swap(vertices[3], vertices[2]);
+            }
+
+            if (scaleY < 0.0f)
+            {
+                std::swap(vertices[0], vertices[3]);
+                std::swap(vertices[1], vertices[2]);
+            }
+
+            return true;
+        }
+
+        static WorldPoint GetGridEntityRenderWorldPosition(
+            Room *room,
+            GridEntity *grid)
+        {
+            WorldPoint result{};
+
+            if (!room || !grid)
+                return result;
+
+            const unsigned int width =
+                static_cast<unsigned int>(room->_gridWidth);
+            const unsigned int height =
+                static_cast<unsigned int>(room->_gridHeight);
+
+            const unsigned int index =
+                static_cast<unsigned int>(grid->_gridIndex);
+
+            if (width == 0 || height == 0 || index >= width * height)
+                return result;
+
+            const unsigned int row = index / width;
+            const unsigned int column = index % width;
+
+            const float centerX =
+                ((static_cast<float>(width) - 1.0f) * 0.5f -
+                 static_cast<float>(column)) *
+                1.0f;
+
+            const float centerZ =
+                ((static_cast<float>(height) - 1.0f) * 0.5f -
+                 static_cast<float>(row)) *
+                1.0f;
+
+            result.x = centerX;
+            result.y = FLOOR_Y + 0.06f;
+            result.z = centerZ;
+
+            return result;
+        }
+
+        static void RenderGridDecorationSprite(
+            Room *room,
+            GridEntity *grid,
+            float cameraRightX,
+            float cameraRightZ)
+        {
+            if (!room || !grid || grid->GetType() != GRID_DECORATION)
+                return;
+
+            ANM2 *sprite = &grid->_sprite;
+            if (!sprite->_loaded ||
+                !sprite->_layerState ||
+                sprite->_layerCount == 0)
+            {
+                return;
+            }
+
+            AnimationState *animationState = sprite->GetAnimationState();
+            if (!animationState || !animationState->_animData)
+                return;
+
+            AnimationData *animationData = animationState->_animData;
+            if (!animationData->_animLayers || animationData->_layerCount <= 0)
+                return;
+
+            const WorldPoint base = GetGridEntityRenderWorldPosition(room, grid);
+
+            for (int i = 0; i < animationData->_layerCount; ++i)
+            {
+                AnimationLayer *animationLayer =
+                    animationData->GetLayerByOrder(i);
+
+                if (!animationLayer)
+                    continue;
+
+                if (!animationState->_layerFrames ||
+                    !animationState->_animData)
+                {
+                    continue;
+                }
+
+                const int layerID = animationLayer->_layerID;
+                if (layerID < 0 || layerID >= 64)
+                    continue;
+
+                const int frameIndex = animationState->_layerFrames[layerID];
+                if (frameIndex < 0)
+                    continue;
+
+                AnimationFrame *frame = animationLayer->GetFrame(frameIndex);
+                if (!frame)
+                    continue;
+
+                if (!animationLayer->IsVisible() || !frame->visible)
+                    continue;
+
+                LayerState *layer = sprite->GetLayer(layerID);
+                if (!layer || !layer->_visible)
+                    continue;
+
+                if (!layer->_spriteSheetLoaded)
+                    continue;
+
+                KAGE_SmartPointer_ImageBase sheet = layer->GetSpriteSheet();
+                if (!sheet.image)
+                    continue;
+
+                SpriteTexture *texture = GetSpriteTexture(sheet.image);
+                if (!texture || !texture->id)
+                    continue;
+
+                SpriteVertex vertices[4]{};
+                if (!BuildGridDecorationSpriteQuad(
+                        room,
+                        sprite,
+                        layer,
+                        frame,
+                        texture,
+                        base,
+                        cameraRightX,
+                        cameraRightZ,
+                        vertices))
+                {
+                    continue;
+                }
+
+                float red;
+                float green;
+                float blue;
+                float alpha;
+
+                GetSpriteColor(
+                    sprite,
+                    layer,
+                    frame,
+                    red,
+                    green,
+                    blue,
+                    alpha);
+
+                if (alpha <= 0.001f)
+                    continue;
+
+                const float brightness =
+                    CalculateQuadBrightness(
+                        vertices[0],
+                        vertices[1],
+                        vertices[2]);
+
+                glPushAttrib(GL_CURRENT_BIT);
+                glBindTexture(GL_TEXTURE_2D, texture->id);
+                glColor4f(
+                    red * brightness,
+                    green * brightness,
+                    blue * brightness,
+                    alpha);
+
+                glBegin(GL_QUADS);
+                for (int v = 0; v < 4; ++v)
+                {
+                    glTexCoord2f(vertices[v].u, vertices[v].v);
+                    glVertex3f(vertices[v].x, vertices[v].y, vertices[v].z);
+                }
+                glEnd();
+                glPopAttrib();
+                glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+            }
+        }
+
         static void RenderDoorSprite(
             Room *room,
             GridEntity_Door *door,
@@ -1538,6 +1822,27 @@ namespace ViewPoint
 
         const float cameraRightZ =
             -std::sin(yawRadians);
+
+        // ------------------------------------------------------------
+        // GRID DECORATION SPRITES
+        // ------------------------------------------------------------
+
+        glEnable(GL_TEXTURE_2D);
+        glEnable(GL_BLEND);
+
+        for (unsigned int i = 0; i < 447; ++i)
+        {
+            GridEntity *grid = room->GetGridEntity(i);
+
+            if (!grid || grid->GetType() != GRID_DECORATION)
+                continue;
+
+            RenderGridDecorationSprite(
+                room,
+                grid,
+                cameraRightX,
+                cameraRightZ);
+        }
 
         // ------------------------------------------------------------
         // DOOR SPRITES
