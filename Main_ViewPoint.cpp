@@ -251,6 +251,13 @@ namespace
         if (!wglGetCurrentContext())
             return;
 
+        // The hook fires during the game's normal render passes before the
+        // feature is enabled and before a valid room is always available.
+        // Avoid doing any ViewPoint work in those startup states so the
+        // injected render path cannot dereference invalid game state.
+        if (!ViewPoint::g_Camera.enabled || !g_Game)
+            return;
+
         HWND window = ViewPoint::g_RenderWindow;
 
         if (!window)
@@ -264,6 +271,9 @@ namespace
 
         ViewPoint::g_RenderWindow = window;
         ViewPoint::UpdateRoomExtractor();
+
+        if (!g_Game || !g_Game->GetCurrentRoom())
+            return;
 
         glPushAttrib(GL_DEPTH_BUFFER_BIT | GL_ENABLE_BIT);
         glEnable(GL_DEPTH_TEST);
