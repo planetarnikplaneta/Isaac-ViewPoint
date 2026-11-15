@@ -17,6 +17,28 @@ namespace
 
     constexpr char CONFIG_FILE[] = "IsaacViewPoint.ini";
 
+    bool CreateDefaultConfigurationFile(const fs::path& configPath)
+    {
+        const fs::path directory = configPath.parent_path();
+
+        std::error_code error;
+        if (!directory.empty())
+        {
+            fs::create_directories(directory, error);
+        }
+
+        std::ofstream file(configPath, std::ios::out | std::ios::trunc);
+
+        if (!file)
+            return false;
+
+        file << "# Isaac ViewPoint default scene\n";
+        file << "Object = OBJECTS/CUBE.OBJ | 0,0,0 | 0,0,0 | 1\n";
+        file.flush();
+
+        return static_cast<bool>(file);
+    }
+
     fs::path GetDllDirectory()
     {
         char modulePath[MAX_PATH] = {};
@@ -226,13 +248,20 @@ namespace ViewPoint
     void LoadConfiguration()
     {
         std::vector<ObjectConfig> configuredObjects;
+        const fs::path configPath = GetConfigurationPath();
 
         if (!ReadConfiguration(configuredObjects))
         {
             LogMessage(
-                "Configuration file not found or invalid; leaving scene empty.");
+                "Configuration file not found or invalid; creating a default demo scene.");
 
-            configuredObjects.clear();
+            if (!CreateDefaultConfigurationFile(configPath) ||
+                !ReadConfiguration(configuredObjects))
+            {
+                LogMessage(
+                    "Default configuration could not be created; leaving scene empty.");
+                configuredObjects.clear();
+            }
         }
 
         g_ObjectConfigs = std::move(configuredObjects);
