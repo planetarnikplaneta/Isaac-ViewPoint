@@ -287,29 +287,13 @@ namespace
 
     void PatchRoomRenderEntitiesCallback()
     {
-        SigScan scanner("33f68d87????????39b0????????76??8bbd????????6690");
-        if (!scanner.Scan())
-        {
-            ViewPoint::LogMessage("ViewPoint: Room render signature not found.");
-            return;
-        }
-
-        void* addr = scanner.GetAddress();
-        if (!addr)
-            return;
-
-        ASMPatch::SavedRegisters savedRegisters(
-            ASMPatch::SavedRegisters::Registers::GP_REGISTERS_STACKLESS,
-            true);
-
-        ASMPatch patch;
-        patch.PreserveRegisters(savedRegisters)
-            .AddInternalCall(RenderSceneAfterRoomRender)
-            .RestoreRegisters(savedRegisters)
-            .AddBytes(ByteBuffer().AddAny((char*)addr, 0x8))
-            .AddRelativeJump((char*)addr + 0x8);
-
-        ASMPatcher::instance().PatchAt(addr, &patch);
+        // The signature-based room render patch is not reliable for the current
+        // Isaac/Rebirth binary and can overwrite executable code in a way that
+        // causes access violations. Keep the mod safe by disabling it until a
+        // validated address pattern is available for this build.
+        ViewPoint::LogMessage(
+            "ViewPoint: room render hook disabled pending a validated ASM signature.");
+        return;
     }
 }
 
