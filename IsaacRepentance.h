@@ -5288,6 +5288,7 @@ struct Room {
 	LIBZHL_API bool CanSpawnObstacleAtPosition(int GridIndex, bool Force);
 	LIBZHL_API float GetLightingAlpha();
 	LIBZHL_API void PreRender();
+	LIBZHL_API void Render();
 	LIBZHL_API void RenderGridLight(GridEntity * grid, Vector & offset);
 	LIBZHL_API void RenderEntityLight(Entity * ent, Vector & offset);
 	LIBZHL_API bool CanPickupGridEntity(int GridIndex);

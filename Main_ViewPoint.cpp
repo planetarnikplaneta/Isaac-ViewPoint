@@ -239,41 +239,41 @@ HOOK_METHOD(
 }
 
 // ------------------------------------------------------------
-// GAME RENDER HOOK
+// ROOM RENDER HOOK
 // ------------------------------------------------------------
 
 HOOK_METHOD(
-    Game,
+    Room,
     Render,
     (void)->void)
 {
     super();
 
-    if (wglGetCurrentContext())
+    if (!wglGetCurrentContext())
+        return;
+
+    HWND window = ViewPoint::g_RenderWindow;
+
+    if (!window)
     {
-        HWND window = ViewPoint::g_RenderWindow;
-
-        if (!window)
-        {
-            HDC currentDC = wglGetCurrentDC();
-            window = currentDC ? WindowFromDC(currentDC) : nullptr;
-        }
-
-        if (!window)
-            return;
-
-        ViewPoint::g_RenderWindow = window;
-        ViewPoint::UpdateRoomExtractor();
-
-        glPushAttrib(GL_DEPTH_BUFFER_BIT | GL_ENABLE_BIT);
-        glEnable(GL_DEPTH_TEST);
-        glDepthFunc(GL_LEQUAL);
-        glDepthMask(GL_TRUE);
-
-        RenderTriangleMesh(window);
-
-        glPopAttrib();
+        HDC currentDC = wglGetCurrentDC();
+        window = currentDC ? WindowFromDC(currentDC) : nullptr;
     }
+
+    if (!window)
+        return;
+
+    ViewPoint::g_RenderWindow = window;
+    ViewPoint::UpdateRoomExtractor();
+
+    glPushAttrib(GL_DEPTH_BUFFER_BIT | GL_ENABLE_BIT);
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL);
+    glDepthMask(GL_TRUE);
+
+    RenderTriangleMesh(window);
+
+    glPopAttrib();
 }
 
 // ------------------------------------------------------------
