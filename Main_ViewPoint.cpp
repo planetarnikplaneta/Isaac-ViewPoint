@@ -251,6 +251,8 @@ HOOK_METHOD(
     Render,
     (void)->void)
 {
+    super();
+
     if (wglGetCurrentContext())
     {
         HWND window = ViewPoint::g_RenderWindow;
@@ -278,8 +280,6 @@ HOOK_METHOD(
             glPopAttrib();
         }
     }
-
-    super();
 }
 
 // ------------------------------------------------------------
