@@ -239,6 +239,50 @@ HOOK_METHOD(
 }
 
 // ------------------------------------------------------------
+// GAME RENDER HOOK
+// ------------------------------------------------------------
+// This is the closest native equivalent to the Lua room callback flow:
+// MC_POST_ROOM_RENDER_ENTITIES runs after room geometry/entities are drawn,
+// before HUD overlays. In this project we hook the engine render pass itself
+// so the custom 3D scene is drawn in the same stage instead of at swap time.
+
+HOOK_METHOD(
+    Game,
+    Render,
+    (void)->void)
+{
+    if (wglGetCurrentContext())
+    {
+        HWND window = ViewPoint::g_RenderWindow;
+
+        if (!window)
+        {
+            window = WindowFromDC(wglGetCurrentDC());
+            if (window)
+            {
+                ViewPoint::g_RenderWindow = window;
+            }
+        }
+
+        if (window)
+        {
+            ViewPoint::UpdateRoomExtractor();
+
+            glPushAttrib(GL_DEPTH_BUFFER_BIT | GL_ENABLE_BIT);
+            glEnable(GL_DEPTH_TEST);
+            glDepthFunc(GL_LEQUAL);
+            glDepthMask(GL_TRUE);
+
+            RenderTriangleMesh(window);
+
+            glPopAttrib();
+        }
+    }
+
+    super();
+}
+
+// ------------------------------------------------------------
 // REPENTOGON OPENGL HOOK
 // ------------------------------------------------------------
 
@@ -259,18 +303,6 @@ HOOK_GLOBAL(
         {
             return super(hdc);
         }
-
-        ViewPoint::UpdateRoomExtractor();
-
-        glPushAttrib(GL_DEPTH_BUFFER_BIT | GL_ENABLE_BIT);
-
-        glEnable(GL_DEPTH_TEST);
-        glDepthFunc(GL_LEQUAL);
-        glDepthMask(GL_TRUE);
-
-        RenderTriangleMesh(window);
-
-        glPopAttrib();
     }
 
     return super(hdc);
