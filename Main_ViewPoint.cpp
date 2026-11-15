@@ -247,23 +247,18 @@ HOOK_METHOD(
 // so the custom 3D scene is drawn in the same stage instead of at swap time.
 
 HOOK_METHOD(
-    Game,
+    HUD,
     Render,
-    (void)->void)
+    () -> void)
 {
-    super();
-
     if (wglGetCurrentContext())
     {
         HWND window = ViewPoint::g_RenderWindow;
-
         if (!window)
         {
             window = WindowFromDC(wglGetCurrentDC());
             if (window)
-            {
                 ViewPoint::g_RenderWindow = window;
-            }
         }
 
         if (window)
@@ -280,6 +275,8 @@ HOOK_METHOD(
             glPopAttrib();
         }
     }
+
+    super();
 }
 
 // ------------------------------------------------------------
