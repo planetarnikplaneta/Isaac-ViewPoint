@@ -8,6 +8,8 @@
 
 #include "libzhl.h"
 #include "HookSystem.h"
+#include "ASMPatcher.hpp"
+#include "SigScan.h"
 
 #include "Core/Logger.h"
 #include "Core/State.h"
@@ -239,67 +241,66 @@ HOOK_METHOD(
 }
 
 // ------------------------------------------------------------
-// ROOM RENDER HOOK
+// ROOM RENDER CALLBACK PATCH
 // ------------------------------------------------------------
 
-HOOK_METHOD(
-    Room,
-    Render,
-    (void)->void)
+namespace
 {
-    super();
-
-    if (!wglGetCurrentContext())
-        return;
-
-    HWND window = ViewPoint::g_RenderWindow;
-
-    if (!window)
+    void __stdcall RenderSceneAfterRoomRender()
     {
-        HDC currentDC = wglGetCurrentDC();
-        window = currentDC ? WindowFromDC(currentDC) : nullptr;
+        if (!wglGetCurrentContext())
+            return;
+
+        HWND window = ViewPoint::g_RenderWindow;
+
+        if (!window)
+        {
+            HDC currentDC = wglGetCurrentDC();
+            window = currentDC ? WindowFromDC(currentDC) : nullptr;
+        }
+
+        if (!window)
+            return;
+
+        ViewPoint::g_RenderWindow = window;
+        ViewPoint::UpdateRoomExtractor();
+
+        glPushAttrib(GL_DEPTH_BUFFER_BIT | GL_ENABLE_BIT);
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LEQUAL);
+        glDepthMask(GL_TRUE);
+
+        ViewPoint::RenderTriangleMesh(window);
+
+        glPopAttrib();
     }
 
-    if (!window)
-        return;
-
-    ViewPoint::g_RenderWindow = window;
-    ViewPoint::UpdateRoomExtractor();
-
-    glPushAttrib(GL_DEPTH_BUFFER_BIT | GL_ENABLE_BIT);
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LEQUAL);
-    glDepthMask(GL_TRUE);
-
-    RenderTriangleMesh(window);
-
-    glPopAttrib();
-}
-
-// ------------------------------------------------------------
-// REPENTOGON OPENGL HOOK
-// ------------------------------------------------------------
-
-HOOK_GLOBAL(
-    OpenGL::wglSwapBuffers,
-    (HDC hdc)->bool,
-    __stdcall)
-{
-    if (wglGetCurrentContext())
+    void PatchRoomRenderEntitiesCallback()
     {
-        const HWND window = WindowFromDC(hdc);
+        SigScan scanner("33f68d87????????39b0????????76??8bbd????????6690");
+        if (!scanner.Scan())
+        {
+            ViewPoint::LogMessage("ViewPoint: Room render signature not found.");
+            return;
+        }
 
-        if (!ViewPoint::g_RenderWindow)
-        {
-            ViewPoint::g_RenderWindow = window;
-        }
-        else if (ViewPoint::g_RenderWindow != window)
-        {
-            return super(hdc);
-        }
+        void* addr = scanner.GetAddress();
+        if (!addr)
+            return;
+
+        ASMPatch::SavedRegisters savedRegisters(
+            ASMPatch::SavedRegisters::Registers::GP_REGISTERS_STACKLESS,
+            true);
+
+        ASMPatch patch;
+        patch.PreserveRegisters(savedRegisters)
+            .AddInternalCall(RenderSceneAfterRoomRender)
+            .RestoreRegisters(savedRegisters)
+            .AddBytes(ByteBuffer().AddAny((char*)addr, 0x8))
+            .AddRelativeJump((char*)addr + 0x8);
+
+        ASMPatcher::instance().PatchAt(addr, &patch);
     }
-
-    return super(hdc);
 }
 
 // ------------------------------------------------------------
@@ -342,6 +343,8 @@ extern "C" __declspec(dllexport) int ModInit()
         g_ObjectConfigs.size());
 
     DiagnoseEmbeddedResources();
+
+    PatchRoomRenderEntitiesCallback();
 
     return 0;
 }
