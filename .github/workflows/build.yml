@@ -82,6 +82,7 @@ jobs:
             /I REPENTOGON/libzhl ^
             /I REPENTOGON/libs/lua ^
             /I REPENTOGON/libs/zydis/include/ ^
+            /I REPENTOGON/libs/zydis/dependencies/zycore/include ^
             /I "%RAPIDXML_INCLUDE%" ^
             Main_ViewPoint.cpp ^
             Core\Logger.cpp ^
