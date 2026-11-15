@@ -72,28 +72,28 @@ namespace ViewPoint
 
         switch (action)
         {
-        // Shoot left
-        case 4:
-            value = -cameraShoot.x;
-            break;
+            // Shoot left
+            case 4:
+                value = -cameraShoot.x;
+                break;
 
-        // Shoot right
-        case 5:
-            value = cameraShoot.x;
-            break;
+            // Shoot right
+            case 5:
+                value = cameraShoot.x;
+                break;
 
-        // Shoot up
-        case 6:
-            value = -cameraShoot.y;
-            break;
+            // Shoot up
+            case 6:
+                value = -cameraShoot.y;
+                break;
 
-        // Shoot down
-        case 7:
-            value = cameraShoot.y;
-            break;
+            // Shoot down
+            case 7:
+                value = cameraShoot.y;
+                break;
 
-        default:
-            return 0.0f;
+            default:
+                return 0.0f;
         }
 
         return std::clamp(value, 0.0f, 1.0f);
@@ -106,11 +106,11 @@ namespace ViewPoint
 HOOK_METHOD(
     Weapon,
     Fire,
-    (const Vector &dir, bool isShooting, bool isInterpolated)->void)
+    (const Vector& dir, bool isShooting, bool isInterpolated)->void)
 {
     if (ViewPoint::IsMouseAiming() && g_Game)
     {
-        Entity_Player *player = g_Game->GetPlayer(0);
+        Entity_Player* player = g_Game->GetPlayer(0);
 
         if (player && GetOwner() == player)
         {
@@ -179,17 +179,17 @@ HOOK_METHOD(
 
     switch (action)
     {
-    case 0:
-        return worldX < 0.0f ? -worldX : 0.0f;
+        case 0:
+            return worldX < 0.0f ? -worldX : 0.0f;
 
-    case 1:
-        return worldX > 0.0f ? worldX : 0.0f;
+        case 1:
+            return worldX > 0.0f ? worldX : 0.0f;
 
-    case 2:
-        return worldZ > 0.0f ? worldZ : 0.0f;
+        case 2:
+            return worldZ > 0.0f ? worldZ : 0.0f;
 
-    case 3:
-        return worldZ < 0.0f ? -worldZ : 0.0f;
+        case 3:
+            return worldZ < 0.0f ? -worldZ : 0.0f;
     }
 
     return 0.0f;
@@ -239,45 +239,6 @@ HOOK_METHOD(
 }
 
 // ------------------------------------------------------------
-// GAME RENDER HOOK
-// ------------------------------------------------------------
-// This is the closest native equivalent to the Lua room callback flow:
-// MC_POST_ROOM_RENDER_ENTITIES runs after room geometry/entities are drawn,
-// before HUD overlays. In this project we hook the engine render pass itself
-// so the custom 3D scene is drawn in the same stage instead of at swap time.
-
-HOOK_METHOD(
-    HUD,
-    Render,
-    ()->void)
-{
-    if (wglGetCurrentContext())
-    {
-        HWND window = ViewPoint::g_RenderWindow;
-        if (!window)
-        {
-            window = WindowFromDC(wglGetCurrentDC());
-            if (window)
-                ViewPoint::g_RenderWindow = window;
-        }
-
-        if (window)
-        {
-            ViewPoint::UpdateRoomExtractor();
-
-            glPushAttrib(GL_DEPTH_BUFFER_BIT | GL_ENABLE_BIT);
-            glEnable(GL_DEPTH_TEST);
-            glDepthFunc(GL_LEQUAL);
-            glDepthMask(GL_TRUE);
-            super();
-            RenderTriangleMesh(window);
-
-            glPopAttrib();
-        }
-    }
-}
-
-// ------------------------------------------------------------
 // REPENTOGON OPENGL HOOK
 // ------------------------------------------------------------
 
@@ -286,6 +247,8 @@ HOOK_GLOBAL(
     (HDC hdc)->bool,
     __stdcall)
 {
+    bool result = super(hdc);
+
     if (wglGetCurrentContext())
     {
         const HWND window = WindowFromDC(hdc);
@@ -296,11 +259,22 @@ HOOK_GLOBAL(
         }
         else if (ViewPoint::g_RenderWindow != window)
         {
-            return super(hdc);
+            return result;
         }
+
+        ViewPoint::UpdateRoomExtractor();
+
+        glPushAttrib(GL_DEPTH_BUFFER_BIT | GL_ENABLE_BIT);
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LEQUAL);
+        glDepthMask(GL_TRUE);
+
+        RenderTriangleMesh(window);
+
+        glPopAttrib();
     }
 
-    return super(hdc);
+    return result;
 }
 
 // ------------------------------------------------------------
