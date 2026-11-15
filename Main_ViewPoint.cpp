@@ -251,6 +251,8 @@ HOOK_METHOD(
     Render,
     () -> void)
 {
+    super();
+
     if (wglGetCurrentContext())
     {
         HWND window = ViewPoint::g_RenderWindow;
@@ -276,7 +278,6 @@ HOOK_METHOD(
         }
     }
 
-    super();
 }
 
 // ------------------------------------------------------------
