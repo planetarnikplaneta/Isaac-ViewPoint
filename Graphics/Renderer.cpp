@@ -1051,10 +1051,11 @@ namespace ViewPoint
         if (!g_Camera.enabled)
             return;
 
-        // Preserve the room/framebuffer beneath this custom scene.
-        // Clearing the color buffer here wipes the game image, which is why
-        // a pass drawn before HUD can appear to vanish or overwrite the scene.
-        glClear(GL_DEPTH_BUFFER_BIT);
+        // Set the background to black and clear the previous frame.
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+
+        // Clear both color and depth buffers.
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // Detect configuration changes.
         CheckConfigurationReload();
