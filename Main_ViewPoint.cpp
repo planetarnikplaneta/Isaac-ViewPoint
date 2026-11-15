@@ -255,7 +255,7 @@ namespace
         // feature is enabled and before a valid room is always available.
         // Avoid doing any ViewPoint work in those startup states so the
         // injected render path cannot dereference invalid game state.
-        if (!ViewPoint::g_Camera.enabled || !g_Game)
+        if (!ViewPoint::g_Camera.enabled || !g_Game || g_ObjectConfigs.empty())
             return;
 
         HWND window = ViewPoint::g_RenderWindow;
@@ -354,7 +354,15 @@ extern "C" __declspec(dllexport) int ModInit()
 
     DiagnoseEmbeddedResources();
 
-    PatchRoomRenderEntitiesCallback();
+    if (!g_ObjectConfigs.empty())
+    {
+        PatchRoomRenderEntitiesCallback();
+    }
+    else
+    {
+        ViewPoint::LogMessage(
+            "No configured objects; skipping room render patch until a scene is configured.");
+    }
 
     return 0;
 }
