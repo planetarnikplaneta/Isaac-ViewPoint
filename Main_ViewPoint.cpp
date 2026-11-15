@@ -239,29 +239,30 @@ HOOK_METHOD(
 }
 
 // ------------------------------------------------------------
-// REPENTOGON OPENGL HOOK
+// GAME RENDER HOOK
 // ------------------------------------------------------------
 
-HOOK_GLOBAL(
-    OpenGL::wglSwapBuffers,
-    (HDC hdc)->bool,
-    __stdcall)
+HOOK_METHOD(
+    Game,
+    Render,
+    (void)->void)
 {
-    bool result = super(hdc);
+    super();
 
     if (wglGetCurrentContext())
     {
-        const HWND window = WindowFromDC(hdc);
+        HWND window = ViewPoint::g_RenderWindow;
 
-        if (!ViewPoint::g_RenderWindow)
+        if (!window)
         {
-            ViewPoint::g_RenderWindow = window;
-        }
-        else if (ViewPoint::g_RenderWindow != window)
-        {
-            return result;
+            HDC currentDC = wglGetCurrentDC();
+            window = currentDC ? WindowFromDC(currentDC) : nullptr;
         }
 
+        if (!window)
+            return;
+
+        ViewPoint::g_RenderWindow = window;
         ViewPoint::UpdateRoomExtractor();
 
         glPushAttrib(GL_DEPTH_BUFFER_BIT | GL_ENABLE_BIT);
@@ -273,8 +274,32 @@ HOOK_GLOBAL(
 
         glPopAttrib();
     }
+}
 
-    return result;
+// ------------------------------------------------------------
+// REPENTOGON OPENGL HOOK
+// ------------------------------------------------------------
+
+HOOK_GLOBAL(
+    OpenGL::wglSwapBuffers,
+    (HDC hdc)->bool,
+    __stdcall)
+{
+    if (wglGetCurrentContext())
+    {
+        const HWND window = WindowFromDC(hdc);
+
+        if (!ViewPoint::g_RenderWindow)
+        {
+            ViewPoint::g_RenderWindow = window;
+        }
+        else if (ViewPoint::g_RenderWindow != window)
+        {
+            return super(hdc);
+        }
+    }
+
+    return super(hdc);
 }
 
 // ------------------------------------------------------------
